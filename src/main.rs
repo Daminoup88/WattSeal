@@ -1,20 +1,28 @@
 use win_ring0::WinRing0;
- 
+
 pub fn main() {
     let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
- 
+
     println!("Installing ring0 driver");
     match r0.install() {
-        Ok(()) => { println!("Driver installed"); }
-        Err(err) => { println!("Error: {}", err); }
+        Ok(()) => {
+            println!("Driver installed");
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+        }
     }
- 
+
     println!("Opening ring0 driver");
     match r0.open() {
-        Ok(()) => { println!("Driver opened"); }
-        Err(err) => { println!("Error: {}", err); }
+        Ok(()) => {
+            println!("Driver opened");
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+        }
     }
- 
+
     println!("Trying to get tjMax value, should work on most Intel CPUs");
     // MSR_TEMPERATURE_TARGET
     let msr = 0x1a2;
@@ -24,12 +32,11 @@ pub fn main() {
             let eax = (out & 0xffffffff) as u32;
             let tj_max = (eax >> 16) & 0xff;
             println!("MSR Value: {}", tj_max);
-        },
+        }
         Err(err) => {
             println!("Error reading MSR: {}", err);
         }
     }
-
 
     // MSR_RAPL_POWER_UNIT
     let msr = 0x606;
@@ -46,7 +53,7 @@ pub fn main() {
             let energy_unit = 1.0 / f64::from(1 << ((eax >> 8) & 0x1f));
             // time_unit = 1/2^TU where TU is bits 19:16 of EAX
             let time_unit = 1.0 / f64::from(1 << ((eax >> 16) & 0xf));
-            
+
             println!("Raw Power Unit: {:b}", eax & 0xf);
             println!("Raw Energy Unit: {:b}", (eax >> 8) & 0x1f);
             println!("Raw Time Unit: {:b}", (eax >> 16) & 0xf);
@@ -54,10 +61,9 @@ pub fn main() {
             println!("Power Unit: {}mW", power_unit);
             println!("Energy Unit: {}µJ", energy_unit);
             println!("Time Unit: {}s", time_unit);
-        },
+        }
         Err(err) => {
             println!("Error reading MSR: {}", err);
-            return;
         }
     }
 
@@ -71,17 +77,25 @@ pub fn main() {
     //     let energy = ((edx as u64) << 32) | (eax as u64);
     //     println!("Energy: {}", energy);
     //     count += 1;
-    // }  
- 
+    // }
+
     println!("Closing ring0 driver");
     match r0.close() {
-        Ok(()) => { println!("Driver closed"); }
-        Err(err) => { println!("Error: {}", err); }
+        Ok(()) => {
+            println!("Driver closed");
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+        }
     }
- 
+
     println!("Uninstall ring0 driver");
     match r0.uninstall() {
-        Ok(()) => { println!("Driver uninstalled"); }
-        Err(err) => { println!("Error: {}", err); }
-    }    
+        Ok(()) => {
+            println!("Driver uninstalled");
+        }
+        Err(err) => {
+            println!("Error: {}", err);
+        }
+    }
 }
