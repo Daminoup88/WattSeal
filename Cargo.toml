@@ -1,0 +1,8 @@
+[package]
+name = "winring0-test"
+version = "0.1.0"
+edition = "2024"
+
+[target.'cfg(windows)'.dependencies]
+win-kernel-driver = { git = "https://github.com/alex-dow/winRing0-rs" }
+win_ring0 = { git = "https://github.com/alex-dow/winRing0-rs" }
