@@ -107,7 +107,7 @@ pub fn main() {
             let eax = (out & 0xffffffff) as u32;
             let edx = ((out >> 32) & 0xffffffff) as u32;
             let energy = ((edx as u64) << 32) | (eax as u64);
-            println!("Package Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+            println!("Package Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
             println!("Error reading MSR: {}", err);
@@ -121,7 +121,7 @@ pub fn main() {
             let eax = (out & 0xffffffff) as u32;
             let edx = ((out >> 32) & 0xffffffff) as u32;
             let energy = ((edx as u64) << 32) | (eax as u64);
-            println!("DRAM Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+            println!("DRAM Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
             println!("Error reading MSR: {}", err);
@@ -135,7 +135,7 @@ pub fn main() {
             let eax = (out & 0xffffffff) as u32;
             let edx = ((out >> 32) & 0xffffffff) as u32;
             let energy = ((edx as u64) << 32) | (eax as u64);
-            println!("PP0 Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+            println!("PP0 Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
             println!("Error reading MSR: {}", err);
@@ -149,7 +149,7 @@ pub fn main() {
             let eax = (out & 0xffffffff) as u32;
             let edx = ((out >> 32) & 0xffffffff) as u32;
             let energy = ((edx as u64) << 32) | (eax as u64);
-            println!("PP1 Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+            println!("PP1 Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
             println!("Error reading MSR: {}", err);
