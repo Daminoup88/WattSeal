@@ -1,5 +1,6 @@
 use sysinfo::System;
 use win_ring0::WinRing0;
+use std::{thread, time::Duration, time::Instant};
 
 pub fn main() {
     let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
@@ -39,6 +40,7 @@ pub fn main() {
         }
     }
 
+    let mut energy_unit: f64 = 0.0;
     // MSR_RAPL_POWER_UNIT
     let msr = 0x606;
     match r0.readMsr(msr) {
@@ -51,7 +53,7 @@ pub fn main() {
             // power_unit = 1/2^PU where PU is bits 3:0 of EAX
             let power_unit = 1.0 / f64::from(1 << (eax & 0xf));
             // energy_unit = 1/2^EU where EU is bits 12:8 of EAX
-            let energy_unit = 1.0 / f64::from(1 << ((eax >> 8) & 0x1f));
+            energy_unit = 1.0 / f64::from(1 << ((eax >> 8) & 0x1f)) / 3600.0;
             // time_unit = 1/2^TU where TU is bits 19:16 of EAX
             let time_unit = 1.0 / f64::from(1 << ((eax >> 16) & 0xf));
 
@@ -60,7 +62,7 @@ pub fn main() {
             println!("Raw Time Unit: {:b}", (eax >> 16) & 0xf);
 
             println!("Power Unit: {}mW", power_unit);
-            println!("Energy Unit: {}µJ", energy_unit);
+            println!("Energy Unit: {}Wh", energy_unit);
             println!("Time Unit: {}s", time_unit);
         }
         Err(err) => {
@@ -97,20 +99,168 @@ pub fn main() {
             println!("Error reading MSR: {}", err);
         }
     }
-    uninstall_driver(r0);
 
-    // let mut count = 0;
-    // while count < 100 {
-    //     /
     // MSR_PKG_ENERGY_STATUS
-    //     let msr = 0x611;
-    //     let out = r0.readMsr(msr).unwrap();
-    //     let edx = ((out >> 32) & 0xffffffff) as u32;
-    //     let eax = (out & 0xffffffff) as u32;
-    //     let energy = ((edx as u64) << 32) | (eax as u64);
-    //     println!("Energy: {}", energy);
-    //     count += 1;
-    // }
+    let msr = 0x611;
+    match r0.readMsr(msr) {
+        Ok(out) => {
+            let eax = (out & 0xffffffff) as u32;
+            let edx = ((out >> 32) & 0xffffffff) as u32;
+            let energy = ((edx as u64) << 32) | (eax as u64);
+            println!("Package Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+        }
+        Err(err) => {
+            println!("Error reading MSR: {}", err);
+        }
+    }
+
+    // MSR_DRAM_ENERGY_STATUS
+    let msr = 0x619;
+    match r0.readMsr(msr) {
+        Ok(out) => {
+            let eax = (out & 0xffffffff) as u32;
+            let edx = ((out >> 32) & 0xffffffff) as u32;
+            let energy = ((edx as u64) << 32) | (eax as u64);
+            println!("DRAM Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+        }
+        Err(err) => {
+            println!("Error reading MSR: {}", err);
+        }
+    }
+
+    // MSR_PP0_ENERGY_STATUS
+    let msr = 0x639;
+    match r0.readMsr(msr) {
+        Ok(out) => {
+            let eax = (out & 0xffffffff) as u32;
+            let edx = ((out >> 32) & 0xffffffff) as u32;
+            let energy = ((edx as u64) << 32) | (eax as u64);
+            println!("PP0 Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+        }
+        Err(err) => {
+            println!("Error reading MSR: {}", err);
+        }
+    }
+
+    // MSR_PP1_ENERGY_STATUS
+    let msr = 0x641;
+    match r0.readMsr(msr) {
+        Ok(out) => {
+            let eax = (out & 0xffffffff) as u32;
+            let edx = ((out >> 32) & 0xffffffff) as u32;
+            let energy = ((edx as u64) << 32) | (eax as u64);
+            println!("PP1 Energy: {} Wh", (energy as f64) * energy_unit/3600.0);
+        }
+        Err(err) => {
+            println!("Error reading MSR: {}", err);
+        }
+    }
+
+    // Mesure de la puissance sur une période
+    println!("\n=== Mesure de la puissance ===");
+    
+    // Première lecture des énergies
+    let start_time = Instant::now();
+    
+    let pkg_energy_start = r0.readMsr(0x611).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let dram_energy_start = r0.readMsr(0x619).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let pp0_energy_start = r0.readMsr(0x639).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let pp1_energy_start = r0.readMsr(0x641).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    // Attendre une seconde
+    println!("Mesure en cours (1 seconde)...");
+    thread::sleep(Duration::from_secs(1));
+    
+    // Deuxième lecture des énergies
+    let elapsed = start_time.elapsed();
+    let elapsed_ms = elapsed.as_millis() as f64;
+    let elapsed_s = elapsed.as_secs_f64();
+    
+    let pkg_energy_end = r0.readMsr(0x611).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let dram_energy_end = r0.readMsr(0x619).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let pp0_energy_end = r0.readMsr(0x639).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    let pp1_energy_end = r0.readMsr(0x641).ok().map(|out| {
+        let eax = (out & 0xffffffff) as u32;
+        let edx = ((out >> 32) & 0xffffffff) as u32;
+        ((edx as u64) << 32) | (eax as u64)
+    });
+    
+    // Calcul et affichage des puissances
+    println!("\nHeure (Temps écoulé): {:.3} ms", elapsed_ms);
+    println!("Temps écoulé: {:.3} s", elapsed_s);
+    println!();
+    
+    if let (Some(start), Some(end)) = (dram_energy_start, dram_energy_end) {
+        let energy_diff = (end.wrapping_sub(start)) as f64 * energy_unit; // en Wh
+        let power_w = energy_diff / elapsed_s * 3600.0; // convertir Wh en W
+        let power_mw = power_w * 1000.0; // convertir W en mW
+        println!("RAPL_Package0_DRAM:");
+        println!("  Alimentation: {:.3} mW", power_mw);
+        println!("  Énergie consommée: {:.6} Wh", energy_diff);
+    }
+    
+    if let (Some(start), Some(end)) = (pkg_energy_start, pkg_energy_end) {
+        let energy_diff = (end.wrapping_sub(start)) as f64 * energy_unit; // en Wh
+        let power_w = energy_diff / elapsed_s * 3600.0; // convertir Wh en W
+        let power_mw = power_w * 1000.0; // convertir W en mW
+        println!("\nRAPL_Package0_PKG:");
+        println!("  Alimentation: {:.3} mW", power_mw);
+        println!("  Énergie consommée: {:.6} Wh", energy_diff);
+    }
+    
+    if let (Some(start), Some(end)) = (pp0_energy_start, pp0_energy_end) {
+        let energy_diff = (end.wrapping_sub(start)) as f64 * energy_unit; // en Wh
+        let power_w = energy_diff / elapsed_s * 3600.0; // convertir Wh en W
+        let power_mw = power_w * 1000.0; // convertir W en mW
+        println!("\nRAPL_Package0_PP0:");
+        println!("  Alimentation: {:.3} mW", power_mw);
+        println!("  Énergie consommée: {:.6} Wh", energy_diff);
+    }
+    
+    if let (Some(start), Some(end)) = (pp1_energy_start, pp1_energy_end) {
+        let energy_diff = (end.wrapping_sub(start)) as f64 * energy_unit; // en Wh
+        let power_w = energy_diff / elapsed_s * 3600.0; // convertir Wh en W
+        let power_mw = power_w * 1000.0; // convertir W en mW
+        println!("\nRAPL_Package0_PP1:");
+        println!("  Alimentation: {:.3} mW", power_mw);
+        println!("  Énergie consommée: {:.6} Wh", energy_diff);
+    }
+
+    uninstall_driver(r0);
 }
 
 fn uninstall_driver(mut r0: Box<WinRing0>) {
