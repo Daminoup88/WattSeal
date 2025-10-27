@@ -2,6 +2,9 @@ use sysinfo::System;
 use win_ring0::WinRing0;
 use std::{thread, time::Duration, time::Instant};
 
+mod sensors;
+mod core;
+
 pub fn main() {
     let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
 
@@ -103,10 +106,7 @@ pub fn main() {
     // MSR_PKG_ENERGY_STATUS
     let msr = 0x611;
     match r0.readMsr(msr) {
-        Ok(out) => {
-            let eax = (out & 0xffffffff) as u32;
-            let edx = ((out >> 32) & 0xffffffff) as u32;
-            let energy = ((edx as u64) << 32) | (eax as u64);
+        Ok(energy) => {
             println!("Package Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
@@ -117,10 +117,7 @@ pub fn main() {
     // MSR_DRAM_ENERGY_STATUS
     let msr = 0x619;
     match r0.readMsr(msr) {
-        Ok(out) => {
-            let eax = (out & 0xffffffff) as u32;
-            let edx = ((out >> 32) & 0xffffffff) as u32;
-            let energy = ((edx as u64) << 32) | (eax as u64);
+        Ok(energy) => {
             println!("DRAM Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
@@ -131,10 +128,7 @@ pub fn main() {
     // MSR_PP0_ENERGY_STATUS
     let msr = 0x639;
     match r0.readMsr(msr) {
-        Ok(out) => {
-            let eax = (out & 0xffffffff) as u32;
-            let edx = ((out >> 32) & 0xffffffff) as u32;
-            let energy = ((edx as u64) << 32) | (eax as u64);
+        Ok(energy) => {
             println!("PP0 Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
@@ -145,10 +139,7 @@ pub fn main() {
     // MSR_PP1_ENERGY_STATUS
     let msr = 0x641;
     match r0.readMsr(msr) {
-        Ok(out) => {
-            let eax = (out & 0xffffffff) as u32;
-            let edx = ((out >> 32) & 0xffffffff) as u32;
-            let energy = ((edx as u64) << 32) | (eax as u64);
+        Ok(energy) => {
             println!("PP1 Energy: {} Wh", (energy as f64) * energy_unit);
         }
         Err(err) => {
@@ -162,29 +153,10 @@ pub fn main() {
     // Première lecture des énergies
     let start_time = Instant::now();
     
-    let pkg_energy_start = r0.readMsr(0x611).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let dram_energy_start = r0.readMsr(0x619).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let pp0_energy_start = r0.readMsr(0x639).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let pp1_energy_start = r0.readMsr(0x641).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
+    let pkg_energy_start = r0.readMsr(0x611).ok();
+    let dram_energy_start = r0.readMsr(0x619).ok();
+    let pp0_energy_start = r0.readMsr(0x639).ok();
+    let pp1_energy_start = r0.readMsr(0x641).ok();
     
     // Attendre une seconde
     println!("Mesure en cours (1 seconde)...");
@@ -195,29 +167,10 @@ pub fn main() {
     let elapsed_ms = elapsed.as_millis() as f64;
     let elapsed_s = elapsed.as_secs_f64();
     
-    let pkg_energy_end = r0.readMsr(0x611).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let dram_energy_end = r0.readMsr(0x619).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let pp0_energy_end = r0.readMsr(0x639).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
-    
-    let pp1_energy_end = r0.readMsr(0x641).ok().map(|out| {
-        let eax = (out & 0xffffffff) as u32;
-        let edx = ((out >> 32) & 0xffffffff) as u32;
-        ((edx as u64) << 32) | (eax as u64)
-    });
+    let pkg_energy_end = r0.readMsr(0x611).ok();
+    let dram_energy_end = r0.readMsr(0x619).ok();
+    let pp0_energy_end = r0.readMsr(0x639).ok();
+    let pp1_energy_end = r0.readMsr(0x641).ok();
     
     // Calcul et affichage des puissances
     println!("\nHeure (Temps écoulé): {:.3} ms", elapsed_ms);
