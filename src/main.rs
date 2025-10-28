@@ -6,14 +6,38 @@ mod core;
 mod sensors;
 
 pub fn main() {
+    check_permissions();
     let sensor = sensors::cpu::get_cpu_power_sensor().unwrap();
+}
+
+fn check_permissions() {
+    #[cfg(target_os = "windows")]
+    {
+        if !is_admin::is_admin() {
+            eprintln!("This program requires Administrator privileges on Windows.");
+            eprintln!("Please run this program as Administrator.");
+            std::process::exit(1);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if !is_root() {
+            eprintln!("This program requires root privileges on Linux.");
+            eprintln!(
+                "Please run with: sudo {}",
+                std::env::current_exe().unwrap().display()
+            );
+            std::process::exit(1);
+        }
+    }
 }
 
 // pub fn main() {
 //     // Check if we have the required privileges
-    check_permissions();
+    // check_permissions();
 
-    let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
+    // let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
 
 //     println!("Installing ring0 driver");
 //     match r0.install() {
