@@ -1,16 +1,19 @@
+use std::{thread, time::Duration, time::Instant};
 use sysinfo::System;
 use win_ring0::WinRing0;
-use std::{thread, time::Duration, time::Instant};
 
-mod sensors;
 mod core;
+mod sensors;
 
 pub fn main() {
     let sensor = sensors::cpu::get_cpu_power_sensor().unwrap();
 }
 
 // pub fn main() {
-//     let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
+//     // Check if we have the required privileges
+    check_permissions();
+
+    let mut r0: Box<WinRing0> = Box::from(WinRing0::new());
 
 //     println!("Installing ring0 driver");
 //     match r0.install() {

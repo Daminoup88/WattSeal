@@ -2,10 +2,15 @@
 name = "winring0-test"
 version = "0.1.0"
 edition = "2024"
+build = "build.rs"
 
 [target.'cfg(windows)'.dependencies]
 win-kernel-driver = { git = "https://github.com/alex-dow/winRing0-rs" }
 win_ring0 = { git = "https://github.com/alex-dow/winRing0-rs" }
 
 [dependencies]
+is-admin = "0.1.4"
 sysinfo = "0.37.2"
+
+[build-dependencies]
+winres = "0.1"
