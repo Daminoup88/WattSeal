@@ -76,9 +76,7 @@ impl WindowsCPUSensor {
                 *self.last_energy_measurement.borrow_mut() = current_energy;
 
                 if power.is_none() {
-                    return Err(SensorError::ReadError(
-                        "Failed to calculate power".to_string(),
-                    ));
+                    return Err(SensorError::ReadError("Failed to calculate power".to_string(),));
                 }
                 Ok(power.unwrap())
             }
@@ -108,10 +106,7 @@ impl MSRReader {
         }
     }
 
-    fn read_energy_unit(
-        ring0_reader: &WinRing0Reader,
-        vendor: &CPUVendor,
-    ) -> Result<f64, SensorError> {
+    fn read_energy_unit(ring0_reader: &WinRing0Reader, vendor: &CPUVendor,) -> Result<f64, SensorError> {
         let read_fn = match vendor {
             CPUVendor::Intel => IntelMSR::read_energy_unit,
             CPUVendor::Amd => AMDMSR::read_energy_unit,
@@ -133,11 +128,7 @@ impl MSRReader {
         })
     }
 
-    fn calculate_power(
-        &self,
-        current_energy: &EnergyMeasurement,
-        last_energy: &EnergyMeasurement,
-    ) -> Option<f64> {
+    fn calculate_power(&self, current_energy: &EnergyMeasurement, last_energy: &EnergyMeasurement,) -> Option<f64> {
         let duration: f64 = current_energy
             .instant
             .duration_since(last_energy.instant)
@@ -165,11 +156,7 @@ trait MSR {
     fn energy_expression(edx: u32, eax: u32) -> u64 {
         ((edx as u64) << 32) | (eax as u64)
     }
-    fn read_msr<T>(
-        ring0_reader: &WinRing0Reader,
-        msr_addr: u32,
-        expression: fn(edx: u32, eax: u32) -> T,
-    ) -> Result<T, String> {
+    fn read_msr<T>(ring0_reader: &WinRing0Reader, msr_addr: u32, expression: fn(edx: u32, eax: u32) -> T,) -> Result<T, String> {
         let out = ring0_reader.read_msr(msr_addr)?;
         let edx = ((out >> 32) & 0xffffffff) as u32;
         let eax = (out & 0xffffffff) as u32;

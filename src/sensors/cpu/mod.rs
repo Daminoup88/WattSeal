@@ -38,3 +38,31 @@ impl CPUVendor {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn test_cpu_vendor_from_str() {
+        let intel = CPUVendor::from_str("GenuineIntel");
+        assert!(matches!(intel, CPUVendor::Intel));
+
+        let amd = CPUVendor::from_str("AuthenticAMD");
+        assert!(matches!(amd, CPUVendor::Amd));
+
+        let other = CPUVendor::from_str("SomeOtherVendor");
+        assert!(matches!(other, CPUVendor::Other));
+    }
+
+    #[test]
+    fn test_get_cpu_power_sensor() {
+        let sensor_result = get_cpu_power_sensor();
+        
+        #[cfg(target_os = "windows")]
+        {
+            assert!(sensor_result.is_ok());
+            assert_eq!(sensor_result.unwrap().name(), "Windows CPU");
+        }
+    }
+}
