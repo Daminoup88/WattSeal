@@ -1,5 +1,7 @@
 mod tables;
 
+use std::time::Instant;
+
 use crate::core::types::{CPUData, Event};
 use rusqlite::{params, Connection, Result};
 use chrono::{DateTime, Utc};
@@ -11,6 +13,8 @@ pub struct Database {
 impl Database {
     pub fn new(db_path: &str) -> Result<Self> {
         let conn = Connection::open(db_path)?;
+        conn.pragma_update(None, "journal_mode", "WAL")?;
+        conn.pragma_update(None, "synchronous", "OFF")?;
         Ok(Database { conn })
     }
 
