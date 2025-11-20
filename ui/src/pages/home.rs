@@ -1,6 +1,6 @@
 use chrono::Utc;
 use iced::{Color, Element, Font, Length, alignment::Alignment, font};
-use iced::widget::{Column, Container, Text};
+use iced::widget::{button, Column, Container, Text};
 
 use crate::components::SensorChart;
 use crate::message::Message;
@@ -31,6 +31,7 @@ impl HomePage {
                 let percent2 = rand::random::<f32>() * 100.0;
                 self.chart.push_data(now, percent, percent2);
             }
+            _ => {}
         }
     }
 
@@ -45,7 +46,11 @@ impl HomePage {
                     .size(TITLE_FONT_SIZE)
                     .font(FONT_BOLD),
             )
-            .push(self.chart.view(300.0));
+            .push(self.chart.view(300.0))
+            .push(
+                button("Show Overlay Demo")
+                    .on_press(Message::ToggleOverlay)
+            );
 
         let view: Element<'_, Message> = Container::new(content)
             .padding(5)
