@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 collector = { path = "../collector" }
 sysinfo = "0.28"
-clap = { version = "4.2", features = ["derive"] }
 ctrlc = "3.2"
 windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 image = "0.25"

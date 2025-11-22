@@ -1,15 +1,18 @@
 #![allow(dead_code, unused_imports)]
-use std::{time::Duration};
-use sensors::Sensor;
-use tray_icon::menu::MenuItem;
-use std::time::{UNIX_EPOCH};
-use std::sync::mpsc;
-use std::thread;
-use rusqlite::{Connection, Result, ToSql};
-use std::time::SystemTime;
+use std::{
+    sync::mpsc,
+    thread,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
+
 use chrono::{DateTime, Utc};
 use database::Database;
-use tray_icon::{TrayIconBuilder, Icon, menu::Menu, menu::MenuItemKind, TrayIconEvent, menu::MenuEvent};
+use rusqlite::{Connection, Result, ToSql};
+use sensors::Sensor;
+use tray_icon::{
+    Icon, TrayIconBuilder, TrayIconEvent,
+    menu::{Menu, MenuEvent, MenuItem, MenuItemKind},
+};
 
 mod core;
 mod database;
@@ -85,22 +88,21 @@ fn main() {
     //     .build()
     //     .expect("Failed to create tray icon");
 
-    // loop {
-    //     let event = match sensor.read_full_data() {
-    //         Ok(event) => event,
-    //         Err(e) => {
-    //             eprintln!("Error reading CPU data: {:?}", e);
-    //             continue;
-    //         }
-    //     };
-    //     database.insert_cpu_data(&event).unwrap();
-    //     println!("Read CPU data: power {:.3} W, usage {:.2} %", event.data().total_power_watts, event.data().usage_percent);
-    //     tray_icon.set_tooltip(Some(format!("CPU Power: {:.3} W, Usage: {:.2} %", event.data().total_power_watts, event.data().usage_percent))).unwrap();
-
-    //     let gpu_event = gpu_sensor.read_full_data().unwrap();
-    //     println!("GPU power {:.3} W, CPU power {:.3} W, 2 RAMS : 10 W, total {:.3} W", gpu_event.data().total_power_watts, event.data().total_power_watts, gpu_event.data().total_power_watts + event.data().total_power_watts + 10.0);
-    //     thread::sleep(Duration::from_millis(1000));
-    // }
+    loop {
+        let event = match sensor.read_full_data() {
+            Ok(event) => event,
+            Err(e) => {
+                eprintln!("Error reading CPU data: {:?}", e);
+                continue;
+            }
+        };
+        database.insert_cpu_data(&event).unwrap();
+        println!("Read CPU data: power {:.3} W, usage {:.2} %", event.data().total_power_watts, event.data().usage_percent);
+        tray_icon.set_tooltip(Some(format!("CPU Power: {:.3} W, Usage: {:.2} %", event.data().total_power_watts, event.data().usage_percent))).unwrap();
+        let gpu_event = gpu_sensor.read_full_data().unwrap();
+        println!("GPU power {:.3} W, CPU power {:.3} W, 2 RAMS : 10 W, total {:.3} W", gpu_event.data().total_power_watts, event.data().total_power_watts, gpu_event.data().total_power_watts + event.data().total_power_watts + 10.0);
+        thread::sleep(Duration::from_millis(1000));
+    }
     // let (tx, rx) = mpsc::channel();
     // let tx2 = tx.clone();
     // thread::spawn(move || {
@@ -159,10 +161,7 @@ fn check_permissions() {
     {
         if !is_root() {
             eprintln!("This program requires root privileges on Linux.");
-            eprintln!(
-                "Please run with: sudo {}",
-                std::env::current_exe().unwrap().display()
-            );
+            eprintln!("Please run with: sudo {}", std::env::current_exe().unwrap().display());
             std::process::exit(1);
         }
     }

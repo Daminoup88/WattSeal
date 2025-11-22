@@ -1,6 +1,7 @@
+use sysinfo::System;
+
 use super::{Sensor, SensorError};
 use crate::core::types::{Event, GPUData};
-use sysinfo::{System};
 
 pub fn get_gpu_power_sensor() -> Result<impl Sensor<GPUData>, SensorError> {
     Ok(nvidia_gpu::NvidiaGPUSensor::new()?)
@@ -31,7 +32,7 @@ impl GPUVendor {
 //     use crate::core::types::{Event, GPUData};
 
 //     pub struct AmdGPUSensor {
-        
+
 //     }
 
 //     impl AmdGPUSensor {
@@ -68,6 +69,7 @@ impl GPUVendor {
 
 mod nvidia_gpu {
     use nvml_wrapper::Nvml;
+
     use super::{Sensor, SensorError};
     use crate::core::types::{Event, GPUData};
 
@@ -92,9 +94,16 @@ mod nvidia_gpu {
         }
 
         fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
-            let device = self.nvml.device_by_index(0).map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let power_usage_mw = device.power_usage().map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let utilization = device.utilization_rates().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let device = self
+                .nvml
+                .device_by_index(0)
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let power_usage_mw = device
+                .power_usage()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let utilization = device
+                .utilization_rates()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
             let data = GPUData {
                 total_power_watts: power_usage_mw as f64 / 1000.0,
                 usage_percent: utilization.gpu as f64,

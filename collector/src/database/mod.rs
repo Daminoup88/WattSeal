@@ -2,9 +2,10 @@ mod tables;
 
 use std::time::Instant;
 
-use crate::core::types::{CPUData, Event};
-use rusqlite::{params, Connection, Result};
 use chrono::{DateTime, Utc};
+use rusqlite::{Connection, Result, params};
+
+use crate::core::types::{CPUData, Event};
 
 pub struct Database {
     conn: rusqlite::Connection,
@@ -36,10 +37,14 @@ impl Database {
 
     pub fn insert_cpu_data(&self, event: &Event<CPUData>) -> Result<()> {
         let data = event.data();
-        let mut stmt = self.conn.prepare(
-            "INSERT INTO cpu_data (timestamp, total_power_watts, usage_percent) VALUES (?1, ?2, ?3)",
-        )?;
-        stmt.execute((DateTime::<Utc>::from(event.time()), data.total_power_watts, data.usage_percent))?;
+        let mut stmt = self
+            .conn
+            .prepare("INSERT INTO cpu_data (timestamp, total_power_watts, usage_percent) VALUES (?1, ?2, ?3)")?;
+        stmt.execute((
+            DateTime::<Utc>::from(event.time()),
+            data.total_power_watts,
+            data.usage_percent,
+        ))?;
         Ok(())
     }
 }

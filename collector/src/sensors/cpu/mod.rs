@@ -1,6 +1,7 @@
+use windows_cpu::WindowsCPUSensor;
+
 use super::{Sensor, SensorError};
 use crate::core::types::{CPUData, Event};
-use windows_cpu::WindowsCPUSensor;
 
 #[cfg(target_os = "windows")]
 mod windows_cpu;
@@ -58,7 +59,7 @@ mod test {
     #[test]
     fn test_get_cpu_power_sensor() {
         let sensor_result = get_cpu_power_sensor();
-        
+
         #[cfg(target_os = "windows")]
         {
             assert!(sensor_result.is_ok());

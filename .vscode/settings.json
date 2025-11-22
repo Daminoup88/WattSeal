@@ -1,0 +1,7 @@
+{
+    "rust-analyzer.rustfmt.overrideCommand": ["rustup", "run", "nightly", "rustfmt"],
+    "[rust]": {
+        "editor.defaultFormatter": "rust-lang.rust-analyzer",
+        "editor.formatOnSave": true
+    },
+}

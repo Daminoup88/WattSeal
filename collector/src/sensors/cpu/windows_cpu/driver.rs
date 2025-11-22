@@ -1,5 +1,5 @@
-use std::ffi::c_ulong;
-use std::{any::Any, panic, process::Command};
+use std::{any::Any, ffi::c_ulong, panic, process::Command};
+
 use win_ring0::WinRing0;
 
 pub struct WinRing0Reader {
@@ -26,7 +26,10 @@ impl WinRing0Reader {
     fn free_stuck_driver(_err: Box<dyn Any + Send>) -> Self {
         println!("WinRing0 initialization panicked. Freeing stuck driver...");
         // sc stop WinRing0_1_2_0
-        Command::new("sc").args(["stop", "WinRing0_1_2_0"]).output().expect("sc stop failed");
+        Command::new("sc")
+            .args(["stop", "WinRing0_1_2_0"])
+            .output()
+            .expect("sc stop failed");
         println!("Stuck WinRing0 driver stopped successfully.");
         let mut handler = WinRing0Reader { ring0: WinRing0::new() };
         match handler.ring0.uninstall() {

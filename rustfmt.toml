@@ -1,0 +1,18 @@
+edition = "2024"
+
+# Set a consistent line width
+max_width = 120
+
+# Use spaces instead of tabs
+hard_tabs = false
+
+# Group imports and format them alphabetically
+group_imports = "StdExternalCrate"
+reorder_imports = true
+reorder_modules = true
+
+# Use trailing commas where appropriate
+trailing_comma = "Vertical"
+
+# Always format imports
+imports_granularity = "Crate"

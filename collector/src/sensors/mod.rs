@@ -1,4 +1,4 @@
-use crate::core::types::{Event};
+use crate::core::types::Event;
 
 pub mod cpu;
 pub mod gpu;
