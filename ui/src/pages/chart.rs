@@ -8,7 +8,10 @@ use iced::{
 };
 use plotters::style::RGBColor;
 
-use crate::{components::chart::SensorChart, message::Message};
+use crate::{
+    components::chart::{LineType, SensorChart},
+    message::Message,
+};
 
 const TITLE_FONT_SIZE: u16 = 22;
 const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
@@ -28,8 +31,8 @@ impl ChartPage {
             Self {
                 chart: SensorChart::new(
                     [
-                        ("Series 1".to_string(), RGBColor(255, 0, 0)),
-                        ("Series 2".to_string(), RGBColor(0, 255, 0)),
+                        ("Series 1".to_string(), RGBColor(255, 0, 0), LineType::Area),
+                        ("Series 2".to_string(), RGBColor(0, 255, 0), LineType::Dotted),
                     ],
                     RGBColor(0, 200, 0),
                 ),

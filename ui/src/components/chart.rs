@@ -12,6 +12,7 @@ use iced::{
 };
 use plotters::{
     coord::Shift,
+    data,
     prelude::ChartBuilder,
     style::{Color, RGBColor},
 };
@@ -29,10 +30,19 @@ pub struct SensorChart<const N: usize> {
     color: RGBColor,
 }
 
+pub enum LineType {
+    Line,
+    Dashed,
+    Area,
+    Dotted,
+    Points,
+}
+
 struct TimeSeries {
     label: String,
     data: VecDeque<(DateTime<Utc>, f32)>,
     color: RGBColor,
+    line_type: LineType,
 }
 
 impl TimeSeries {
@@ -43,16 +53,25 @@ impl TimeSeries {
     pub fn pop_back(&mut self) {
         self.data.pop_back();
     }
+
+    pub fn iter(&self) -> impl Iterator<Item = (DateTime<Utc>, f32)> {
+        self.data.iter().map(|(time, value)| (*time, *value))
+    }
+
+    pub fn vec(&self) -> Vec<(DateTime<Utc>, f32)> {
+        self.data.iter().map(|(time, value)| (*time, *value)).collect()
+    }
 }
 
 impl<const N: usize> SensorChart<N> {
-    pub fn new(series: [(String, RGBColor); N], color: RGBColor) -> Self {
+    pub fn new(series: [(String, RGBColor, LineType); N], color: RGBColor) -> Self {
         let data: Vec<TimeSeries> = series
             .into_iter()
-            .map(|(label, color)| TimeSeries {
+            .map(|(label, color, line_type)| TimeSeries {
                 label,
                 data: VecDeque::new(),
                 color,
+                line_type,
             })
             .collect();
 
@@ -104,11 +123,11 @@ impl<const N: usize> Chart<Message> for SensorChart<N> {
     }
 
     fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, chart: ChartBuilder<DB>) {
-        build_chart_2D(chart, &self.data_series, &self.color);
+        build_chart_2d(chart, &self.data_series, &self.color);
     }
 }
 
-fn build_chart_2D<DB: DrawingBackend>(mut chart: ChartBuilder<DB>, data_series: &[TimeSeries], color: &RGBColor) {
+fn build_chart_2d<DB: DrawingBackend>(mut chart: ChartBuilder<DB>, data_series: &[TimeSeries], color: &RGBColor) {
     use plotters::prelude::*;
     const PLOT_LINE_COLOR: RGBColor = RGBColor(0, 175, 255);
 
@@ -121,7 +140,7 @@ fn build_chart_2D<DB: DrawingBackend>(mut chart: ChartBuilder<DB>, data_series: 
     let oldest_time = newest_time - chrono::Duration::seconds(PLOT_SECONDS as i64);
 
     let mut chart = chart
-        .x_label_area_size(0)
+        .x_label_area_size(40)
         .y_label_area_size(28)
         .margin(20)
         .build_cartesian_2d(oldest_time..newest_time, 0.0f32..100.0f32)
@@ -140,18 +159,54 @@ fn build_chart_2D<DB: DrawingBackend>(mut chart: ChartBuilder<DB>, data_series: 
                 .transform(FontTransform::Rotate90),
         )
         .y_label_formatter(&|y: &f32| format!("{}%", y))
+        .y_desc("Usage (%)")
+        .x_labels(10)
+        .x_label_style(("sans-serif", 15).into_font().color(&color.mix(0.65)))
+        .x_labels(60)
+        .x_label_formatter(&|x: &DateTime<Utc>| {
+            let t = (newest_time.timestamp_millis() - x.timestamp_millis()) / 1000;
+            if t % 5 == 0 { format!("{}", t) } else { "".to_string() }
+        })
+        .x_desc("Time (s)")
         .draw()
         .expect("failed to draw chart mesh");
 
     for series in data_series {
-        chart
-            .draw_series(LineSeries::new(
-                series.data.iter().map(|(time, value)| (*time, *value)),
-                series.color,
-            ))
+        let series_anno = match series.line_type {
+            LineType::Line => chart.draw_series(LineSeries::new(series.iter(), series.color)),
+            LineType::Area => chart.draw_series(
+                AreaSeries::new(series.vec(), 0.0, series.color.mix(0.2))
+                    .border_style(ShapeStyle::from(series.color).stroke_width(2)),
+            ),
+            LineType::Dotted => chart.draw_series(DottedLineSeries::new(series.vec(), 5, 10, {
+                let color = series.color;
+                move |(x, y)| Circle::new((x, y), 3, color.filled())
+            })),
+            LineType::Points => chart.draw_series(PointSeries::of_element(
+                series.iter(),
+                5,
+                &series.color,
+                &|coord, size, style| EmptyElement::at(coord) + Circle::new((0, 0), size, style.filled()),
+            )),
+            LineType::Dashed => chart.draw_series(DashedLineSeries::new(
+                series.vec(),
+                5,
+                10,
+                ShapeStyle {
+                    color: series.color.to_rgba(),
+                    filled: false,
+                    stroke_width: 1,
+                },
+            )),
+        };
+
+        series_anno
             .expect("failed to draw chart data")
             .label(&series.label)
-            .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], series.color.stroke_width(2)));
+            .legend({
+                let color = series.color;
+                move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2))
+            });
     }
 
     chart
