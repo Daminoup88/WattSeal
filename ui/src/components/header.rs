@@ -4,7 +4,7 @@ use iced::{
     alignment::Alignment,
     font,
     time::Duration,
-    widget::{Column, Row, Text, button, stack},
+    widget::{Column, Container, Row, Text, button, stack},
 };
 
 use crate::{message::Message, pages::Page};
@@ -23,17 +23,18 @@ impl Header {
     }
 
     pub fn view(&self) -> Element<'_, Message> {
-        let mut content = Row::new().spacing(20).width(Length::Fill).height(Length::Shrink).push(
-            Text::new(&self.title).size(24).font(Font {
-                family: font::Family::Name("Noto Sans"),
-                weight: font::Weight::Bold,
-                ..Font::DEFAULT
-            }),
-        );
+        let content = Container::new(Text::new(&self.title).size(24).font(Font {
+            family: font::Family::Name("Noto Sans"),
+            weight: font::Weight::Bold,
+            ..Font::DEFAULT
+        }))
+        .width(Length::Fill)
+        .height(Length::Shrink);
 
+        let mut content = Row::new().padding(10).spacing(20).push(content);
         for navigation_button in &self.navigation_buttons {
             content = content.push(
-                button(Text::new(navigation_button.to_string()))
+                button(Text::new(navigation_button.to_string()).align_x(Alignment::End))
                     .on_press(Message::NavigateTo(navigation_button.clone())),
             );
         }
