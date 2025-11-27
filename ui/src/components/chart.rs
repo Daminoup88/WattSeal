@@ -9,6 +9,7 @@ use iced::{
     widget::{
         Column, Text,
         canvas::{self, Cache, Event, Frame, Geometry, event},
+        text_input::cursor,
     },
 };
 use plotters::{
@@ -26,10 +27,20 @@ const PLOT_SECONDS: usize = 60;
 const SNAP_DISTANCE_PX: f32 = 30.0;
 const VALUE_MIN: f32 = 0.0;
 const VALUE_MAX: f32 = 100.0;
+const X_LABEL_AREA_SIZE: f32 = 40.0;
+const Y_LABEL_AREA_SIZE: f32 = 28.0;
+const CHART_MARGIN: f32 = 20.0;
+
+struct ChartRange {
+    min: f32,
+    max: f32,
+}
 
 #[derive(PartialEq)]
 struct HoverInfo {
     label: String,
+    time: DateTime<Utc>,
+    value: f32,
 }
 
 pub struct SensorChart<const N: usize> {
@@ -38,6 +49,8 @@ pub struct SensorChart<const N: usize> {
     limit: Duration,
     color: RGBColor,
     hovered: RefCell<Option<HoverInfo>>,
+    range: ChartRange,
+    dynamic_range: bool,
 }
 
 pub enum LineType {
@@ -60,8 +73,8 @@ impl TimeSeries {
         self.data.push_front(value);
     }
 
-    fn pop_back(&mut self) {
-        self.data.pop_back();
+    fn pop_back(&mut self) -> Option<(DateTime<Utc>, f32)> {
+        self.data.pop_back()
     }
 
     fn iter(&self) -> impl Iterator<Item = (DateTime<Utc>, f32)> {
@@ -82,7 +95,12 @@ impl TimeSeries {
 }
 
 impl<const N: usize> SensorChart<N> {
-    pub fn new(series: [(String, RGBColor, LineType); N], color: RGBColor) -> Self {
+    pub fn new(
+        series: [(String, RGBColor, LineType); N],
+        color: RGBColor,
+        min_y: Option<f32>,
+        max_y: Option<f32>,
+    ) -> Self {
         let data: Vec<TimeSeries> = series
             .into_iter()
             .map(|(label, color, line_type)| TimeSeries {
@@ -99,6 +117,11 @@ impl<const N: usize> SensorChart<N> {
             limit: Duration::from_secs(PLOT_SECONDS as u64),
             color,
             hovered: RefCell::new(None),
+            range: ChartRange {
+                min: min_y.unwrap_or(VALUE_MIN),
+                max: max_y.unwrap_or(VALUE_MAX),
+            },
+            dynamic_range: min_y.is_none() || max_y.is_none(),
         }
     }
 
@@ -110,9 +133,37 @@ impl<const N: usize> SensorChart<N> {
                 None => continue,
             };
             ts.push_front((time, value));
+            if self.dynamic_range {
+                if value < self.range.min {
+                    self.range.min = value;
+                }
+                if value > self.range.max {
+                    self.range.max = value;
+                }
+            }
             while let Some(&(old_time, _)) = ts.data.back() {
                 if cur_ms - old_time.timestamp_millis() > self.limit.as_millis() as i64 {
-                    ts.pop_back();
+                    let p = ts.pop_back();
+                    if self.dynamic_range {
+                        if let Some((_, old_value)) = p {
+                            if (old_value - self.range.min).abs() < f32::EPSILON
+                                || (old_value - self.range.max).abs() < f32::EPSILON
+                            {
+                                let mut new_min = f32::MAX;
+                                let mut new_max = f32::MIN;
+                                for &(_, v) in ts.data.iter() {
+                                    if v < new_min {
+                                        new_min = v;
+                                    }
+                                    if v > new_max {
+                                        new_max = v;
+                                    }
+                                }
+                                self.range.min = new_min;
+                                self.range.max = new_max;
+                            }
+                        }
+                    }
                 } else {
                     break;
                 }
@@ -144,10 +195,10 @@ impl<const N: usize> SensorChart<N> {
         let oldest_time = newest_time - chrono::Duration::seconds(PLOT_SECONDS as i64);
 
         let mut chart = chart
-            .x_label_area_size(40)
-            .y_label_area_size(28)
-            .margin(20)
-            .build_cartesian_2d(oldest_time..newest_time, 0.0f32..100.0f32)
+            .x_label_area_size(X_LABEL_AREA_SIZE)
+            .y_label_area_size(Y_LABEL_AREA_SIZE)
+            .margin(CHART_MARGIN)
+            .build_cartesian_2d(oldest_time..newest_time, self.range.min..self.range.max)
             .expect("failed to build chart");
 
         chart
@@ -164,7 +215,6 @@ impl<const N: usize> SensorChart<N> {
             )
             .y_label_formatter(&|y: &f32| format!("{}%", y))
             .y_desc("Usage (%)")
-            .x_labels(10)
             .x_label_style(("sans-serif", 15).into_font().color(&self.color.mix(0.65)))
             .x_labels(60)
             .x_label_formatter(&|x: &DateTime<Utc>| {
@@ -219,10 +269,40 @@ impl<const N: usize> SensorChart<N> {
             .background_style(&WHITE.mix(0.8))
             .draw()
             .expect("failed to draw legend");
+
+        if let Some(info) = self.hovered.borrow().as_ref() {
+            chart
+                .draw_series(PointSeries::of_element(
+                    vec![(info.time, info.value)],
+                    6,
+                    ShapeStyle::from(BLACK.mix(0.8)).filled(),
+                    &|coord, size, style| {
+                        return EmptyElement::at(coord)
+                            + Circle::new((0, 0), size + 3, ShapeStyle::from(BLACK).stroke_width(2))
+                            + Circle::new((0, 0), size, style.clone());
+                    },
+                ))
+                .expect("failed to draw hover marker");
+
+            let label = format!("{:.1}% @ {}", info.value, info.time.format("%H:%M:%S"));
+
+            chart
+                .draw_series(std::iter::once(Text::new(
+                    label,
+                    (info.time, info.value),
+                    TextStyle::from(("sans-serif", 14).into_font()).color(&BLACK.mix(0.8)),
+                )))
+                .expect("failed to draw hover tooltip");
+        }
     }
 
     fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<HoverInfo> {
-        if bounds.width <= 0.0 || bounds.height <= 0.0 {
+        let chart_area_bounds = Size::new(
+            bounds.width - Y_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
+            bounds.height - X_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
+        );
+        let chart_area_cursor = Point::new(cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN, cursor.y - CHART_MARGIN);
+        if chart_area_bounds.width <= 0.0 || chart_area_bounds.height <= 0.0 {
             return None;
         }
         let mut candidate: Option<(HoverInfo, f32)> = None;
@@ -242,8 +322,8 @@ impl<const N: usize> SensorChart<N> {
             self.update_hover_candidate(
                 &mut candidate,
                 &series.data,
-                cursor,
-                bounds,
+                chart_area_cursor,
+                chart_area_bounds,
                 oldest_time_limit,
                 total_ms,
                 snap_distance_sq,
@@ -271,6 +351,8 @@ impl<const N: usize> SensorChart<N> {
             if distance_sq <= snap_distance_sq {
                 let info = HoverInfo {
                     label: format!("{}: {:.2}%", time.format("%H:%M:%S"), value),
+                    time: *time,
+                    value: *value,
                 };
 
                 match candidate {
@@ -287,13 +369,13 @@ impl<const N: usize> SensorChart<N> {
             return 0.0;
         }
 
-        let range = VALUE_MAX - VALUE_MIN;
+        let range = self.range.max - self.range.min;
         if range <= f32::EPSILON {
             return height / 2.0;
         }
 
-        let clamped = value.clamp(VALUE_MIN, VALUE_MAX);
-        let ratio = (clamped - VALUE_MIN) / range;
+        let clamped = value.clamp(self.range.min, self.range.max);
+        let ratio = (clamped - self.range.min) / range;
         height - (ratio * height)
     }
 
@@ -331,7 +413,6 @@ impl<const N: usize> Chart<Message> for SensorChart<N> {
                         let mut current = self.hovered.borrow_mut();
                         if hovered != *current {
                             *current = hovered;
-                            println!("Hovered: {:?}", current.as_ref().map(|h| &h.label));
                             self.cache.borrow_mut().clear();
                             return (event::Status::Captured, None);
                         }
