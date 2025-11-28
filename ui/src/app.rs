@@ -1,5 +1,11 @@
 use chrono::Utc;
-use iced::{Color, Element, Font, Length, Task, Theme, alignment::Alignment, font, time::Duration, widget::Column};
+use iced::{
+    Color, Element, Font, Length, Subscription, Task, Theme,
+    alignment::Alignment,
+    font,
+    time::{Duration, every},
+    widget::{Column, shader::wgpu::naga::back},
+};
 
 use crate::{
     components::header::Header,
@@ -60,5 +66,10 @@ impl App {
             .into();
 
         view.explain(Color::BLACK)
+    }
+
+    pub fn subscription(&self) -> Subscription<Message> {
+        const FPS: u64 = 1;
+        every(Duration::from_millis(1000 / FPS)).map(|_| Message::Tick)
     }
 }

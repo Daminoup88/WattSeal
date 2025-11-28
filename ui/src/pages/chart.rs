@@ -35,6 +35,8 @@ impl ChartPage {
                         ("Series 2".to_string(), RGBColor(0, 255, 0), LineType::Dotted),
                     ],
                     RGBColor(0, 200, 0),
+                    None,
+                    None,
                 ),
             },
             Task::done(Message::Tick),
@@ -46,7 +48,7 @@ impl ChartPage {
             Message::Tick => {
                 let now = Utc::now();
                 let percent = rand::random::<f32>() * 100.0;
-                let percent2 = rand::random::<f32>() * 100.0;
+                let percent2 = rand::random::<f32>() * 1000.0;
                 self.chart.push_data(now, [Some(percent), Some(percent2)]);
             }
             _ => {
