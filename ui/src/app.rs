@@ -4,13 +4,14 @@ use iced::{
     alignment::Alignment,
     font,
     time::{Duration, every},
-    widget::{Column, shader::wgpu::naga::back},
+    widget::{Column, pick_list},
 };
 
 use crate::{
     components::header::Header,
     message::Message,
     pages::{Page, chart::ChartPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
+    themes::AppTheme,
 };
 
 pub struct App {
@@ -20,11 +21,13 @@ pub struct App {
     optimization_page: OptimizationPage,
     settings_page: SettingsPage,
     header: Header,
+    theme: AppTheme,
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
-        let (chart_page, task) = ChartPage::new();
+        let theme = AppTheme::Dracula;
+        let (chart_page, task) = ChartPage::new(theme);
         let current_page = Page::Chart;
         (
             Self {
@@ -37,6 +40,7 @@ impl App {
                 info_page: InfoPage::new(),
                 optimization_page: OptimizationPage::new(),
                 settings_page: SettingsPage::new(),
+                theme,
             },
             task,
         )
@@ -51,6 +55,10 @@ impl App {
                 self.current_page = page;
                 self.header.set_title(&page.to_string());
             }
+            Message::ChangeTheme(theme) => {
+                self.theme = theme;
+                self.chart_page.update_theme(theme);
+            }
         }
     }
 
@@ -63,6 +71,7 @@ impl App {
                 Page::Optimization => self.optimization_page.view(),
                 Page::Settings => self.settings_page.view(),
             })
+            .push(pick_list(AppTheme::all(), Some(self.theme), Message::ChangeTheme))
             .into();
 
         view.explain(Color::BLACK)
@@ -71,5 +80,9 @@ impl App {
     pub fn subscription(&self) -> Subscription<Message> {
         const FPS: u64 = 1;
         every(Duration::from_millis(1000 / FPS)).map(|_| Message::Tick)
+    }
+
+    pub fn theme(&self) -> Theme {
+        self.theme.to_iced_theme()
     }
 }

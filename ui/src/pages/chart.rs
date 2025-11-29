@@ -11,6 +11,7 @@ use plotters::style::RGBColor;
 use crate::{
     components::chart::{LineType, SensorChart},
     message::Message,
+    themes::AppTheme,
 };
 
 const TITLE_FONT_SIZE: u16 = 22;
@@ -26,21 +27,25 @@ pub struct ChartPage {
 }
 
 impl ChartPage {
-    pub fn new() -> (Self, Task<Message>) {
+    pub fn new(theme: AppTheme) -> (Self, Task<Message>) {
         (
             Self {
                 chart: SensorChart::new(
                     [
-                        ("Series 1".to_string(), RGBColor(255, 0, 0), LineType::Area),
-                        ("Series 2".to_string(), RGBColor(0, 255, 0), LineType::Dotted),
+                        ("Series 1".to_string(), LineType::Area),
+                        ("Series 2".to_string(), LineType::Dotted),
                     ],
-                    RGBColor(0, 200, 0),
                     None,
                     None,
+                    theme,
                 ),
             },
             Task::done(Message::Tick),
         )
+    }
+
+    pub fn update_theme(&mut self, theme: AppTheme) {
+        self.chart.update_style(theme);
     }
 
     pub fn update(&mut self, message: Message) {
