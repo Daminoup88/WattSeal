@@ -1,4 +1,4 @@
-use iced::{font::Font, theme::Theme, time::Duration};
+use iced::font::Font;
 
 pub mod app;
 pub mod components;
@@ -7,7 +7,6 @@ pub mod pages;
 pub mod themes;
 
 use app::App;
-use message::Message;
 
 pub fn run() -> iced::Result {
     iced::application("Energy Monitor", App::update, App::view)
