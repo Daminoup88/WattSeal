@@ -1,5 +1,4 @@
-use crate::pages::Page;
-use crate::themes::AppTheme;
+use crate::{pages::Page, themes::AppTheme};
 
 #[derive(Debug, Clone)]
 pub enum Message {

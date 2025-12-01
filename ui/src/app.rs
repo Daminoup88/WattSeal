@@ -28,7 +28,7 @@ impl App {
         let theme = AppTheme::Dracula;
         let (chart_page, task) = ChartPage::new(theme);
         let current_page = Page::Chart;
-        
+
         (
             Self {
                 current_page,
