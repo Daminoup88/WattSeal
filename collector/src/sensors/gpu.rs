@@ -1,10 +1,8 @@
 use sysinfo::System;
+use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 
 use super::{Sensor, SensorError};
 use crate::core::types::{Event, GPUData};
-
-use windows::Win32::Graphics::Dxgi::*;
-use windows::core::PCWSTR;
 
 enum GPUVendor {
     Nvidia,
@@ -26,8 +24,7 @@ impl GPUVendor {
 }
 
 pub fn get_gpu_list() -> Vec<String> {
-    use windows::Win32::Graphics::Dxgi::*;
-    use windows::core::Result;
+    use windows::{Win32::Graphics::Dxgi::*, core::Result};
 
     let mut list = Vec::new();
 
@@ -47,7 +44,8 @@ pub fn get_gpu_list() -> Vec<String> {
             let mut desc = DXGI_ADAPTER_DESC1::default();
             if adapter.GetDesc1(&mut desc).is_ok() {
                 let name = String::from_utf16_lossy(
-                    &desc.Description
+                    &desc
+                        .Description
                         .iter()
                         .take_while(|c| **c != 0)
                         .cloned()
@@ -61,8 +59,7 @@ pub fn get_gpu_list() -> Vec<String> {
     list
 }
 
-
-pub fn get_gpu_power_sensor(vendor_id: &str, index:u32) -> Result<Box<dyn Sensor<GPUData>>, SensorError> {
+pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<Box<dyn Sensor<GPUData>>, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
     match vendor {
         GPUVendor::Amd => Ok(Box::new(amd_gpu::AmdGPUSensor::new(index)?)),
@@ -75,12 +72,10 @@ pub fn get_gpu_power_sensor(vendor_id: &str, index:u32) -> Result<Box<dyn Sensor
 mod amd_gpu {
     use std::ops::Index;
 
-    use adlx::helper::AdlxHelper;
-    use adlx::system::System;
-    use adlx::performance_monitoring_services::PerformanceMonitoringServices;
-    use adlx::gpu_list::GpuList;
-    use adlx::gpu::Gpu;
-    use adlx::gpu_metrics::GpuMetrics;
+    use adlx::{
+        gpu::Gpu, gpu_list::GpuList, gpu_metrics::GpuMetrics, helper::AdlxHelper,
+        performance_monitoring_services::PerformanceMonitoringServices, system::System,
+    };
 
     use super::{Sensor, SensorError};
     use crate::core::types::{Event, GPUData};
@@ -93,11 +88,15 @@ mod amd_gpu {
         pub fn new(index: u32) -> Result<Self, SensorError> {
             let helper = AdlxHelper::new().map_err(|e| SensorError::ReadError(e.to_string()))?;
             let system = helper.system();
-            let perfo= system.performance_monitoring_services().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let perfo = system
+                .performance_monitoring_services()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
             let gpu_list = system.gpus().map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let gpu = gpu_list.at(index).map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let gpu_metrics = perfo.current_gpu_metrics(&gpu).map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let gpu_metrics = perfo
+                .current_gpu_metrics(&gpu)
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             Ok(AmdGPUSensor { gpu_metrics })
         }
@@ -106,9 +105,18 @@ mod amd_gpu {
     impl Sensor<GPUData> for AmdGPUSensor {
         fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
             // Read AMD GPU data here
-            let power_mw = self.gpu_metrics.power().map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let usage = self.gpu_metrics.usage().map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let memory = self.gpu_metrics.vram().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let power_mw = self
+                .gpu_metrics
+                .power()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let usage = self
+                .gpu_metrics
+                .usage()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let memory = self
+                .gpu_metrics
+                .vram()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
                 total_power_watts: power_mw as f64 / 1000.0,
@@ -123,6 +131,7 @@ mod amd_gpu {
 
 mod nvidia_gpu {
     use nvml_wrapper::Nvml;
+
     use super::{Sensor, SensorError};
     use crate::core::types::{Event, GPUData};
 
@@ -135,17 +144,29 @@ mod nvidia_gpu {
         pub fn new(index: u32) -> Result<Self, SensorError> {
             let nvml = Nvml::init().map_err(|e| SensorError::ReadError(e.to_string()))?;
             // Validate that the device exists
-            let _ = nvml.device_by_index(index).map_err(|e| SensorError::ReadError(e.to_string()))?;
-            Ok(NvidiaGPUSensor { nvml, device_index: index })
+            let _ = nvml
+                .device_by_index(index)
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            Ok(NvidiaGPUSensor {
+                nvml,
+                device_index: index,
+            })
         }
     }
 
     impl Sensor<GPUData> for NvidiaGPUSensor {
         fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
             // Read NVIDIA GPU data here
-            let device = self.nvml.device_by_index(self.device_index).map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let power_usage_mw = device.power_usage().map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let utilization = device.utilization_rates().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let device = self
+                .nvml
+                .device_by_index(self.device_index)
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let power_usage_mw = device
+                .power_usage()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let utilization = device
+                .utilization_rates()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
                 total_power_watts: power_usage_mw as f64 / 1000.0,

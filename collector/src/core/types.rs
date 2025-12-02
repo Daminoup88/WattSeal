@@ -85,7 +85,7 @@ pub struct BatteryInfo {
 pub struct HardwareInfo {
     pub os: OS,
     pub total_ram_gb: u8,
-    pub cpu_list:Vec<String>,
+    pub cpu_list: Vec<String>,
     pub gpu_list: Vec<String>,
     pub disk_list: Vec<String>,
     pub peripherals: Vec<String>,

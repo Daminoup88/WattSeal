@@ -35,12 +35,11 @@ pub struct WindowsCPUSensor {
 impl WindowsCPUSensor {
     pub fn new(vendor_id: &str) -> Self {
         let vendor = CPUVendor::from_str(vendor_id);
-        let measurement_source= WinRing0Reader::new()
+        let measurement_source = WinRing0Reader::new()
             .map(|ring0_reader| MeasurementSource::MSR(MSRReader::new(ring0_reader, vendor)))
             .unwrap_or(MeasurementSource::Estimation);
 
         let last_energy_measurement = EnergyMeasurement::default();
-
 
         WindowsCPUSensor {
             measurement_source,

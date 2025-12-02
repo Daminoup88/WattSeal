@@ -7,14 +7,12 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use collector::database::Database;
+use collector::{database::Database, sensors, sensors::Sensor};
 use rusqlite::{Connection, Result, ToSql};
-use collector::sensors::Sensor;
 use tray_icon::{
     Icon, TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, MenuItemKind},
 };
-use collector::sensors;
 
 fn main() {
     let sensors_cpu = sensors::cpu::get_cpu_list();
@@ -46,7 +44,7 @@ fn main() {
     //     // let vram: i32 = gpumetrics.vram().unwrap();
 
     //     // println!("Power (mW): {}", power);
-    //     println!("Usage (%): {}", usage);   
+    //     println!("Usage (%): {}", usage);
     //     // println!("VRAM Usage (MB): {}", vram);
     //     // let gpu1 = gpu.cast::<Gpu1>().unwrap();
     //     // dbg!(gpu1.name()).unwrap();
