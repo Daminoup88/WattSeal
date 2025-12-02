@@ -27,9 +27,10 @@ const PLOT_SECONDS: usize = 60;
 const SNAP_DISTANCE_PX: f32 = 30.0;
 const VALUE_MIN: f32 = 0.0;
 const VALUE_MAX: f32 = 100.0;
-const X_LABEL_AREA_SIZE: f32 = 40.0;
-const Y_LABEL_AREA_SIZE: f32 = 28.0;
+const X_LABEL_AREA_SIZE: f32 = 50.0;
+const Y_LABEL_AREA_SIZE: f32 = 80.0;
 const CHART_MARGIN: f32 = 20.0;
+const CHART_MARGIN_LEFT: f32 = 40.0;
 
 const TOOLTIP_WIDTH: f32 = 150.0;
 const TOOLTIP_MIN_HEIGHT: f32 = 60.0;
@@ -350,6 +351,7 @@ impl<const N: usize> SensorChart<N> {
             .x_label_area_size(X_LABEL_AREA_SIZE)
             .y_label_area_size(Y_LABEL_AREA_SIZE)
             .margin(CHART_MARGIN)
+            .margin_left(CHART_MARGIN_LEFT)
             .build_cartesian_2d(oldest_time..newest_time, self.range.0..self.range.1)
             .expect("failed to build chart");
 
@@ -366,7 +368,7 @@ impl<const N: usize> SensorChart<N> {
                     .transform(FontTransform::Rotate90),
             )
             .y_label_formatter(&|y: &f32| format!("{}%", y))
-            .y_desc("Usage (%)")
+            .y_desc("Value (%)")
             .x_label_style(("sans-serif", 15).into_font().color(&style.text))
             .x_labels(60)
             .x_label_formatter(&|x: &DateTime<Utc>| {
@@ -516,7 +518,7 @@ impl<const N: usize> SensorChart<N> {
 
     fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<TooltipData> {
         let chart_bounds = Size::new(
-            bounds.width - Y_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
+            bounds.width - Y_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN - CHART_MARGIN_LEFT,
             bounds.height - X_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
         );
 
@@ -524,7 +526,10 @@ impl<const N: usize> SensorChart<N> {
             return None;
         }
 
-        let chart_cursor = Point::new(cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN, cursor.y - CHART_MARGIN);
+        let chart_cursor = Point::new(
+            cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN - CHART_MARGIN_LEFT,
+            cursor.y - CHART_MARGIN,
+        );
 
         let (oldest, _) = self.time_bounds();
         let total_ms = self.limit.as_millis().max(1) as f32;
