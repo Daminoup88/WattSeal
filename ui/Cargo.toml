@@ -7,7 +7,6 @@ edition = "2024"
 collector = { path = "../collector" }
 sysinfo = "0.28"
 ctrlc = "3.2"
-windows = { version = "0.62.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_IO", "Win32_UI_WindowsAndMessaging", "Win32_Graphics_Gdi"] }
 image = "0.25"
 tray-icon = "0.21.2"
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
