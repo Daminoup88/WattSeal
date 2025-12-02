@@ -6,21 +6,6 @@ use crate::core::types::{CPUData, Event};
 #[cfg(target_os = "windows")]
 mod windows_cpu;
 
-pub fn get_cpu_power_sensor() -> Result<impl Sensor<CPUData>, SensorError> {
-    let s = sysinfo::System::new_all();
-    let cpu = s.cpus().first();
-    let vendor_id = match cpu {
-        None => return Err(SensorError::NotSupported),
-        Some(cpu_info) => cpu_info.vendor_id(),
-    };
-
-    #[cfg(target_os = "windows")]
-    return Ok(WindowsCPUSensor::new(vendor_id));
-
-    #[cfg(not(target_os = "windows"))]
-    return Err(SensorError::NotSupported);
-}
-
 enum CPUVendor {
     Intel,
     Amd,
@@ -38,6 +23,26 @@ impl CPUVendor {
             CPUVendor::Other
         }
     }
+}
+
+pub fn get_cpu_list() -> Vec<String> {
+    let s = sysinfo::System::new_all();
+    s.cpus().iter().map(|cpu| cpu.name().to_string()).collect()
+}
+
+pub fn get_cpu_power_sensor() -> Result<impl Sensor<CPUData>, SensorError> {
+    let s = sysinfo::System::new_all();
+    let cpu = s.cpus().first();
+    let vendor_id = match cpu {
+        None => return Err(SensorError::NotSupported),
+        Some(cpu_info) => cpu_info.vendor_id(),
+    };
+
+    #[cfg(target_os = "windows")]
+    return Ok(WindowsCPUSensor::new(vendor_id));
+
+    #[cfg(not(target_os = "windows"))]
+    return Err(SensorError::NotSupported);
 }
 
 #[cfg(test)]
@@ -63,7 +68,6 @@ mod test {
         #[cfg(target_os = "windows")]
         {
             assert!(sensor_result.is_ok());
-            assert_eq!(sensor_result.unwrap().name(), "Windows CPU");
         }
     }
 }

@@ -12,9 +12,14 @@ win-kernel-driver = { git = "https://github.com/alex-dow/winRing0-rs" }
 win_ring0 = { git = "https://github.com/alex-dow/winRing0-rs" }
 
 [dependencies]
+adlx = "0.0.0-alpha.1"
 chrono = { version = "0.4.42", features = ["clock"] }
 is-admin = "0.1.4"
 nvml-wrapper = "0.11.0"
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
 sysinfo = "0.37.2"
 tray-icon = "0.21.2"
+windows = { version = "0.57", features = [
+    "Win32_Graphics_Dxgi",
+    "Win32_Foundation"
+] }

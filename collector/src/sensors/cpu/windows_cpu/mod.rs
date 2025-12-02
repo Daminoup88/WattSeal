@@ -32,14 +32,15 @@ pub struct WindowsCPUSensor {
     last_energy_measurement: RefCell<EnergyMeasurement>,
 }
 
-impl Sensor<CPUData> for WindowsCPUSensor {
-    fn new(vendor_id: &str) -> Self {
+impl WindowsCPUSensor {
+    pub fn new(vendor_id: &str) -> Self {
         let vendor = CPUVendor::from_str(vendor_id);
-        let measurement_source = WinRing0Reader::new()
+        let measurement_source= WinRing0Reader::new()
             .map(|ring0_reader| MeasurementSource::MSR(MSRReader::new(ring0_reader, vendor)))
             .unwrap_or(MeasurementSource::Estimation);
 
         let last_energy_measurement = EnergyMeasurement::default();
+
 
         WindowsCPUSensor {
             measurement_source,
@@ -47,25 +48,6 @@ impl Sensor<CPUData> for WindowsCPUSensor {
         }
     }
 
-    fn name(&self) -> &'static str {
-        "Windows CPU"
-    }
-
-    fn read_full_data(&self) -> Result<Event<CPUData>, SensorError> {
-        let power = self.read_raw_power()?;
-        let usage = self.read_cpu_usage()?;
-        let data = CPUData {
-            total_power_watts: power,
-            pp0_power_watts: None,
-            pp1_power_watts: None,
-            dram_power_watts: None,
-            usage_percent: usage,
-        };
-        Ok(Event::new(data))
-    }
-}
-
-impl WindowsCPUSensor {
     fn read_raw_power(&self) -> Result<f64, SensorError> {
         match &self.measurement_source {
             MeasurementSource::MSR(msr_reader) => {
@@ -85,6 +67,21 @@ impl WindowsCPUSensor {
     fn read_cpu_usage(&self) -> Result<f64, SensorError> {
         // TODO: fetch CPU usage
         Ok(0.0)
+    }
+}
+
+impl Sensor<CPUData> for WindowsCPUSensor {
+    fn read_full_data(&self) -> Result<Event<CPUData>, SensorError> {
+        let power = self.read_raw_power()?;
+        let usage = self.read_cpu_usage()?;
+        let data = CPUData {
+            total_power_watts: power,
+            pp0_power_watts: None,
+            pp1_power_watts: None,
+            dram_power_watts: None,
+            usage_percent: usage,
+        };
+        Ok(Event::new(data))
     }
 }
 

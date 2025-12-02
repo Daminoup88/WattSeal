@@ -60,7 +60,38 @@ pub struct CPUData {
 pub struct GPUData {
     pub total_power_watts: f64,
     pub usage_percent: f64,
-    pub memory_usage_percent: f64,
+    pub vram_usage_percent: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct ScreenInfo {
+    pub resolution: (u32, u32),
+    pub refresh_rate_hz: u32,
+    pub technology: String,
+    pub luminosity_nits: u32,
+}
+
+#[derive(Debug, Clone)]
+pub struct BatteryInfo {
+    pub manufacturer: String,
+    pub model: String,
+    pub serial_number: String,
+    pub design_capacity_mwh: u32,
+    pub full_charge_capacity_mwh: u32,
+    pub cycle_count: u32,
+    pub health_percent: u8,
+}
+
+pub struct HardwareInfo {
+    pub os: OS,
+    pub total_ram_gb: u8,
+    pub cpu_list:Vec<String>,
+    pub gpu_list: Vec<String>,
+    pub disk_list: Vec<String>,
+    pub peripherals: Vec<String>,
+    pub network_card: String,
+    pub screen_info: ScreenInfo,
+    pub battery_info: BatteryInfo,
 }
 
 pub enum OS {
