@@ -31,6 +31,13 @@ const X_LABEL_AREA_SIZE: f32 = 40.0;
 const Y_LABEL_AREA_SIZE: f32 = 28.0;
 const CHART_MARGIN: f32 = 20.0;
 
+const TOOLTIP_WIDTH: f32 = 150.0;
+const TOOLTIP_MIN_HEIGHT: f32 = 60.0;
+const TOOLTIP_PADDING: f32 = 8.0;
+const TOOLTIP_OFFSET: f32 = 12.0;
+const TOOLTIP_CORNER_RADIUS: f32 = 4.0;
+const TOOLTIP_LINE_HEIGHT: f32 = 16.0;
+
 #[derive(Debug, Clone, Copy)]
 pub struct ChartStyle {
     pub grid_bold: RGBAColor,
@@ -39,6 +46,8 @@ pub struct ChartStyle {
     pub text: RGBAColor,
     pub legend_background: RGBAColor,
     pub legend_border: RGBColor,
+    pub tooltip_background: RGBAColor,
+    pub tooltip_border: RGBAColor,
     pub series_colors: [RGBColor; 4],
 }
 
@@ -55,6 +64,8 @@ impl From<AppTheme> for ChartStyle {
             text: text.mix(0.65),
             legend_background: background.mix(0.8),
             legend_border: text,
+            tooltip_background: background.mix(0.95),
+            tooltip_border: text.mix(0.3),
             series_colors: [primary, success, danger, text],
         }
     }
@@ -68,18 +79,142 @@ impl ChartStyle {
 
 type Range = (f32, f32);
 
-#[derive(PartialEq)]
-struct HoverInfo {
-    label: String,
-    time: DateTime<Utc>,
-    value: f32,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum TooltipSide {
+    Left,
+    Right,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TooltipContent {
+    pub title: String,
+    pub value: String,
+    pub timestamp: String,
+    pub description: Option<String>,
+    pub series_index: usize,
+}
+
+impl TooltipContent {
+    pub fn new(title: String, value: f32, time: DateTime<Utc>, series_index: usize) -> Self {
+        Self {
+            title: title,
+            value: format!("{:.1}%", value),
+            timestamp: time.format("%H:%M:%S").to_string(),
+            description: None,
+            series_index,
+        }
+    }
+
+    pub fn with_description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+
+    pub fn calculate_height(&self) -> f32 {
+        let mut height = TOOLTIP_PADDING * 2.0;
+        height += TOOLTIP_LINE_HEIGHT;
+        height += TOOLTIP_LINE_HEIGHT;
+        height += TOOLTIP_LINE_HEIGHT;
+        if self.description.is_some() {
+            height += TOOLTIP_LINE_HEIGHT;
+        }
+        height.max(TOOLTIP_MIN_HEIGHT)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TooltipData {
+    pub content: TooltipContent,
+    pub time: DateTime<Utc>,
+    pub value: f32,
+    pub point_x: f32,
+    pub point_y: f32,
+    pub side: TooltipSide,
+    pub bounds: TooltipBounds,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TooltipBounds {
+    pub x: f32,
+    pub y: f32,
+    pub width: f32,
+    pub height: f32,
+}
+
+impl TooltipBounds {
+    pub fn new(x: f32, y: f32, width: f32, height: f32) -> Self {
+        Self { x, y, width, height }
+    }
+
+    pub fn corners(&self) -> [(i32, i32); 4] {
+        let x1 = self.x as i32;
+        let y1 = self.y as i32;
+        let x2 = (self.x + self.width) as i32;
+        let y2 = (self.y + self.height) as i32;
+        [(x1, y1), (x2, y1), (x2, y2), (x1, y2)]
+    }
+}
+
+impl TooltipData {
+    pub fn new(
+        content: TooltipContent,
+        time: DateTime<Utc>,
+        value: f32,
+        point_x: f32,
+        point_y: f32,
+        chart_width: f32,
+        chart_height: f32,
+    ) -> Self {
+        let tooltip_height = content.calculate_height();
+
+        let space_right = chart_width - point_x - TOOLTIP_OFFSET;
+        let space_left = point_x - TOOLTIP_OFFSET;
+
+        let side = if space_right >= TOOLTIP_WIDTH {
+            TooltipSide::Right
+        } else if space_left >= TOOLTIP_WIDTH {
+            TooltipSide::Left
+        } else {
+            if space_right >= space_left {
+                TooltipSide::Right
+            } else {
+                TooltipSide::Left
+            }
+        };
+
+        let tooltip_x = match side {
+            TooltipSide::Right => point_x + TOOLTIP_OFFSET,
+            TooltipSide::Left => point_x - TOOLTIP_OFFSET - TOOLTIP_WIDTH,
+        };
+
+        let tooltip_y = (point_y - tooltip_height / 2.0)
+            .max(0.0)
+            .min(chart_height - tooltip_height);
+
+        let bounds = TooltipBounds::new(
+            tooltip_x.max(0.0).min(chart_width - TOOLTIP_WIDTH),
+            tooltip_y,
+            TOOLTIP_WIDTH,
+            tooltip_height,
+        );
+
+        Self {
+            content,
+            time,
+            value,
+            point_x,
+            point_y,
+            side,
+            bounds,
+        }
+    }
 }
 
 pub struct SensorChart<const N: usize> {
     cache: RefCell<Cache>,
     data_series: Vec<TimeSeries>,
     limit: Duration,
-    hovered: RefCell<Option<HoverInfo>>,
+    hovered: RefCell<Option<TooltipData>>,
     range: Range,
     dynamic_range: bool,
     style: ChartStyle,
@@ -285,15 +420,15 @@ impl<const N: usize> SensorChart<N> {
             .draw()
             .expect("failed to draw legend");
 
-        if let Some(info) = self.hovered.borrow().as_ref() {
-            let hover_color = style.text.mix(0.8);
-            let point = (info.time, info.value);
+        if let Some(tooltip) = self.hovered.borrow().as_ref() {
+            let series_color = style.series_color(tooltip.content.series_index);
+            let point = (tooltip.time, tooltip.value);
 
             chart
                 .draw_series(PointSeries::of_element(
                     vec![point],
                     6,
-                    ShapeStyle::from(hover_color).filled(),
+                    ShapeStyle::from(series_color).filled(),
                     &|coord, size, st| {
                         EmptyElement::at(coord)
                             + Circle::new((0, 0), size + 3, ShapeStyle::from(style.text).stroke_width(2))
@@ -302,17 +437,84 @@ impl<const N: usize> SensorChart<N> {
                 ))
                 .expect("hover marker");
 
-            chart
-                .draw_series(std::iter::once(Text::new(
-                    format!("{:.1}% @ {}", info.value, info.time.format("%H:%M:%S")),
-                    point,
-                    TextStyle::from(("sans-serif", 14).into_font()).color(&hover_color),
-                )))
-                .expect("failed to draw hover tooltip");
+            let backend_area = chart.plotting_area().strip_coord_spec();
+            self.draw_tooltip_on_backend(&backend_area, tooltip, style);
         }
     }
 
-    fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<HoverInfo> {
+    fn draw_tooltip_on_backend<DB: DrawingBackend>(
+        &self,
+        area: &DrawingArea<DB, Shift>,
+        tooltip: &TooltipData,
+        style: &ChartStyle,
+    ) {
+        use plotters::prelude::*;
+
+        let bounds = &tooltip.bounds;
+        let content = &tooltip.content;
+        let series_color = style.series_color(content.series_index);
+        let series_color_rgba = series_color.to_rgba();
+
+        let rect_style = ShapeStyle {
+            color: style.tooltip_background,
+            filled: true,
+            stroke_width: 0,
+        };
+
+        let border_style = ShapeStyle {
+            color: style.tooltip_border,
+            filled: false,
+            stroke_width: 1,
+        };
+
+        let x1 = bounds.x as i32;
+        let y1 = bounds.y as i32;
+        let x2 = (bounds.x + bounds.width) as i32;
+        let y2 = (bounds.y + bounds.height) as i32;
+
+        area.draw(&Rectangle::new([(x1, y1), (x2, y2)], rect_style)).ok();
+
+        area.draw(&Rectangle::new([(x1, y1), (x2, y2)], border_style)).ok();
+
+        let indicator_width = 4;
+        area.draw(&Rectangle::new(
+            [(x1, y1), (x1 + indicator_width, y2)],
+            ShapeStyle::from(series_color).filled(),
+        ))
+        .ok();
+
+        let text_x = x1 + indicator_width + TOOLTIP_PADDING as i32;
+        let mut text_y = y1 + TOOLTIP_PADDING as i32;
+
+        let text_style = TextStyle::from(("sans-serif", 12).into_font()).color(&style.text);
+        let title_style = TextStyle::from(("sans-serif", 12).into_font()).color(&series_color_rgba);
+
+        area.draw(&Text::new(content.title.clone(), (text_x, text_y), title_style))
+            .ok();
+        text_y += TOOLTIP_LINE_HEIGHT as i32;
+
+        area.draw(&Text::new(
+            format!("Value: {}", content.value),
+            (text_x, text_y),
+            text_style.clone(),
+        ))
+        .ok();
+        text_y += TOOLTIP_LINE_HEIGHT as i32;
+
+        area.draw(&Text::new(
+            format!("Time: {}", content.timestamp),
+            (text_x, text_y),
+            text_style.clone(),
+        ))
+        .ok();
+        text_y += TOOLTIP_LINE_HEIGHT as i32;
+
+        if let Some(desc) = &content.description {
+            area.draw(&Text::new(desc.clone(), (text_x, text_y), text_style)).ok();
+        }
+    }
+
+    fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<TooltipData> {
         let chart_bounds = Size::new(
             bounds.width - Y_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
             bounds.height - X_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
@@ -330,23 +532,25 @@ impl<const N: usize> SensorChart<N> {
 
         self.data_series
             .iter()
-            .filter_map(|s| s.newest_time().map(|_| s))
-            .flat_map(|s| s.data.iter())
-            .filter_map(|(time, value)| {
+            .enumerate()
+            .filter_map(|(idx, s)| s.newest_time().map(|_| (idx, s)))
+            .flat_map(|(idx, s)| s.data.iter().map(move |d| (idx, s.label.clone(), d)))
+            .filter_map(|(series_idx, label, (time, value))| {
                 let px = self.point_x_for_time(*time, oldest, total_ms, chart_bounds.width);
                 let py = self.point_y_for_value(*value, chart_bounds.height);
                 let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
-                (dist_sq <= snap_sq).then_some((
-                    HoverInfo {
-                        label: format!("{}: {:.2}%", time.format("%H:%M:%S"), value),
-                        time: *time,
-                        value: *value,
-                    },
-                    dist_sq,
-                ))
+
+                if dist_sq <= snap_sq {
+                    let content = TooltipContent::new(label, *value, *time, series_idx);
+                    let tooltip =
+                        TooltipData::new(content, *time, *value, px, py, chart_bounds.width, chart_bounds.height);
+                    Some((tooltip, dist_sq))
+                } else {
+                    None
+                }
             })
             .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(info, _)| info)
+            .map(|(tooltip, _)| tooltip)
     }
 
     fn point_y_for_value(&self, value: f32, height: f32) -> f32 {
@@ -374,7 +578,7 @@ impl<const N: usize> SensorChart<N> {
         }
     }
 
-    fn update_hover(&self, new: Option<HoverInfo>) -> bool {
+    fn update_hover(&self, new: Option<TooltipData>) -> bool {
         let mut current = self.hovered.borrow_mut();
         if *current != new {
             *current = new;
