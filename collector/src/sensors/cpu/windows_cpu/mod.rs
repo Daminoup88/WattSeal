@@ -73,6 +73,7 @@ impl Sensor<CPUData> for WindowsCPUSensor {
     fn read_full_data(&self) -> Result<Event<CPUData>, SensorError> {
         let power = self.read_raw_power()?;
         let usage = self.read_cpu_usage()?;
+
         let data = CPUData {
             total_power_watts: power,
             pp0_power_watts: None,

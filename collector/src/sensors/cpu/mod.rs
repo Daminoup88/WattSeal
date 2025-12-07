@@ -6,14 +6,15 @@ use crate::core::types::{CPUData, Event};
 #[cfg(target_os = "windows")]
 mod windows_cpu;
 
-enum CPUVendor {
+#[derive(Copy, Clone, PartialEq)]
+pub enum CPUVendor {
     Intel,
     Amd,
     Other,
 }
 
 impl CPUVendor {
-    fn from_str(vendor_str: &str) -> CPUVendor {
+    pub fn from_str(vendor_str: &str) -> CPUVendor {
         let vendor_lower = vendor_str.to_lowercase();
         if vendor_lower.contains("intel") {
             CPUVendor::Intel
@@ -23,16 +24,25 @@ impl CPUVendor {
             CPUVendor::Other
         }
     }
+
+    pub fn differs(&self, other: CPUVendor) -> bool {
+        match (self, other) {
+            (CPUVendor::Intel, CPUVendor::Intel) => false,
+            (CPUVendor::Amd, CPUVendor::Amd) => false,
+            (CPUVendor::Other, CPUVendor::Other) => false,
+            _ => true,
+        }
+    }
 }
 
 pub fn get_cpu_list() -> Vec<String> {
     let s = sysinfo::System::new_all();
-    s.cpus().iter().map(|cpu| cpu.name().to_string()).collect()
+    s.cpus().iter().map(|cpu| cpu.brand().to_string()).collect()
 }
 
-pub fn get_cpu_power_sensor() -> Result<impl Sensor<CPUData>, SensorError> {
+pub fn get_cpu_power_sensor(index: usize) -> Result<impl Sensor<CPUData>, SensorError> {
     let s = sysinfo::System::new_all();
-    let cpu = s.cpus().first();
+    let cpu = s.cpus().get(index);
     let vendor_id = match cpu {
         None => return Err(SensorError::NotSupported),
         Some(cpu_info) => cpu_info.vendor_id(),
@@ -63,7 +73,7 @@ mod test {
 
     #[test]
     fn test_get_cpu_power_sensor() {
-        let sensor_result = get_cpu_power_sensor();
+        let sensor_result = get_cpu_power_sensor(0);
 
         #[cfg(target_os = "windows")]
         {

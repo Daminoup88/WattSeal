@@ -4,21 +4,34 @@ use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 use super::{Sensor, SensorError};
 use crate::core::types::{Event, GPUData};
 
-enum GPUVendor {
+#[derive(Copy, Clone, PartialEq)]
+pub enum GPUVendor {
     Nvidia,
     Amd,
+    Intel,
     Other,
 }
 
 impl GPUVendor {
-    fn from_str(vendor_str: &str) -> GPUVendor {
+    pub fn from_str(vendor_str: &str) -> GPUVendor {
         let vendor_lower = vendor_str.to_lowercase();
         if vendor_lower.contains("nvidia") {
             GPUVendor::Nvidia
         } else if vendor_lower.contains("amd") {
             GPUVendor::Amd
+        } else if vendor_lower.contains("intel") {
+            GPUVendor::Intel
         } else {
             GPUVendor::Other
+        }
+    }
+
+    pub fn differs(&self, other: GPUVendor) -> bool {
+        match (self, other) {
+            (GPUVendor::Nvidia, GPUVendor::Nvidia) => false,
+            (GPUVendor::Amd, GPUVendor::Amd) => false,
+            (GPUVendor::Other, GPUVendor::Other) => false,
+            _ => true,
         }
     }
 }
@@ -64,7 +77,7 @@ pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<Box<dyn Senso
     match vendor {
         GPUVendor::Amd => Ok(Box::new(amd_gpu::AmdGPUSensor::new(index)?)),
         GPUVendor::Nvidia => Ok(Box::new(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
-        // GPUVendor::Intel => Ok(Box::new(intel_gpu::IntelGPUSensor::new(index)?)),
+        GPUVendor::Intel => Ok(Box::new(intel_gpu::IntelGPUSensor::new(index)?)),
         GPUVendor::Other => Err(SensorError::NotSupported),
     }
 }
@@ -172,6 +185,36 @@ mod nvidia_gpu {
                 total_power_watts: power_usage_mw as f64 / 1000.0,
                 usage_percent: utilization.gpu as f64,
                 vram_usage_percent: utilization.memory as f64,
+            };
+
+            Ok(Event::new(data))
+        }
+    }
+}
+
+mod intel_gpu {
+    use super::{Sensor, SensorError};
+    use crate::core::types::{Event, GPUData};
+
+    pub struct IntelGPUSensor {
+        index: u32,
+    }
+
+    impl IntelGPUSensor {
+        pub fn new(index: u32) -> Result<Self, SensorError> {
+            // Initialize Intel GPU sensor here
+            Ok(IntelGPUSensor { index })
+        }
+    }
+
+    impl Sensor<GPUData> for IntelGPUSensor {
+        fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
+            // Read Intel GPU data here
+            // Placeholder implementation
+            let data = GPUData {
+                total_power_watts: 0.0,
+                usage_percent: 0.0,
+                vram_usage_percent: 0.0,
             };
 
             Ok(Event::new(data))

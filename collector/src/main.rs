@@ -7,7 +7,10 @@ use std::{
 };
 
 use chrono::{DateTime, Utc};
-use collector::{database::Database, sensors, sensors::Sensor};
+use collector::{
+    database::Database,
+    sensors::{self, Sensor, cpu, gpu},
+};
 use rusqlite::{Connection, Result, ToSql};
 use tray_icon::{
     Icon, TrayIconBuilder, TrayIconEvent,
@@ -15,42 +18,96 @@ use tray_icon::{
 };
 
 fn main() {
+    check_permissions();
+
+    // Initialize hardware informations
+    println!("\nDETECTED HARDWARE:\n");
     let sensors_cpu = sensors::cpu::get_cpu_list();
-    println!("Detected CPUs:");
-    for (i, cpu) in sensors_cpu.iter().enumerate() {
-        println!("  {}: {}", i, cpu);
-    }
+    println!("Detected CPU cores: {:?}", sensors_cpu.len());
 
     let sensors_gpu = sensors::gpu::get_gpu_list();
-    println!("Detected GPUs:");
-    for (i, gpu) in sensors_gpu.iter().enumerate() {
-        println!("  {}: {}", i, gpu);
+    println!("Detected GPUs: {:?}", sensors_gpu.len());
+
+    println!();
+
+    println!("POWER CONSUMPTION MONITORING:");
+
+    // loop {
+    thread::sleep(Duration::from_secs(5));
+
+    println!("\nCPU {:?}:\n", sensors_cpu.first().unwrap());
+    let sensor_cpu = sensors::cpu::get_cpu_power_sensor(0);
+    match sensor_cpu {
+        Ok(sensor) => match sensor.read_full_data() {
+            Ok(event) => {
+                println!("Power Consumption: {:.3} W", event.data().total_power_watts);
+                println!("CPU Usage: {:.2} %", event.data().usage_percent);
+            }
+            Err(e) => {
+                println!("Error reading CPU data: {:?}", e);
+            }
+        },
+        Err(e) => {
+            println!("Error initializing CPU sensor: {:?}", e);
+        }
     }
 
-    // let helper = AdlxHelper::new().unwrap();
-    // let system = helper.system();
-    // let perfo = system.performance_monitoring_services().unwrap();
+    let mut index = 0;
+    let mut prev = gpu::GPUVendor::Other;
+    for (_, gpu) in sensors_gpu.iter().enumerate() {
+        let current = gpu::GPUVendor::from_str(&gpu);
+        if prev.differs(current) && current != gpu::GPUVendor::Other {
+            println!("\nGPU {:?}:\n", gpu);
 
-    // let gpu_list = system.gpus().unwrap();
-    // println!("Number of GPUs: {}", gpu_list.size());
+            let sensor_gpu = sensors::gpu::get_gpu_power_sensor(&gpu, index);
+            match sensor_gpu {
+                Ok(sensor) => match sensor.read_full_data() {
+                    Ok(event) => {
+                        println!("Power Consumption: {:.3} W", event.data().total_power_watts);
+                        println!("GPU Usage: {:.2} %", event.data().usage_percent);
+                        println!("VRAM Usage: {:.2} %", event.data().vram_usage_percent);
+                    }
+                    Err(e) => {
+                        println!("Error reading GPU data: {:?}", e);
+                    }
+                },
+                Err(e) => {
+                    println!("Error initializing GPU sensor: {:?}", e);
+                }
+            }
 
-    // for gpu in 0..gpu_list.size() {
-    //     let gpu = gpu_list.at(gpu).unwrap();
-    //     println!("GPU Name: {}", gpu.name().unwrap());
+            index = 0;
+        }
+        prev = gpu::GPUVendor::from_str(&gpu);
+        index += 1;
+    }
 
-    //     let gpumetrics = perfo.current_gpu_metrics(&gpu).unwrap();
-    //     // let power = gpumetrics.power().unwrap();
-    //     let usage = gpumetrics.usage().unwrap();
-    //     // let vram: i32 = gpumetrics.vram().unwrap();
-
-    //     // println!("Power (mW): {}", power);
-    //     println!("Usage (%): {}", usage);
-    //     // println!("VRAM Usage (MB): {}", vram);
-    //     // let gpu1 = gpu.cast::<Gpu1>().unwrap();
-    //     // dbg!(gpu1.name()).unwrap();
-    //     // dbg!(gpu1.product_name()).unwrap();
     // }
 }
+
+// let helper = AdlxHelper::new().unwrap();
+// let system = helper.system();
+// let perfo = system.performance_monitoring_services().unwrap();
+
+// let gpu_list = system.gpus().unwrap();
+// println!("Number of GPUs: {}", gpu_list.size());
+
+// for gpu in 0..gpu_list.size() {
+//     let gpu = gpu_list.at(gpu).unwrap();
+//     println!("GPU Name: {}", gpu.name().unwrap());
+
+//     let gpumetrics = perfo.current_gpu_metrics(&gpu).unwrap();
+//     // let power = gpumetrics.power().unwrap();
+//     let usage = gpumetrics.usage().unwrap();
+//     // let vram: i32 = gpumetrics.vram().unwrap();
+
+//     // println!("Power (mW): {}", power);
+//     println!("Usage (%): {}", usage);
+//     // println!("VRAM Usage (MB): {}", vram);
+//     // let gpu1 = gpu.cast::<Gpu1>().unwrap();
+//     // dbg!(gpu1.name()).unwrap();
+//     // dbg!(gpu1.product_name()).unwrap();
+// }
 
 // // pub fn main() {
 //     // let conn = Connection::open("test.db").unwrap();
