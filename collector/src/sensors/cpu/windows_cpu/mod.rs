@@ -1,6 +1,7 @@
 use std::{cell::RefCell, time::Instant};
 
 use driver::WinRing0Reader;
+use sysinfo::System;
 
 use super::{CPUVendor, Sensor, SensorError};
 use crate::core::types::{CPUData, Event};
@@ -30,6 +31,7 @@ impl Default for EnergyMeasurement {
 pub struct WindowsCPUSensor {
     measurement_source: MeasurementSource,
     last_energy_measurement: RefCell<EnergyMeasurement>,
+    sys: RefCell<System>,
 }
 
 impl WindowsCPUSensor {
@@ -40,10 +42,13 @@ impl WindowsCPUSensor {
             .unwrap_or(MeasurementSource::Estimation);
 
         let last_energy_measurement = EnergyMeasurement::default();
+        let mut sys = System::new_all();
+        sys.refresh_all();
 
         WindowsCPUSensor {
             measurement_source,
             last_energy_measurement: RefCell::new(last_energy_measurement),
+            sys: RefCell::new(sys),
         }
     }
 
@@ -64,8 +69,12 @@ impl WindowsCPUSensor {
     }
 
     fn read_cpu_usage(&self) -> Result<f64, SensorError> {
-        // TODO: fetch CPU usage
-        Ok(0.0)
+        let mut sys = self.sys.borrow_mut();
+        sys.refresh_all();
+
+        // Calculate total usage across all CPUs and divide by number of CPUs
+        let total_usage: f32 = sys.cpus().iter().map(|cpu| cpu.cpu_usage()).sum::<f32>() / sys.cpus().len() as f32;
+        Ok(total_usage as f64)
     }
 }
 
