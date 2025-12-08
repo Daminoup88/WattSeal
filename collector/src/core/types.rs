@@ -49,7 +49,7 @@ impl<T> Event<T> {
 
 #[derive(Debug, Clone)]
 pub struct CPUData {
-    pub total_power_watts: f64,
+    pub total_power_watts: Option<f64>,
     pub pp0_power_watts: Option<f64>,
     pub pp1_power_watts: Option<f64>,
     pub dram_power_watts: Option<f64>,
@@ -58,9 +58,9 @@ pub struct CPUData {
 
 #[derive(Debug, Clone)]
 pub struct GPUData {
-    pub total_power_watts: f64,
-    pub usage_percent: f64,
-    pub vram_usage_percent: f64,
+    pub total_power_watts: Option<f64>,
+    pub usage_percent: Option<f64>,
+    pub vram_usage_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone)]

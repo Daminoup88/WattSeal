@@ -15,6 +15,7 @@ win_ring0 = { git = "https://github.com/alex-dow/winRing0-rs" }
 adlx = "0.0.0-alpha.1"
 chrono = { version = "0.4.42", features = ["clock"] }
 is-admin = "0.1.4"
+memmap2 = "0.9.9"
 nvml-wrapper = "0.11.0"
 rusqlite = { version = "0.37.0", features = ["bundled", "chrono"] }
 sysinfo = "0.37.2"

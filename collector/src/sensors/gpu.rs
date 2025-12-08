@@ -132,9 +132,9 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_power_watts: power_mw as f64 / 1000.0,
-                usage_percent: usage as f64,
-                vram_usage_percent: memory as f64,
+                total_power_watts: Some(power_mw as f64 / 1000.0),
+                usage_percent: Some(usage as f64),
+                vram_usage_percent: Some(memory as f64),
             };
 
             Ok(Event::new(data))
@@ -182,9 +182,9 @@ mod nvidia_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_power_watts: power_usage_mw as f64 / 1000.0,
-                usage_percent: utilization.gpu as f64,
-                vram_usage_percent: utilization.memory as f64,
+                total_power_watts: Some(power_usage_mw as f64 / 1000.0),
+                usage_percent: Some(utilization.gpu as f64),
+                vram_usage_percent: Some(utilization.memory as f64),
             };
 
             Ok(Event::new(data))
@@ -212,9 +212,9 @@ mod intel_gpu {
             // Read Intel GPU data here
             // Placeholder implementation
             let data = GPUData {
-                total_power_watts: 0.0,
-                usage_percent: 0.0,
-                vram_usage_percent: 0.0,
+                total_power_watts: None,
+                usage_percent: None,
+                vram_usage_percent: None,
             };
 
             Ok(Event::new(data))

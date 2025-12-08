@@ -1,8 +1,11 @@
 #![allow(dead_code, unused_imports)]
 
 use std::{
+    os::raw::{c_uint, c_ulonglong, c_void},
+    ptr,
     sync::mpsc,
     thread,
+    thread::sleep,
     time::{Duration, SystemTime, UNIX_EPOCH},
 };
 
@@ -16,6 +19,97 @@ use tray_icon::{
     Icon, TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, MenuItemKind},
 };
+
+// use memmap2::MmapOptions;
+// use std::{fs::File, path::Path, process::Command, slice};
+// use std::os::windows::process::CommandExt;
+
+// const HWINFO_SHARED_MEM_NAMES: [&str; 2] = [
+//     r"\\.\Global\HWiNFO_SENS_SM1",
+//     r"\\.\Global\HWiNFO_SENS_SM2",
+// ];
+
+// #[repr(C)]
+// #[derive(Debug, Copy, Clone, Default)]
+// struct SensorEntry {
+//     id: u32,
+//     value: f32,
+//     // add more fields if needed from HWInfo docs
+// }
+
+// fn main() {
+//     let installer_path = r"C:\Users\pmall\Downloads\hw64_410.exe"; // path to downloaded installer
+
+//     if !Path::new(installer_path).exists() {
+//         println!("❌ Please download HWiNFO64.EXE to {}", installer_path);
+//         return;
+//     }
+
+//     // Silent install without showing installer window
+//     let status = Command::new(installer_path)
+//         .args(&["/install", "/silent", "/norestart"])
+//         .creation_flags(0x08000000) // CREATE_NO_WINDOW
+//         .status()
+//         .expect("Failed to run HWInfo installer");
+
+//     if !status.success() {
+//         println!("❌ HWInfo installation failed");
+//         return;
+//     }
+
+//     println!("✅ HWInfo installed. Starting in sensor-only mode...");
+
+//     // Start HWInfo sensor-only hidden
+//     let _hwinfo = Command::new(r"C:\Program Files\HWiNFO64\HWiNFO64.EXE")
+//         .args(&["/sensoronly", "/minimized"])
+//         .creation_flags(0x08000000) // CREATE_NO_WINDOW
+//         .spawn()
+//         .expect("Failed to start HWInfo in sensor-only mode");
+
+//     // Give HWInfo a few seconds to initialize sensors
+//     thread::sleep(Duration::from_secs(3));
+
+//     // Try both possible shared memory names
+//     let mut mmap_opt = None;
+//     for name in HWINFO_SHARED_MEM_NAMES.iter() {
+//         if let Ok(file) = File::open(name) {
+//             mmap_opt = Some(unsafe { MmapOptions::new().map(&file).expect("Failed to map shared memory") });
+//             break;
+//         }
+//     }
+
+//     let mmap = match mmap_opt {
+//         Some(m) => m,
+//         None => {
+//             println!("❌ Could not open HWInfo shared memory. Make sure HWInfo is running.");
+//             return;
+//         }
+//     };
+
+//     // Read sensors
+//     let entries: &[SensorEntry] = unsafe {
+//         let ptr = mmap.as_ptr() as *const SensorEntry;
+//         slice::from_raw_parts(ptr, mmap.len() / std::mem::size_of::<SensorEntry>())
+//     };
+
+//     println!("HWInfo sensors detected: {}", entries.len());
+//     for entry in entries.iter().take(20) { // just print first 20 for brevity
+//         println!("Sensor ID: {:>4}, Value: {:.2}", entry.id, entry.value);
+//     }
+
+//     println!("✅ Done reading HWInfo sensors.");
+
+//     // Optional: uninstall HWInfo silently
+//     let uninstall_status = Command::new(installer_path)
+//         .args(&["/uninstall", "/silent"])
+//         .creation_flags(0x08000000) // CREATE_NO_WINDOW
+//         .status()
+//         .expect("Failed to uninstall HWInfo");
+
+//     if uninstall_status.success() {
+//         println!("✅ HWInfo uninstalled safely");
+//     }
+// }
 
 fn main() {
     check_permissions();
@@ -41,12 +135,27 @@ fn main() {
 
     println!("POWER CONSUMPTION MONITORING:");
     loop {
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(1000));
 
         println!("\nCPU {:?}:", sensors_cpu.first().unwrap());
         match sensor_cpu.as_ref().unwrap().read_full_data() {
             Ok(event) => {
-                println!("Power Consumption: {:.3} W", event.data().total_power_watts);
+                println!(
+                    "Power Consumption PKG: {:.3} W",
+                    event.data().total_power_watts.unwrap_or(-1.0)
+                );
+                println!(
+                    "Power Consumption PP0: {:.3} W",
+                    event.data().pp0_power_watts.unwrap_or(-1.0)
+                );
+                println!(
+                    "Power Consumption PP1: {:.3} W",
+                    event.data().pp1_power_watts.unwrap_or(-1.0)
+                );
+                println!(
+                    "Power Consumption DRAM: {:.3} W",
+                    event.data().dram_power_watts.unwrap_or(-1.0)
+                );
                 println!("CPU Usage: {:.2} %", event.data().usage_percent);
             }
             Err(e) => {
@@ -65,9 +174,12 @@ fn main() {
                 match sensor_gpu {
                     Ok(sensor) => match sensor.read_full_data() {
                         Ok(event) => {
-                            println!("Power Consumption: {:.3} W", event.data().total_power_watts);
-                            println!("GPU Usage: {:.2} %", event.data().usage_percent);
-                            println!("VRAM Usage: {:.2} %", event.data().vram_usage_percent);
+                            println!(
+                                "Power Consumption: {:.3} W",
+                                event.data().total_power_watts.unwrap_or(-1.0)
+                            );
+                            println!("GPU Usage: {:.2} %", event.data().usage_percent.unwrap_or(-1.0));
+                            println!("VRAM Usage: {:.2} %", event.data().vram_usage_percent.unwrap_or(-1.0));
                         }
                         Err(e) => {
                             println!("Error reading GPU data: {:?}", e);
