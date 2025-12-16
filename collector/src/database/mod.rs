@@ -272,4 +272,50 @@ impl Database {
     pub fn delete_data_before_date(&self, before_date: DateTime<Utc>) -> Result<(usize, usize)> {
         tables::delete_data_before_date(&self.conn, before_date)
     }
+
+    // ===== SCREEN DATA OPERATIONS =====
+
+    /// Get the last N screen data entries
+    pub fn get_last_screen_entries(&self, limit: usize) -> Result<Vec<Event<ScreenData>>> {
+        tables::get_last_screen_entries(&self.conn, limit)
+    }
+
+    /// Get total count of screen data entries
+    pub fn get_screen_data_count(&self) -> Result<i64> {
+        tables::get_screen_data_count(&self.conn)
+    }
+
+    // ===== BATTERY DATA OPERATIONS =====
+
+    /// Get the last N battery data entries
+    pub fn get_last_battery_entries(&self, limit: usize) -> Result<Vec<Event<BatteryData>>> {
+        tables::get_last_battery_entries(&self.conn, limit)
+    }
+
+    /// Get total count of battery data entries
+    pub fn get_battery_data_count(&self) -> Result<i64> {
+        tables::get_battery_data_count(&self.conn)
+    }
+
+    /// Get battery health percentage
+    pub fn get_latest_battery_health(&self) -> Result<f64> {
+        tables::get_latest_battery_health(&self.conn)
+    }
+
+    // ===== PERIPHERALS DATA OPERATIONS =====
+
+    /// Get the last N peripherals data entries
+    pub fn get_last_peripherals_entries(&self, limit: usize) -> Result<Vec<Event<PeripheralsData>>> {
+        tables::get_last_peripherals_entries(&self.conn, limit)
+    }
+
+    /// Get total count of peripherals data entries
+    pub fn get_peripherals_data_count(&self) -> Result<i64> {
+        tables::get_peripherals_data_count(&self.conn)
+    }
+
+    /// Get all currently connected peripherals
+    pub fn get_connected_peripherals(&self) -> Result<Vec<Event<PeripheralsData>>> {
+        tables::get_connected_peripherals(&self.conn)
+    }
 }
