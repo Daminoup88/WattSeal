@@ -19,22 +19,16 @@
 use std::{fmt::Display, time::SystemTime};
 
 #[derive(Debug, Clone)]
-pub struct Event<T> {
+pub struct Event {
     time: SystemTime,
-    data: T,
+    data: Vec<SensorData>,
 }
 
-impl Display for Event<f64> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} at {:?}", self.data, self.time)
-    }
-}
-
-impl<T> Event<T> {
-    pub fn new(value: T) -> Self {
+impl Event {
+    pub fn new(value: Vec<impl Into<SensorData>>) -> Self {
         Event {
             time: SystemTime::now(),
-            data: value,
+            data: value.into_iter().map(|v| v.into()).collect(),
         }
     }
 
@@ -42,7 +36,7 @@ impl<T> Event<T> {
         self.time
     }
 
-    pub fn data(&self) -> &T {
+    pub fn data(&self) -> &Vec<SensorData> {
         &self.data
     }
 }
@@ -87,4 +81,43 @@ pub struct PeripheralsData {
     pub device_type: String,
     pub manufacturer: String,
     pub is_connected: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum SensorData {
+    CPU(CPUData),
+    GPU(GPUData),
+    Screen(ScreenData),
+    Battery(BatteryData),
+    Peripherals(PeripheralsData),
+}
+
+impl From<CPUData> for SensorData {
+    fn from(data: CPUData) -> Self {
+        SensorData::CPU(data)
+    }
+}
+
+impl From<GPUData> for SensorData {
+    fn from(data: GPUData) -> Self {
+        SensorData::GPU(data)
+    }
+}
+
+impl From<ScreenData> for SensorData {
+    fn from(data: ScreenData) -> Self {
+        SensorData::Screen(data)
+    }
+}
+
+impl From<BatteryData> for SensorData {
+    fn from(data: BatteryData) -> Self {
+        SensorData::Battery(data)
+    }
+}
+
+impl From<PeripheralsData> for SensorData {
+    fn from(data: PeripheralsData) -> Self {
+        SensorData::Peripherals(data)
+    }
 }

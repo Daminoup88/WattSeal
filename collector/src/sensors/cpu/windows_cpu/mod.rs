@@ -103,7 +103,7 @@ impl WindowsCPUSensor {
 }
 
 impl Sensor<CPUData> for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<Event<CPUData>, SensorError> {
+    fn read_full_data(&self) -> Result<CPUData, SensorError> {
         let cpu_power_values = self.read_raw_power()?;
         let usage = self.read_cpu_usage()?;
 
@@ -114,7 +114,7 @@ impl Sensor<CPUData> for WindowsCPUSensor {
             dram_power_watts: cpu_power_values.dram,
             usage_percent: usage,
         };
-        Ok(Event::new(data))
+        Ok(data)
     }
 }
 

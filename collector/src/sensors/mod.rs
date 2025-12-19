@@ -4,7 +4,7 @@ pub mod cpu;
 pub mod gpu;
 
 pub trait Sensor<T> {
-    fn read_full_data(&self) -> Result<Event<T>, SensorError>;
+    fn read_full_data(&self) -> Result<T, SensorError>;
 }
 
 #[derive(Debug)]

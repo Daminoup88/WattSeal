@@ -116,7 +116,7 @@ mod amd_gpu {
     }
 
     impl Sensor<GPUData> for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
+        fn read_full_data(&self) -> Result<GPUData, SensorError> {
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
@@ -137,7 +137,7 @@ mod amd_gpu {
                 vram_usage_percent: Some(memory as f64),
             };
 
-            Ok(Event::new(data))
+            Ok(data)
         }
     }
 }
@@ -168,7 +168,7 @@ mod nvidia_gpu {
     }
 
     impl Sensor<GPUData> for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
+        fn read_full_data(&self) -> Result<GPUData, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
@@ -187,7 +187,7 @@ mod nvidia_gpu {
                 vram_usage_percent: Some(utilization.memory as f64),
             };
 
-            Ok(Event::new(data))
+            Ok(data)
         }
     }
 }
@@ -208,7 +208,7 @@ mod intel_gpu {
     }
 
     impl Sensor<GPUData> for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<Event<GPUData>, SensorError> {
+        fn read_full_data(&self) -> Result<GPUData, SensorError> {
             // Read Intel GPU data here
             // Placeholder implementation
             let data = GPUData {
@@ -217,7 +217,7 @@ mod intel_gpu {
                 vram_usage_percent: None,
             };
 
-            Ok(Event::new(data))
+            Ok(data)
         }
     }
 }
