@@ -40,7 +40,7 @@ pub fn get_cpu_list() -> Vec<String> {
     s.cpus().iter().map(|cpu| cpu.brand().to_string()).collect()
 }
 
-pub fn get_cpu_power_sensor(index: usize) -> Result<impl Sensor<CPUData>, SensorError> {
+pub fn get_cpu_power_sensor(index: usize) -> Result<impl Sensor, SensorError> {
     let s = sysinfo::System::new_all();
     let cpu = s.cpus().get(index);
     let vendor_id = match cpu {

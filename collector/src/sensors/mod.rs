@@ -1,10 +1,10 @@
-use crate::core::types::Event;
+use crate::core::types::{Event, SensorData};
 
 pub mod cpu;
 pub mod gpu;
 
-pub trait Sensor<T> {
-    fn read_full_data(&self) -> Result<T, SensorError>;
+pub trait Sensor {
+    fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError>;
 }
 
 #[derive(Debug)]

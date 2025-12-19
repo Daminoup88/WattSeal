@@ -92,6 +92,30 @@ pub enum SensorData {
     Peripherals(PeripheralsData),
 }
 
+impl Display for SensorData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SensorData::CPU(data) => {
+                writeln!(f, "  Power PKG:  {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Power PP0:  {:.3} W", data.pp0_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Power PP1:  {:.3} W", data.pp1_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Power DRAM: {:.3} W", data.dram_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Usage:      {:.2} %", data.usage_percent)?;
+                Ok(())
+            }
+            SensorData::GPU(data) => {
+                writeln!(f, "  Power:       {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
+                writeln!(f, "  VRAM Usage:  {:.2} %", data.vram_usage_percent.unwrap_or(-1.0))?;
+                Ok(())
+            }
+            SensorData::Screen(data) => write!(f, "Screen Data: {:?}", data),
+            SensorData::Battery(data) => write!(f, "Battery Data: {:?}", data),
+            SensorData::Peripherals(data) => write!(f, "Peripherals Data: {:?}", data),
+        }
+    }
+}
+
 impl From<CPUData> for SensorData {
     fn from(data: CPUData) -> Self {
         SensorData::CPU(data)

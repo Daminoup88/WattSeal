@@ -2,7 +2,7 @@ use sysinfo::System;
 use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 
 use super::{Sensor, SensorError};
-use crate::core::types::{Event, GPUData};
+use crate::core::types::{Event, GPUData, SensorData};
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum GPUVendor {
@@ -72,12 +72,29 @@ pub fn get_gpu_list() -> Vec<String> {
     list
 }
 
-pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<Box<dyn Sensor<GPUData>>, SensorError> {
+pub enum GPUSensor {
+    Nvidia(nvidia_gpu::NvidiaGPUSensor),
+    Amd(amd_gpu::AmdGPUSensor),
+    Intel(intel_gpu::IntelGPUSensor),
+}
+
+impl Sensor for GPUSensor {
+    fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+        let data = match self {
+            GPUSensor::Nvidia(sensor) => sensor.read_full_data()?.into(),
+            GPUSensor::Amd(sensor) => sensor.read_full_data()?.into(),
+            GPUSensor::Intel(sensor) => sensor.read_full_data()?.into(),
+        };
+        Ok(data)
+    }
+}
+
+pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<GPUSensor, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
     match vendor {
-        GPUVendor::Amd => Ok(Box::new(amd_gpu::AmdGPUSensor::new(index)?)),
-        GPUVendor::Nvidia => Ok(Box::new(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
-        GPUVendor::Intel => Ok(Box::new(intel_gpu::IntelGPUSensor::new(index)?)),
+        GPUVendor::Amd => Ok(GPUSensor::Amd(amd_gpu::AmdGPUSensor::new(index)?)),
+        GPUVendor::Nvidia => Ok(GPUSensor::Nvidia(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
+        GPUVendor::Intel => Ok(GPUSensor::Intel(intel_gpu::IntelGPUSensor::new(index)?)),
         GPUVendor::Other => Err(SensorError::NotSupported),
     }
 }
@@ -91,7 +108,7 @@ mod amd_gpu {
     };
 
     use super::{Sensor, SensorError};
-    use crate::core::types::{Event, GPUData};
+    use crate::core::types::{Event, GPUData, SensorData};
 
     pub struct AmdGPUSensor {
         gpu_metrics: GpuMetrics,
@@ -115,8 +132,8 @@ mod amd_gpu {
         }
     }
 
-    impl Sensor<GPUData> for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<GPUData, SensorError> {
+    impl Sensor for AmdGPUSensor {
+        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
@@ -146,7 +163,7 @@ mod nvidia_gpu {
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
-    use crate::core::types::{Event, GPUData};
+    use crate::core::types::{Event, GPUData, SensorData};
 
     pub struct NvidiaGPUSensor {
         nvml: Nvml,
@@ -167,8 +184,8 @@ mod nvidia_gpu {
         }
     }
 
-    impl Sensor<GPUData> for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<GPUData, SensorError> {
+    impl Sensor for NvidiaGPUSensor {
+        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
@@ -194,7 +211,7 @@ mod nvidia_gpu {
 
 mod intel_gpu {
     use super::{Sensor, SensorError};
-    use crate::core::types::{Event, GPUData};
+    use crate::core::types::{Event, GPUData, SensorData};
 
     pub struct IntelGPUSensor {
         index: u32,
@@ -207,8 +224,8 @@ mod intel_gpu {
         }
     }
 
-    impl Sensor<GPUData> for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<GPUData, SensorError> {
+    impl Sensor for IntelGPUSensor {
+        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
             // Read Intel GPU data here
             // Placeholder implementation
             let data = GPUData {

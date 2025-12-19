@@ -4,7 +4,7 @@ use driver::WinRing0Reader;
 use sysinfo::System;
 
 use super::{CPUVendor, Sensor, SensorError};
-use crate::core::types::{CPUData, Event};
+use crate::core::types::{CPUData, Event, SensorData};
 
 mod driver;
 
@@ -102,8 +102,8 @@ impl WindowsCPUSensor {
     }
 }
 
-impl Sensor<CPUData> for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<CPUData, SensorError> {
+impl Sensor for WindowsCPUSensor {
+    fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
         let cpu_power_values = self.read_raw_power()?;
         let usage = self.read_cpu_usage()?;
 
