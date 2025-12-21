@@ -25,15 +25,6 @@ impl GPUVendor {
             GPUVendor::Other
         }
     }
-
-    pub fn differs(&self, other: GPUVendor) -> bool {
-        match (self, other) {
-            (GPUVendor::Nvidia, GPUVendor::Nvidia) => false,
-            (GPUVendor::Amd, GPUVendor::Amd) => false,
-            (GPUVendor::Other, GPUVendor::Other) => false,
-            _ => true,
-        }
-    }
 }
 
 pub fn get_gpu_list() -> Vec<String> {
