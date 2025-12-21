@@ -103,7 +103,7 @@ impl WindowsCPUSensor {
 }
 
 impl Sensor for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let cpu_power_values = self.read_raw_power()?;
         let usage = self.read_cpu_usage()?;
 
@@ -114,7 +114,7 @@ impl Sensor for WindowsCPUSensor {
             dram_power_watts: cpu_power_values.dram,
             usage_percent: usage,
         };
-        Ok(data)
+        Ok(data.into())
     }
 }
 

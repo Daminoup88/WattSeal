@@ -11,7 +11,7 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use collector::{
-    core::types::{BatteryData, CPUData, Event, GPUData, PeripheralsData, ScreenData},
+    core::types::{BatteryData, CPUData, Event, GPUData, PeripheralsData, ScreenData, SensorData},
     database::Database,
     sensors::{self, Sensor, cpu, gpu},
 };
@@ -26,11 +26,7 @@ fn main() {
     check_permissions();
 
     println!("\n========== INITIALIZING SYSTEM ==========\n");
-
-    // Initialize database
-    let database = Database::new("power_monitoring.db").unwrap();
-    database.create_tables_if_not_exists().unwrap();
-    println!("✓ Database initialized");
+    let mut sensors = Vec::new();
 
     // Initialize hardware information
     let hw_info = HardwareInfo::query().unwrap();
@@ -39,33 +35,37 @@ fn main() {
     // Initialize CPU sensor
     println!("\nInitializing sensors...");
     let sensor_cpu = sensors::cpu::get_cpu_power_sensor(0);
-    match &sensor_cpu {
-        Ok(_) => println!("✓ CPU Power Sensor initialized successfully"),
+    match sensor_cpu {
+        Ok(sensor) => {
+            println!("✓ CPU Power Sensor initialized successfully");
+            sensors.push(sensor);
+        }
         Err(e) => {
             eprintln!("✗ Failed to initialize CPU Power Sensor: {:?}", e);
             eprintln!("Note: Make sure you're running as Administrator");
         }
     }
 
-    // Initialize GPU sensor for Intel Arc
-    let gpu_sensors: Vec<_> = hw_info
-        .gpus()
-        .iter()
-        .enumerate()
-        .filter_map(|(index, gpu)| {
-            let gpu_name = format!("{} {}", gpu.vendor(), gpu.model_name());
-            match sensors::gpu::get_gpu_power_sensor(&gpu_name, index as u32) {
-                Ok(sensor) => {
-                    println!("✓ GPU Sensor initialized for: {}", gpu_name);
-                    Some(sensor)
-                }
-                Err(e) => {
-                    println!("✗ Failed to initialize GPU sensor for {}: {:?}", gpu_name, e);
-                    None
-                }
+    // Initialize GPU sensors
+    for (i, gpu) in hw_info.gpus().iter().enumerate() {
+        let gpu_name = format!("{} {}", gpu.vendor(), gpu.model_name());
+        let sensor_gpu = sensors::gpu::get_gpu_power_sensor(&gpu_name, i as u32);
+        match sensor_gpu {
+            Ok(sensor) => {
+                println!("✓ GPU Sensor {} initialized for: {}", i, gpu_name);
+                sensors.push(sensor);
             }
-        })
-        .collect();
+            Err(e) => {
+                println!("✗ Failed to initialize GPU sensor for {}: {:?}", gpu_name, e);
+            }
+        }
+    }
+
+    println!("\n========== SETTING UP DATABASE ==========");
+    // Initialize database
+    let mut database = Database::new("power_monitoring.db").unwrap();
+    database.create_tables_if_not_exists(&sensors).unwrap();
+    println!("✓ Database initialized");
 
     println!("\n========== POWER CONSUMPTION MONITORING ==========");
     println!("Logging data to database every second. Press Ctrl+C to stop.\n");
@@ -77,64 +77,10 @@ fn main() {
 
         println!("\n--- Iteration {} ---", iteration);
 
-        // Read and save CPU data
-        if let Ok(ref sensor) = sensor_cpu {
-            match sensor.read_full_data() {
-                Ok(event) => {
-                    // Save to database
-                    match database.insert_cpu_data(&event) {
-                        Ok(_) => println!("✓ CPU data saved to database"),
-                        Err(e) => eprintln!("✗ Failed to save CPU data: {:?}", e),
-                    }
-
-                    // Print CPU data
-                    println!("CPU:");
-                    println!("  Power PKG:  {:.3} W", event.data().total_power_watts.unwrap_or(-1.0));
-                    println!("  Power PP0:  {:.3} W", event.data().pp0_power_watts.unwrap_or(-1.0));
-                    println!("  Power PP1:  {:.3} W", event.data().pp1_power_watts.unwrap_or(-1.0));
-                    println!("  Power DRAM: {:.3} W", event.data().dram_power_watts.unwrap_or(-1.0));
-                    println!("  Usage:      {:.2} %", event.data().usage_percent);
-                }
-                Err(e) => {
-                    eprintln!("✗ Error reading CPU data: {:?}", e);
-                }
-            }
-        }
-
-        // Read and save GPU data
-        for (index, gpu_sensor) in gpu_sensors.iter().enumerate() {
-            match gpu_sensor.read_full_data() {
-                Ok(event) => {
-                    // Save to database
-                    match database.insert_gpu_data(&event) {
-                        Ok(_) => println!("✓ GPU {} data saved to database", index),
-                        Err(e) => eprintln!("✗ Failed to save GPU {} data: {:?}", index, e),
-                    }
-
-                    // Print GPU data
-                    println!("GPU {}:", index);
-                    println!("  Power:       {:.3} W", event.data().total_power_watts.unwrap_or(-1.0));
-                    println!("  Usage:       {:.2} %", event.data().usage_percent.unwrap_or(-1.0));
-                    println!(
-                        "  VRAM Usage:  {:.2} %",
-                        event.data().vram_usage_percent.unwrap_or(-1.0)
-                    );
-                }
-                Err(e) => {
-                    eprintln!("✗ Error reading GPU {} data: {:?}", index, e);
-                }
-            }
-        }
-
-        // Print database stats every 10 iterations
-        if iteration % 10 == 0 {
-            if let Ok(cpu_count) = database.get_cpu_data_count() {
-                println!(
-                    "\n Database: {} CPU records, {} GPU records",
-                    cpu_count,
-                    database.get_gpu_data_count().unwrap_or(0)
-                );
-            }
+        let event = Event::with_sensors(&sensors);
+        match database.insert_event(&event) {
+            Ok(_) => println!("✓ Event data saved to database"),
+            Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
         }
     }
 }

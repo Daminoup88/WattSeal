@@ -18,6 +18,8 @@
 
 use std::{fmt::Display, time::SystemTime};
 
+use crate::sensors::{Sensor, SensorError, SensorType};
+
 #[derive(Debug, Clone)]
 pub struct Event {
     time: SystemTime,
@@ -30,6 +32,22 @@ impl Event {
             time: SystemTime::now(),
             data: value.into_iter().map(|v| v.into()).collect(),
         }
+    }
+
+    pub fn with_sensors(sensors: &Vec<SensorType>) -> Self {
+        let time = SystemTime::now();
+        let mut data = Vec::new();
+        for sensor in sensors {
+            let sensor_data = sensor.read_full_data();
+            match sensor_data {
+                Ok(d) => {
+                    println!("{}", d);
+                    data.push(d);
+                }
+                Err(e) => eprintln!("✗ Error reading sensor data: {:?}", e),
+            }
+        }
+        Event { time, data }
     }
 
     pub fn time(&self) -> SystemTime {

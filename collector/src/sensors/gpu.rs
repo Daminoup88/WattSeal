@@ -1,7 +1,7 @@
 use sysinfo::System;
 use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 
-use super::{Sensor, SensorError};
+use super::{Sensor, SensorError, SensorType};
 use crate::core::types::{Event, GPUData, SensorData};
 
 #[derive(Copy, Clone, PartialEq)]
@@ -79,23 +79,27 @@ pub enum GPUSensor {
 }
 
 impl Sensor for GPUSensor {
-    fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let data = match self {
-            GPUSensor::Nvidia(sensor) => sensor.read_full_data()?.into(),
-            GPUSensor::Amd(sensor) => sensor.read_full_data()?.into(),
-            GPUSensor::Intel(sensor) => sensor.read_full_data()?.into(),
+            GPUSensor::Nvidia(sensor) => sensor.read_full_data()?,
+            GPUSensor::Amd(sensor) => sensor.read_full_data()?,
+            GPUSensor::Intel(sensor) => sensor.read_full_data()?,
         };
         Ok(data)
     }
 }
 
-pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<GPUSensor, SensorError> {
+pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
-    match vendor {
+    let sensor = match vendor {
         GPUVendor::Amd => Ok(GPUSensor::Amd(amd_gpu::AmdGPUSensor::new(index)?)),
         GPUVendor::Nvidia => Ok(GPUSensor::Nvidia(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
         GPUVendor::Intel => Ok(GPUSensor::Intel(intel_gpu::IntelGPUSensor::new(index)?)),
         GPUVendor::Other => Err(SensorError::NotSupported),
+    };
+    match sensor {
+        Ok(s) => Ok(SensorType::GPU(s)),
+        Err(e) => Err(e),
     }
 }
 
@@ -133,7 +137,7 @@ mod amd_gpu {
     }
 
     impl Sensor for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData, SensorError> {
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
@@ -154,7 +158,7 @@ mod amd_gpu {
                 vram_usage_percent: Some(memory as f64),
             };
 
-            Ok(data)
+            Ok(data.into())
         }
     }
 }
@@ -185,7 +189,7 @@ mod nvidia_gpu {
     }
 
     impl Sensor for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
@@ -204,7 +208,7 @@ mod nvidia_gpu {
                 vram_usage_percent: Some(utilization.memory as f64),
             };
 
-            Ok(data)
+            Ok(data.into())
         }
     }
 }
@@ -225,7 +229,7 @@ mod intel_gpu {
     }
 
     impl Sensor for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<impl Into<SensorData>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData, SensorError> {
             // Read Intel GPU data here
             // Placeholder implementation
             let data = GPUData {
@@ -234,7 +238,7 @@ mod intel_gpu {
                 vram_usage_percent: None,
             };
 
-            Ok(data)
+            Ok(data.into())
         }
     }
 }
