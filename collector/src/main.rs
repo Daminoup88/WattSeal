@@ -24,7 +24,7 @@ use tray_icon::{
 };
 
 fn main() {
-    let mut app = CollectorApp::new("power_monitoring.db").expect("Failed to create CollectorApp");
+    let mut app = CollectorApp::new().expect("Failed to create CollectorApp");
     app.initialize().expect("Failed to initialize CollectorApp");
 
     app.run();

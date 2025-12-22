@@ -1,9 +1,11 @@
 use std::thread;
 
+use collector::CollectorApp;
+
 fn main() {
     thread::spawn(|| {
         println!("Starting collector...");
-        let mut app = collector::CollectorApp::new("power_monitoring.db").expect("Failed to create CollectorApp");
+        let mut app = CollectorApp::new().expect("Failed to create CollectorApp");
 
         if let Err(e) = app.initialize() {
             eprintln!("Failed to initialize collector: {}", e);

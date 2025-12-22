@@ -17,8 +17,8 @@ pub struct CollectorApp {
 }
 
 impl CollectorApp {
-    pub fn new(db_path: &str) -> Result<Self, rusqlite::Error> {
-        let database = Database::new(db_path)?;
+    pub fn new() -> Result<Self, rusqlite::Error> {
+        let database = Database::new()?;
         Ok(CollectorApp {
             database,
             sensors: Vec::new(),
@@ -67,7 +67,7 @@ impl CollectorApp {
 
         println!("\n========== SETTING UP DATABASE ==========");
         // Initialize database
-        let mut database = Database::new("power_monitoring.db").unwrap();
+        let mut database = Database::new().map_err(|e| format!("Failed to open database: {}", e))?;
         database
             .create_tables_if_not_exists(&self.sensors)
             .map_err(|e| format!("Failed to create database tables: {}", e))?;

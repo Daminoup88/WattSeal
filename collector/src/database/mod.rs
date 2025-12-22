@@ -5,13 +5,15 @@ pub use tables::*;
 
 use crate::core::types::{BatteryData, CPUData, Event, GPUData, PeripheralsData, ScreenData, SensorData};
 
+pub static DATABASE_PATH: &str = "power_monitoring.db";
+
 pub struct Database {
     conn: rusqlite::Connection,
 }
 
 impl Database {
-    pub fn new(db_path: &str) -> Result<Self> {
-        let conn = Connection::open(db_path)?;
+    pub fn new() -> Result<Self> {
+        let conn = Connection::open(DATABASE_PATH)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "OFF")?;
         Ok(Database { conn })
