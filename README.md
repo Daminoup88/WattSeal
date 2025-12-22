@@ -1,8 +1,6 @@
 # Power Monitor
 
-![Last Commit](https://img.shields.io/github/last-commit/username/repo)
-![CI Status](https://img.shields.io/github/actions/workflow/status/username/repo/ci.yml)
-[![Built with Iced badge]][Iced]
+![Built with Iced badge]
 
 A system power consumption monitoring application built in Rust.
 
@@ -13,7 +11,7 @@ The project is divided into two main components:
 - **Collector**: A background service responsible for querying hardware sensors (CPU, GPU, RAM) and logging power consumption metrics to a database.
 - **UI**: A graphical interface built with Iced that visualizes the collected data in real-time.
 
-[Overall Architecture](overall_architecture.png)
+![Overall Architecture](overall_architecture.svg)
 
 The power consumption has been tested with a Shelly Plug Gen3 S smart plug on various devices.
 

@@ -2,7 +2,7 @@
 
 <div align="center">
 
-[![Built with Iced badge]][Iced]
+![Built with Iced badge]
 
 </div>
 
