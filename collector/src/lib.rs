@@ -1,15 +1,13 @@
 #![allow(dead_code, unused_imports)]
 
-pub mod core;
 pub mod database;
 pub mod sensors;
 
-use core::types::Event;
 use std::{thread, time::Duration};
 
-use database::Database;
+use common::Database;
 use hardware_query::HardwareInfo;
-use sensors::SensorType;
+use sensors::{SensorType, create_event_from_sensors};
 
 pub struct CollectorApp {
     database: Database,
@@ -17,8 +15,8 @@ pub struct CollectorApp {
 }
 
 impl CollectorApp {
-    pub fn new() -> Result<Self, rusqlite::Error> {
-        let database = Database::new()?;
+    pub fn new() -> Result<Self, String> {
+        let database = Database::new().map_err(|e| format!("Failed to create database: {}", e))?;
         Ok(CollectorApp {
             database,
             sensors: Vec::new(),
@@ -86,7 +84,7 @@ impl CollectorApp {
 
             println!("\n--- Iteration {} ---", iteration);
 
-            let event = Event::with_sensors(&self.sensors);
+            let event = create_event_from_sensors(&self.sensors);
             match self.database.insert_event(&event) {
                 Ok(_) => println!("✓ Event data saved to database"),
                 Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),

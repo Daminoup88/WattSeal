@@ -1,4 +1,6 @@
-use crate::core::types::{Event, SensorData};
+use std::time::SystemTime;
+
+use common::{SensorData, database::Event};
 
 pub mod cpu;
 pub mod gpu;
@@ -28,4 +30,20 @@ pub trait Sensor {
 pub enum SensorError {
     NotSupported,
     ReadError(String),
+}
+
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event {
+    let time = SystemTime::now();
+    let mut data = Vec::new();
+    for sensor in sensors {
+        let sensor_data = sensor.read_full_data();
+        match sensor_data {
+            Ok(d) => {
+                println!("{}", d);
+                data.push(d);
+            }
+            Err(e) => eprintln!("✗ Error reading sensor data: {:?}", e),
+        }
+    }
+    Event::new(time, data)
 }

@@ -5,8 +5,9 @@ edition = "2024"
 
 [workspace]
 resolver = "3"
-members = ["collector", "ui"]
+members = ["collector", "ui", "common"]
 
 [dependencies]
 collector = { path = "collector" }
 ui = { path = "ui" }
+common = { path = "common" }

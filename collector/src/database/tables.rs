@@ -1,15 +1,6 @@
-use chrono::{DateTime, Utc};
-use rusqlite::{Connection, Result};
+use common::DatabaseTable;
 
-use crate::{
-    core::types::{BatteryData, CPUData, Event, GPUData, PeripheralsData, ScreenData, SensorData},
-    sensors::{CPUSensor, GPUSensor, Sensor, SensorType},
-};
-
-pub trait DatabaseTable: Sensor {
-    fn table_name(&self) -> &'static str;
-    fn columns(&self) -> &'static [&'static str];
-}
+use crate::sensors::{CPUSensor, GPUSensor, SensorType};
 
 impl DatabaseTable for SensorType {
     fn table_name(&self) -> &'static str {

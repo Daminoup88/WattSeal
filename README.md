@@ -8,8 +8,9 @@ A system power consumption monitoring application built in Rust.
 
 The project is divided into two main components:
 
-- **Collector**: A background service responsible for querying hardware sensors (CPU, GPU, RAM) and logging power consumption metrics to a database.
+- **Collector**: A background service responsible for querying hardware sensors (CPU, GPU, RAM).
 - **UI**: A graphical interface built with Iced that visualizes the collected data in real-time.
+- **Common**: A module that holds common types and handles database interactions for storing and retrieving power consumption data.
 
 ![Overall Architecture](overall_architecture.svg)
 
@@ -26,6 +27,7 @@ cargo run
 To run individual components, see:
 - [Collector](collector/README.md)
 - [UI](ui/README.md)
+- [Common](common/README.md)
 
 **Note**: The application requires Administrator privileges on Windows to access hardware sensors.
 

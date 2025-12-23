@@ -12,12 +12,14 @@ use std::{
 use chrono::{DateTime, Utc};
 use collector::{
     CollectorApp,
-    core::types::{BatteryData, CPUData, Event, GPUData, PeripheralsData, ScreenData, SensorData},
     database::Database,
     sensors::{self, Sensor, cpu, gpu},
 };
+use common::{
+    database::Event,
+    types::{BatteryData, CPUData, GPUData, PeripheralsData, ScreenData, SensorData},
+};
 use hardware_query::HardwareInfo;
-use rusqlite::{Connection, Result, ToSql};
 use tray_icon::{
     Icon, TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, MenuItemKind},
