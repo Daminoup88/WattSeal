@@ -5,7 +5,7 @@ pub mod sensors;
 
 use std::{thread, time::Duration};
 
-use common::Database;
+use database::Database;
 use hardware_query::HardwareInfo;
 use sensors::{SensorType, create_event_from_sensors};
 

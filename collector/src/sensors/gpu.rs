@@ -1,8 +1,8 @@
-use common::{GPUData, SensorData};
 use sysinfo::System;
 use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 
 use super::{Sensor, SensorError, SensorType};
+use crate::database::{GPUData, SensorData};
 
 #[derive(Copy, Clone, PartialEq)]
 pub enum GPUVendor {
@@ -101,9 +101,9 @@ mod amd_gpu {
         gpu::Gpu, gpu_list::GpuList, gpu_metrics::GpuMetrics, helper::AdlxHelper,
         performance_monitoring_services::PerformanceMonitoringServices, system::System,
     };
-    use common::{GPUData, SensorData};
 
     use super::{Sensor, SensorError};
+    use crate::database::{GPUData, SensorData};
 
     pub struct AmdGPUSensor {
         gpu_metrics: GpuMetrics,
@@ -155,10 +155,10 @@ mod amd_gpu {
 }
 
 mod nvidia_gpu {
-    use common::{GPUData, SensorData};
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
+    use crate::database::{GPUData, SensorData};
 
     pub struct NvidiaGPUSensor {
         nvml: Nvml,
@@ -205,9 +205,8 @@ mod nvidia_gpu {
 }
 
 mod intel_gpu {
-    use common::{GPUData, SensorData};
-
     use super::{Sensor, SensorError};
+    use crate::database::{GPUData, SensorData};
 
     pub struct IntelGPUSensor {
         index: u32,

@@ -1,10 +1,10 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{CPUData, SensorData};
 use driver::WinRing0Reader;
 use sysinfo::System;
 
 use super::{CPUVendor, Sensor, SensorError};
+use crate::database::{CPUData, SensorData};
 
 mod driver;
 

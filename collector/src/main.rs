@@ -12,12 +12,8 @@ use std::{
 use chrono::{DateTime, Utc};
 use collector::{
     CollectorApp,
-    database::Database,
+    database::{BatteryData, CPUData, Database, GPUData, PeripheralsData, ScreenData, SensorData},
     sensors::{self, Sensor, cpu, gpu},
-};
-use common::{
-    database::Event,
-    types::{BatteryData, CPUData, GPUData, PeripheralsData, ScreenData, SensorData},
 };
 use hardware_query::HardwareInfo;
 use tray_icon::{

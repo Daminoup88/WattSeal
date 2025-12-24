@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use common::{SensorData, database::Event};
+use crate::database::{Event, SensorData};
 
 pub mod cpu;
 pub mod gpu;

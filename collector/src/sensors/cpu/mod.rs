@@ -1,7 +1,7 @@
-use common::{CPUData, SensorData};
 use windows_cpu::WindowsCPUSensor;
 
 use super::{Sensor, SensorError, SensorType};
+use crate::database::{CPUData, SensorData};
 
 #[cfg(target_os = "windows")]
 mod windows_cpu;
