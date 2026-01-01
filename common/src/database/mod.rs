@@ -1,14 +1,15 @@
 use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, Result, ToSql, params};
+use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
 
 use crate::types::{CPUData, GPUData, SensorData};
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 
 pub struct Database {
-    conn: rusqlite::Connection,
+    conn: Connection,
+    tables: Option<Vec<String>>,
 }
 
 impl Database {
@@ -16,7 +17,15 @@ impl Database {
         let conn = Connection::open(DATABASE_PATH)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "OFF")?;
-        Ok(Database { conn })
+
+        let tables = {
+            let mut stmt = conn.prepare("SELECT detected_materials FROM hardware_info ORDER BY id DESC LIMIT 1")?;
+            match stmt.query_row([], |row| row.get::<_, String>(0)).optional() {
+                Ok(Some(materials)) => Some(materials.split(',').map(|s| s.trim().to_string()).collect()),
+                _ => None,
+            }
+        };
+        Ok(Database { conn, tables })
     }
 
     pub fn create_tables_if_not_exists(&mut self, tables: &Vec<impl DatabaseTable>) -> Result<()> {
@@ -29,15 +38,39 @@ impl Database {
             [],
         )?;
 
+        tx.execute(
+            "CREATE TABLE IF NOT EXISTS hardware_info (
+                    id                 INTEGER PRIMARY KEY,
+                    timestamp_id       INTEGER REFERENCES timestamp(id),
+                    detected_materials TEXT,
+            )",
+            [],
+        )?;
+
+        let mut table_names = Vec::new();
+
         for table in tables {
-            let create_table_sql = format!(
-                "CREATE TABLE IF NOT EXISTS {} ({});",
-                table.table_name(),
-                table.columns().join(", ")
-            );
+            let name = table.table_name();
+            let create_table_sql = format!("CREATE TABLE IF NOT EXISTS {} ({});", name, table.columns().join(", "));
             tx.execute(&create_table_sql, [])?;
+            table_names.push(name.to_string());
         }
+        Self::insert_hardware_info(&tx, Utc::now(), &table_names.join(","))?;
+        self.tables = Some(table_names);
         tx.commit()?;
+        Ok(())
+    }
+
+    pub fn insert_hardware_info(tx: &Transaction, timestamp: DateTime<Utc>, detected_materials: &str) -> Result<()> {
+        tx.execute(
+            "INSERT INTO timestamp (timestamp) VALUES (?1)",
+            params![timestamp.to_rfc3339()],
+        )?;
+        let timestamp_id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO hardware_info (timestamp_id, detected_materials) VALUES (?1, ?2)",
+            params![timestamp_id, detected_materials],
+        )?;
         Ok(())
     }
 
@@ -55,6 +88,35 @@ impl Database {
         }
         tx.commit()?;
         Ok(())
+    }
+
+    pub fn select_last_n_events(&mut self, n: i64) -> Result<Vec<Event>> {
+        let mut events = Vec::new();
+        let mut stmt = self.conn.prepare(
+            "SELECT total_power_watts, pp0_power_watts, pp1_power_watts, dram_power_watts, usage_percent, timestamp FROM timestamp JOIN cpu_data ON timestamp.id = cpu_data.timestamp_id ORDER BY timestamp.id DESC LIMIT ?1",
+        )?;
+        let data_rows = stmt.query_map(params![n], |row| {
+            Ok((
+                CPUData {
+                    total_power_watts: row.get(0)?,
+                    pp0_power_watts: row.get(1)?,
+                    pp1_power_watts: row.get(2)?,
+                    dram_power_watts: row.get(3)?,
+                    usage_percent: row.get(4)?,
+                },
+                row.get::<_, String>(5)?,
+            ))
+        })?;
+        for data_row in data_rows {
+            let (cpu_data, timestamp_str) = data_row?;
+            let timestamp = DateTime::parse_from_rfc3339(&timestamp_str)
+                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?
+                .with_timezone(&Utc)
+                .into();
+            let sensor_data = vec![SensorData::CPU(cpu_data)];
+            events.push(Event::new(timestamp, sensor_data));
+        }
+        Ok(events)
     }
 }
 
