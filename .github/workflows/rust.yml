@@ -1,4 +1,4 @@
-name: Format
+name: Rust CI
 
 on:
   push:
@@ -26,3 +26,19 @@ jobs:
 
       - name: Run Format Check
         run: cargo +nightly fmt -- --check
+
+  build:
+    name: Build
+    runs-on: windows-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v6
+
+      - name: Install stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+
+      - name: Build Project
+        run: cargo build --all
