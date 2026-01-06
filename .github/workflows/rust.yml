@@ -40,8 +40,10 @@ jobs:
           profile: minimal
           toolchain: stable
 
-      - name: Uses cache
+      - name: Use cache
         uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
 
       - name: Compile project
         run: cargo build --all
