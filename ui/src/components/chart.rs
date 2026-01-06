@@ -311,6 +311,7 @@ impl SensorChart {
                         self.push_data_point("GPU Usage", datetime, usage as f32, cutoff);
                     }
                 }
+                // Other sensor types (Screen, Battery, Peripherals) are not displayed in the chart
                 _ => {}
             }
         }
