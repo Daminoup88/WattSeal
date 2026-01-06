@@ -25,7 +25,7 @@ use plotters::{
 use plotters_backend::DrawingBackend;
 use plotters_iced::{Chart, ChartWidget, DrawingArea, Renderer, plotters_backend};
 
-use common::{Event, SensorData, CPUData, GPUData};
+use common::{Event, SensorData};
 
 use crate::{message::Message, themes::AppTheme};
 
