@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use common::{CPUData, Database, DatabaseEntry, GPUData};
+use common::{CPUData, Database, DatabaseEntry, Event, GPUData};
 use iced::{
     Element, Subscription, Task, Theme,
     time::{Duration, every},
@@ -9,7 +9,7 @@ use iced::{
 };
 
 use crate::{
-    components::{chart::ChartData, header::Header},
+    components::header::Header,
     message::Message,
     pages::{Page, chart::ChartPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
     themes::AppTheme,
@@ -53,8 +53,9 @@ impl App {
     pub fn update(&mut self, message: Message) {
         match message {
             Message::Tick => {
-                let chart_data = self.load_latest_chart_data();
-                self.chart_page.update(Message::UpdateChartData(chart_data));
+                if let Some(event) = self.load_latest_event() {
+                    self.chart_page.update(Message::UpdateChartData(event));
+                }
             }
             Message::NavigateTo(page) => {
                 self.current_page = page;
@@ -68,17 +69,11 @@ impl App {
         }
     }
 
-    fn load_latest_chart_data(&mut self) -> ChartData {
-        let mut chart_data: ChartData = HashMap::new();
-        let res = self.database.select_last_n_events(1).unwrap_or_default();
-        for event in res {
-            let event_data: HashMap<String, (DateTime<Utc>, f32)> = event.into();
-            for (key, value) in event_data {
-                chart_data.insert(key, value);
-            }
-        }
-
-        chart_data
+    fn load_latest_event(&mut self) -> Option<Event> {
+        self.database
+            .select_last_n_events(1)
+            .ok()
+            .and_then(|events| events.into_iter().next())
     }
 
     pub fn view(&self) -> Element<'_, Message> {

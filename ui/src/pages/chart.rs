@@ -37,8 +37,8 @@ impl ChartPage {
 
     pub fn update(&mut self, message: Message) {
         match message {
-            Message::UpdateChartData(data) => {
-                self.chart.push_data(data);
+            Message::UpdateChartData(event) => {
+                self.chart.push_data(event);
             }
             _ => {}
         }

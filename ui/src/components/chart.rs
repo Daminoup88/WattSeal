@@ -25,6 +25,8 @@ use plotters::{
 use plotters_backend::DrawingBackend;
 use plotters_iced::{Chart, ChartWidget, DrawingArea, Renderer, plotters_backend};
 
+use common::{Event, SensorData, CPUData, GPUData};
+
 use crate::{message::Message, themes::AppTheme};
 
 const PLOT_SECONDS: usize = 60;
@@ -42,8 +44,6 @@ const TOOLTIP_PADDING: f32 = 8.0;
 const TOOLTIP_OFFSET: f32 = 12.0;
 const TOOLTIP_CORNER_RADIUS: f32 = 4.0;
 const TOOLTIP_LINE_HEIGHT: f32 = 16.0;
-
-pub type ChartData = HashMap<String, (DateTime<Utc>, f32)>;
 
 #[derive(Debug, Clone, Copy)]
 pub struct ChartStyle {
@@ -291,28 +291,27 @@ impl SensorChart {
         self.cache.borrow_mut().clear();
     }
 
-    pub fn push_data(&mut self, data: ChartData) {
-        if data.is_empty() {
-            return;
-        }
+    pub fn push_data(&mut self, event: Event) {
+        let datetime: DateTime<Utc> = event.time().into();
+        let cutoff = datetime - chrono::Duration::from_std(self.limit).unwrap_or_default();
 
-        for (label, (time, value)) in data {
-            let cutoff = time - chrono::Duration::from_std(self.limit).unwrap_or_default();
-
-            if let Some(ts) = self.data_series.get_mut(&label) {
-                ts.data.push_front((time, value));
-
-                if self.dynamic_range {
-                    self.range = (self.range.0.min(value), self.range.1.max(value));
+        for sensor_data in event.data() {
+            match sensor_data {
+                SensorData::CPU(cpu_data) => {
+                    if let Some(power) = cpu_data.total_power_watts {
+                        self.push_data_point("CPU Power", datetime, power as f32, cutoff);
+                    }
+                    self.push_data_point("CPU Usage", datetime, cpu_data.usage_percent as f32, cutoff);
                 }
-
-                while ts.data.back().is_some_and(|(t, _)| *t < cutoff) {
-                    ts.data.pop_back();
+                SensorData::GPU(gpu_data) => {
+                    if let Some(power) = gpu_data.total_power_watts {
+                        self.push_data_point("GPU Power", datetime, power as f32, cutoff);
+                    }
+                    if let Some(usage) = gpu_data.usage_percent {
+                        self.push_data_point("GPU Usage", datetime, usage as f32, cutoff);
+                    }
                 }
-            } else {
-                let mut ts = TimeSeries::from(LineType::default());
-                ts.data.push_front((time, value));
-                self.data_series.insert(label, ts);
+                _ => {}
             }
         }
 
@@ -321,6 +320,24 @@ impl SensorChart {
         }
 
         self.cache.borrow_mut().clear();
+    }
+
+    fn push_data_point(&mut self, label: &str, time: DateTime<Utc>, value: f32, cutoff: DateTime<Utc>) {
+        if let Some(ts) = self.data_series.get_mut(label) {
+            ts.data.push_front((time, value));
+
+            if self.dynamic_range {
+                self.range = (self.range.0.min(value), self.range.1.max(value));
+            }
+
+            while ts.data.back().is_some_and(|(t, _)| *t < cutoff) {
+                ts.data.pop_back();
+            }
+        } else {
+            let mut ts = TimeSeries::from(LineType::default());
+            ts.data.push_front((time, value));
+            self.data_series.insert(label.to_string(), ts);
+        }
     }
 
     fn recalculate_range(&mut self) {
