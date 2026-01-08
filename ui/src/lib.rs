@@ -1,3 +1,5 @@
+#![allow(dead_code, unused_imports)]
+
 use iced::font::Font;
 
 pub mod app;

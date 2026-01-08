@@ -1,4 +1,5 @@
-use chrono::Utc;
+use chrono::{DateTime, Utc};
+use common::SensorData;
 use iced::{
     Element, Font, Length, Task,
     alignment::Alignment,
@@ -8,7 +9,7 @@ use iced::{
 };
 
 use crate::{
-    components::chart::{LineType, SensorChart},
+    components::chart::{AxisType, LineType, SensorChart},
     message::Message,
     themes::AppTheme,
 };
@@ -27,8 +28,30 @@ pub struct ChartPage {
 
 impl ChartPage {
     pub fn new(theme: AppTheme) -> (Self, Task<Message>) {
-        let chart = SensorChart::new(vec![], None, None, theme);
-        (Self { chart }, Task::done(Message::Tick))
+        let series = vec![
+            (
+                "CPU Power".to_string(),
+                LineType::Line,
+                AxisType::Primary("CPU Power".to_string(), "W".to_string()),
+            ),
+            (
+                "GPU Power".to_string(),
+                LineType::Line,
+                AxisType::Primary("GPU Power".to_string(), "W".to_string()),
+            ),
+            (
+                "CPU Usage".to_string(),
+                LineType::Dashed,
+                AxisType::Secondary("CPU Usage".to_string(), "%".to_string()),
+            ),
+            (
+                "GPU Usage".to_string(),
+                LineType::Dashed,
+                AxisType::Secondary("GPU Usage".to_string(), "%".to_string()),
+            ),
+        ];
+        let chart = SensorChart::new(series, None, None, theme);
+        (Self { chart }, Task::done(Message::LoadChartEvents(60)))
     }
 
     pub fn update_theme(&mut self, theme: AppTheme) {
