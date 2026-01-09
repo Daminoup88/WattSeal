@@ -1,5 +1,4 @@
-use core::time;
-use std::{collections::HashMap, hash::Hash, time::SystemTime};
+use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Utc};
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};

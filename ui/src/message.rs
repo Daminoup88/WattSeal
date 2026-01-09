@@ -9,5 +9,6 @@ pub enum Message {
     NavigateTo(Page),
     ChangeTheme(AppTheme),
     UpdateChartData(Vec<(DateTime<Utc>, SensorData)>),
+    Redraw,
     LoadChartEvents(i64),
 }

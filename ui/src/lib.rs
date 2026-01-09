@@ -11,10 +11,11 @@ pub mod themes;
 use app::App;
 
 pub fn run() -> iced::Result {
-    iced::application("Energy Monitor", App::update, App::view)
+    iced::application(App::new, App::update, App::view)
+        .title("Energy Monitor")
         .antialiasing(true)
         .default_font(Font::with_name("Roboto"))
         .subscription(App::subscription)
         .theme(App::theme)
-        .run_with(App::new)
+        .run()
 }
