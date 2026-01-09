@@ -120,9 +120,7 @@ impl TooltipContent {
     }
 
     fn unit(&self) -> &str {
-        match &self.axis_type {
-            AxisType::Primary(_, unit) | AxisType::Secondary(_, unit) => unit,
-        }
+        &self.axis_type.unit()
     }
 
     fn value_text(&self) -> String {
@@ -220,8 +218,9 @@ pub struct SensorChart {
     data: ChartData,
     limit: Duration,
     hovered: RefCell<Option<TooltipData>>,
-    range: Range,
-    secondary_range: Range,
+    y_ranges: (Range, Range),
+    x_axis: AxisType,
+    y_axes: (AxisType, AxisType),
     dynamic_range: bool,
     style: ChartStyle,
 }
@@ -240,6 +239,20 @@ pub enum LineType {
 pub enum AxisType {
     Primary(String, String),
     Secondary(String, String),
+}
+
+impl AxisType {
+    pub fn label(&self) -> &str {
+        match self {
+            AxisType::Primary(label, _) | AxisType::Secondary(label, _) => label,
+        }
+    }
+
+    pub fn unit(&self) -> &str {
+        match self {
+            AxisType::Primary(_, unit) | AxisType::Secondary(_, unit) => unit,
+        }
+    }
 }
 
 impl Default for AxisType {
@@ -317,16 +330,27 @@ fn to_plotters_color(color: iced::Color) -> RGBColor {
 }
 
 impl SensorChart {
-    pub fn new(series: SeriesSettings, min_y: Option<f32>, max_y: Option<f32>, theme: AppTheme) -> Self {
+    pub fn new(
+        series: SeriesSettings,
+        min_y: Option<f32>,
+        max_y: Option<f32>,
+        theme: AppTheme,
+        x_axis: AxisType,
+        y_axes: (AxisType, AxisType),
+    ) -> Self {
         Self {
             cache: RefCell::default(),
             data: ChartData::from(series),
             limit: Duration::seconds(PLOT_SECONDS as i64),
             hovered: RefCell::default(),
-            range: (min_y.unwrap_or(VALUE_MIN), max_y.unwrap_or(VALUE_MAX)),
-            secondary_range: (VALUE_MIN, VALUE_MAX),
+            y_ranges: (
+                (min_y.unwrap_or(VALUE_MIN), max_y.unwrap_or(VALUE_MAX)),
+                (VALUE_MIN, VALUE_MAX),
+            ),
             dynamic_range: min_y.is_none() || max_y.is_none(),
             style: theme.into(),
+            x_axis,
+            y_axes,
         }
     }
 
@@ -383,11 +407,12 @@ impl SensorChart {
             .data
             .series
             .values()
+            .filter(|series| matches!(series.axis_type, AxisType::Primary(_, _)))
             .flat_map(|series| series.points.iter().map(|(_, v)| *v))
             .fold((f32::MAX, f32::MIN), |(min, max), v| (min.min(v), max.max(v)));
 
         if min <= max {
-            self.range = (min, max);
+            self.y_ranges.0 = (min, max);
         }
     }
 
@@ -422,9 +447,9 @@ impl SensorChart {
             .margin(CHART_MARGIN)
             .margin_left(CHART_MARGIN_LEFT)
             .margin_right(CHART_MARGIN_RIGHT)
-            .build_cartesian_2d(oldest_time..newest_time, self.range.0..self.range.1)
+            .build_cartesian_2d(oldest_time..newest_time, self.y_ranges.0.0..self.y_ranges.0.1)
             .expect("failed to build chart")
-            .set_secondary_coord(oldest_time..newest_time, self.secondary_range.0..self.secondary_range.1);
+            .set_secondary_coord(oldest_time..newest_time, self.y_ranges.1.0..self.y_ranges.1.1);
 
         chart
             .configure_mesh()
@@ -433,8 +458,8 @@ impl SensorChart {
             .axis_style(ShapeStyle::from(style.axis).stroke_width(1))
             .y_labels(10)
             .y_label_style(label_style.clone())
-            .y_label_formatter(&|y: &f32| format!("{}W", y))
-            .y_desc("Power (W)")
+            .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_axes.0.unit()))
+            .y_desc(format!("{} ({})", self.y_axes.0.label(), self.y_axes.0.unit()))
             .axis_desc_style(label_style.clone().transform(FontTransform::Rotate90))
             .x_label_style(label_style.clone())
             .x_labels(60)
@@ -442,7 +467,7 @@ impl SensorChart {
                 let t = (newest_time.timestamp_millis() - x.timestamp_millis()) / 1000;
                 if t % 5 == 0 { format!("{}", t) } else { "".to_string() }
             })
-            .x_desc("Time (s)")
+            .x_desc(format!("{} ({})", self.x_axis.label(), self.x_axis.unit()))
             .draw()
             .expect("failed to draw chart mesh");
 
@@ -450,8 +475,8 @@ impl SensorChart {
             .configure_secondary_axes()
             .axis_style(ShapeStyle::from(style.axis).stroke_width(1))
             .y_labels(10)
-            .y_label_formatter(&|y: &f32| format!("{}%", y))
-            .y_desc("Usage (%)")
+            .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_axes.1.unit()))
+            .y_desc(format!("{} ({})", self.y_axes.1.label(), self.y_axes.1.unit()))
             .axis_desc_style(label_style.clone().transform(FontTransform::Rotate90))
             .label_style(label_style.clone())
             .draw()
@@ -664,8 +689,8 @@ impl SensorChart {
 
     fn point_y_for_value(&self, value: f32, height: f32, axis_type: &AxisType) -> f32 {
         let (min, max) = match axis_type {
-            AxisType::Primary(_, _) => self.range,
-            AxisType::Secondary(_, _) => self.secondary_range,
+            AxisType::Primary(_, _) => self.y_ranges.0,
+            AxisType::Secondary(_, _) => self.y_ranges.1,
         };
 
         let range = max - min;

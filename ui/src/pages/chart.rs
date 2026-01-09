@@ -50,7 +50,12 @@ impl ChartPage {
                 AxisType::Secondary("GPU Usage".to_string(), "%".to_string()),
             ),
         ];
-        let chart = SensorChart::new(series, None, None, theme);
+        let x_axis = AxisType::Primary("Time".to_string(), "s".to_string());
+        let y_axes = (
+            AxisType::Primary("Power".to_string(), "W".to_string()),
+            AxisType::Secondary("Usage".to_string(), "%".to_string()),
+        );
+        let chart = SensorChart::new(series, None, None, theme, x_axis, y_axes);
         (Self { chart }, Task::done(Message::LoadChartEvents(60)))
     }
 
