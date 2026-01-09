@@ -1,4 +1,28 @@
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display, time::SystemTime};
+
+#[derive(Debug, Clone)]
+pub struct Event {
+    time: SystemTime,
+    data: Vec<SensorData>,
+}
+
+impl Event {
+    pub fn new(time: SystemTime, data: Vec<SensorData>) -> Self {
+        Event { time, data }
+    }
+
+    pub fn time(&self) -> SystemTime {
+        self.time
+    }
+
+    pub fn data(&self) -> &Vec<SensorData> {
+        &self.data
+    }
+
+    pub fn push_data(&mut self, data: SensorData) {
+        self.data.push(data);
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct CPUData {

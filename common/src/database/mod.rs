@@ -1,9 +1,9 @@
-use std::time::SystemTime;
+use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Utc};
-use rusqlite::{Connection, OptionalExtension, Result, ToSql, Transaction, params};
+use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};
 
-use crate::types::{CPUData, GPUData, SensorData};
+use crate::types::{CPUData, Event, GPUData, SensorData};
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 
@@ -12,23 +12,46 @@ pub struct Database {
     tables: Option<Vec<String>>,
 }
 
+#[derive(Debug)]
+pub enum DatabaseError {
+    ConversionError(String),
+    QueryError(String),
+}
+
+impl std::fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            DatabaseError::ConversionError(msg) => write!(f, "Conversion Error: {}", msg),
+            DatabaseError::QueryError(msg) => write!(f, "Query Error: {}", msg),
+        }
+    }
+}
+
+impl From<rusqlite::Error> for DatabaseError {
+    fn from(err: rusqlite::Error) -> Self {
+        match err {
+            _ => DatabaseError::QueryError(err.to_string()),
+        }
+    }
+}
+
 impl Database {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<Self, DatabaseError> {
         let conn = Connection::open(DATABASE_PATH)?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "OFF")?;
 
-        let tables = {
-            let mut stmt = conn.prepare("SELECT detected_materials FROM hardware_info ORDER BY id DESC LIMIT 1")?;
-            match stmt.query_row([], |row| row.get::<_, String>(0)).optional() {
+        let tables = match conn.prepare("SELECT detected_materials FROM hardware_info ORDER BY id DESC LIMIT 1") {
+            Err(_) => None,
+            Ok(mut stmt) => match stmt.query_row([], |row| row.get::<_, String>(0)).optional() {
                 Ok(Some(materials)) => Some(materials.split(',').map(|s| s.trim().to_string()).collect()),
                 _ => None,
-            }
+            },
         };
         Ok(Database { conn, tables })
     }
 
-    pub fn create_tables_if_not_exists(&mut self, tables: &Vec<impl DatabaseTable>) -> Result<()> {
+    pub fn create_tables_if_not_exists(&mut self, tables: &Vec<impl DatabaseTable>) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "CREATE TABLE IF NOT EXISTS timestamp (
@@ -42,7 +65,7 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS hardware_info (
                     id                 INTEGER PRIMARY KEY,
                     timestamp_id       INTEGER REFERENCES timestamp(id),
-                    detected_materials TEXT,
+                    detected_materials TEXT
             )",
             [],
         )?;
@@ -61,7 +84,11 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_hardware_info(tx: &Transaction, timestamp: DateTime<Utc>, detected_materials: &str) -> Result<()> {
+    pub fn insert_hardware_info(
+        tx: &Transaction,
+        timestamp: DateTime<Utc>,
+        detected_materials: &str,
+    ) -> Result<(), DatabaseError> {
         tx.execute(
             "INSERT INTO timestamp (timestamp) VALUES (?1)",
             params![timestamp.to_rfc3339()],
@@ -74,7 +101,7 @@ impl Database {
         Ok(())
     }
 
-    pub fn insert_event(&mut self, event: &Event) -> Result<()> {
+    pub fn insert_event(&mut self, event: &Event) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO timestamp (timestamp) VALUES (?1)",
@@ -90,46 +117,100 @@ impl Database {
         Ok(())
     }
 
-    pub fn select_last_n_events(&mut self, n: i64) -> Result<Vec<Event>> {
-        let mut events = Vec::new();
-        let mut stmt = self.conn.prepare(
-            "SELECT total_power_watts, pp0_power_watts, pp1_power_watts, dram_power_watts, usage_percent, timestamp FROM timestamp JOIN cpu_data ON timestamp.id = cpu_data.timestamp_id ORDER BY timestamp.id DESC LIMIT ?1",
-        )?;
-        let data_rows = stmt.query_map(params![n], |row| {
-            Ok((
-                CPUData {
-                    total_power_watts: row.get(0)?,
-                    pp0_power_watts: row.get(1)?,
-                    pp1_power_watts: row.get(2)?,
-                    dram_power_watts: row.get(3)?,
-                    usage_percent: row.get(4)?,
-                },
-                row.get::<_, String>(5)?,
-            ))
-        })?;
-        for data_row in data_rows {
-            let (cpu_data, timestamp_str) = data_row?;
-            let timestamp = DateTime::parse_from_rfc3339(&timestamp_str)
-                .map_err(|e| rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e)))?
-                .with_timezone(&Utc)
-                .into();
-            let sensor_data = vec![SensorData::CPU(cpu_data)];
-            events.push(Event::new(timestamp, sensor_data));
+    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+        let mut records = Vec::<(SystemTime, SensorData)>::new();
+        let mut stmt = self
+            .conn
+            .prepare("SELECT id, timestamp FROM timestamp ORDER BY id DESC LIMIT ?1")?;
+        let timestamps: Vec<(i64, SystemTime)> = stmt
+            .query_map(params![n], |row| {
+                let id: i64 = row.get(0)?;
+                let ts_str: String = row.get(1)?;
+                let timestamp = DateTime::parse_from_rfc3339(&ts_str)
+                    .map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
+                    })?
+                    .with_timezone(&Utc)
+                    .into();
+                Ok((id, timestamp))
+            })?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        if timestamps.is_empty() {
+            return Ok(records);
         }
-        Ok(events)
+
+        let mut id_vec = Vec::new();
+        let mut timestamps_map = HashMap::new();
+
+        for timestamp in timestamps.iter() {
+            id_vec.push(timestamp.0.to_string());
+            timestamps_map.insert(timestamp.0, timestamp.1);
+        }
+        let id_list = id_vec.join(",");
+
+        if let Some(tables) = &self.tables {
+            for table_name in tables {
+                let sensor_data_list = self.fetch_sensor_data(table_name, &id_list)?;
+                for (ts_id, sensor_data) in sensor_data_list {
+                    if let Some(ts) = timestamps_map.get(&ts_id) {
+                        records.push((*ts, sensor_data));
+                    }
+                }
+            }
+        }
+
+        Ok(records)
+    }
+
+    fn fetch_sensor_data(&self, table_name: &str, timestamp_ids: &str) -> rusqlite::Result<Vec<(i64, SensorData)>> {
+        if table_name == CPUData::table_name_static() {
+            self.query_table::<CPUData>(table_name, timestamp_ids)
+        } else if table_name == GPUData::table_name_static() {
+            self.query_table::<GPUData>(table_name, timestamp_ids)
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    fn query_table<T>(&self, table_name: &str, timestamp_ids: &str) -> rusqlite::Result<Vec<(i64, SensorData)>>
+    where
+        T: DatabaseEntry + Into<SensorData>,
+    {
+        let cols = T::columns_static()
+            .iter()
+            .map(|(name, _)| *name)
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT timestamp_id, {} FROM {} WHERE timestamp_id IN ({})",
+            cols, table_name, timestamp_ids
+        );
+        let mut stmt = self.conn.prepare(&query)?;
+
+        let rows = stmt.query_map([], |row| {
+            let ts_id: i64 = row.get(0)?;
+            let data = T::from_row(row)?;
+            Ok((ts_id, data.into()))
+        })?;
+
+        rows.collect()
     }
 }
 
 pub trait DatabaseTable {
     fn table_name(&self) -> &'static str;
-    fn columns(&self) -> &'static [&'static str];
+    fn columns(&self) -> Vec<String>;
 }
 
 pub trait DatabaseEntry {
     fn table_name_static() -> &'static str;
     fn insert_sql(&self) -> String;
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql>;
-    fn select_last_n_sql(&self, n: i64) -> String;
+    fn columns_static() -> &'static [(&'static str, &'static str)];
+    fn from_row(row: &Row) -> rusqlite::Result<Self>
+    where
+        Self: Sized;
 }
 
 impl DatabaseEntry for SensorData {
@@ -153,17 +234,12 @@ impl DatabaseEntry for SensorData {
         }
     }
 
-    fn select_last_n_sql(&self, n: i64) -> String {
-        let name = match self {
-            SensorData::CPU(_) => CPUData::table_name_static(),
-            SensorData::GPU(_) => GPUData::table_name_static(),
-            _ => "",
-        };
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[]
+    }
 
-        format!(
-            "SELECT * FROM timestamp JOIN {} ON timestamp.id = {}.timestamp_id ORDER BY timestamp.id DESC LIMIT {}",
-            name, name, n
-        )
+    fn from_row(_row: &Row) -> rusqlite::Result<Self> {
+        Err(rusqlite::Error::InvalidQuery)
     }
 }
 
@@ -187,8 +263,24 @@ impl DatabaseEntry for CPUData {
         ]
     }
 
-    fn select_last_n_sql(&self, _n: i64) -> String {
-        "".to_string()
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("total_power_watts", "REAL"),
+            ("pp0_power_watts", "REAL"),
+            ("pp1_power_watts", "REAL"),
+            ("dram_power_watts", "REAL"),
+            ("usage_percent", "REAL NOT NULL"),
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(CPUData {
+            total_power_watts: row.get("total_power_watts")?,
+            pp0_power_watts: row.get("pp0_power_watts")?,
+            pp1_power_watts: row.get("pp1_power_watts")?,
+            dram_power_watts: row.get("dram_power_watts")?,
+            usage_percent: row.get("usage_percent")?,
+        })
     }
 }
 
@@ -210,27 +302,19 @@ impl DatabaseEntry for GPUData {
         ]
     }
 
-    fn select_last_n_sql(&self, _n: i64) -> String {
-        "".to_string()
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Event {
-    time: SystemTime,
-    data: Vec<SensorData>,
-}
-
-impl Event {
-    pub fn new(time: SystemTime, data: Vec<SensorData>) -> Self {
-        Event { time, data }
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("total_power_watts", "REAL"),
+            ("usage_percent", "REAL"),
+            ("vram_usage_percent", "REAL"),
+        ]
     }
 
-    pub fn time(&self) -> SystemTime {
-        self.time
-    }
-
-    pub fn data(&self) -> &Vec<SensorData> {
-        &self.data
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(GPUData {
+            total_power_watts: row.get("total_power_watts")?,
+            usage_percent: row.get("usage_percent")?,
+            vram_usage_percent: row.get("vram_usage_percent")?,
+        })
     }
 }

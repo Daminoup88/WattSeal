@@ -1,3 +1,5 @@
+use std::time;
+
 use common::DatabaseTable;
 
 use super::{CPUData, DatabaseEntry, GPUData};
@@ -11,7 +13,7 @@ impl DatabaseTable for SensorType {
         }
     }
 
-    fn columns(&self) -> &'static [&'static str] {
+    fn columns(&self) -> Vec<String> {
         match self {
             SensorType::CPU(s) => s.columns(),
             SensorType::GPU(s) => s.columns(),
@@ -19,21 +21,24 @@ impl DatabaseTable for SensorType {
     }
 }
 
+fn timestamp_columns() -> Vec<String> {
+    vec![
+        "id           INTEGER PRIMARY KEY".to_string(),
+        "timestamp_id INTEGER NOT NULL".to_string(),
+    ]
+}
+
 impl DatabaseTable for CPUSensor {
     fn table_name(&self) -> &'static str {
         CPUData::table_name_static()
     }
 
-    fn columns(&self) -> &'static [&'static str] {
-        &[
-            "id                    INTEGER PRIMARY KEY",
-            "timestamp_id          INTEGER REFERENCES timestamp(id)",
-            "total_power_watts     REAL",
-            "pp0_power_watts       REAL",
-            "pp1_power_watts       REAL",
-            "dram_power_watts      REAL",
-            "usage_percent         REAL NOT NULL",
-        ]
+    fn columns(&self) -> Vec<String> {
+        let mut cols = timestamp_columns();
+        for (name, type_) in CPUData::columns_static() {
+            cols.push(format!("{} {}", name, type_));
+        }
+        cols
     }
 }
 
@@ -42,14 +47,12 @@ impl DatabaseTable for GPUSensor {
         GPUData::table_name_static()
     }
 
-    fn columns(&self) -> &'static [&'static str] {
-        &[
-            "id                    INTEGER PRIMARY KEY",
-            "timestamp_id          INTEGER REFERENCES timestamp(id)",
-            "total_power_watts     REAL",
-            "usage_percent         REAL",
-            "vram_usage_percent    REAL",
-        ]
+    fn columns(&self) -> Vec<String> {
+        let mut cols = timestamp_columns();
+        for (name, type_) in GPUData::columns_static() {
+            cols.push(format!("{} {}", name, type_));
+        }
+        cols
     }
 }
 

@@ -1,4 +1,4 @@
-pub mod chart;
+pub mod dashboard;
 pub mod info;
 pub mod optimization;
 pub mod settings;
@@ -26,4 +26,4 @@ macro_rules! define_pages {
     };
 }
 
-define_pages!(Chart, Info, Optimization, Settings);
+define_pages!(Dashboard, Info, Optimization, Settings);

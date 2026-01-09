@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use common::database::Database;
+use common::{CPUData, Database, DatabaseEntry, GPUData, SensorData};
 use iced::{
     Element, Subscription, Task, Theme,
     time::{Duration, every},
@@ -9,9 +9,9 @@ use iced::{
 };
 
 use crate::{
-    components::{chart::ChartData, header::Header},
+    components::header::Header,
     message::Message,
-    pages::{Page, chart::ChartPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
+    pages::{Page, dashboard::ChartPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
     themes::AppTheme,
 };
 
@@ -26,15 +26,14 @@ pub struct App {
     header: Header,
     theme: AppTheme,
     database: Database,
-    last_timestamp: Option<DateTime<Utc>>,
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::Dracula;
-        let (chart_page, task) = ChartPage::new(theme);
-        let current_page = Page::Chart;
+        let current_page = Page::Dashboard;
         let database = Database::new().unwrap();
+        let (chart_page, task) = ChartPage::new(theme);
 
         (
             Self {
@@ -46,7 +45,6 @@ impl App {
                 settings_page: SettingsPage::new(),
                 theme,
                 database,
-                last_timestamp: None,
             },
             task,
         )
@@ -54,8 +52,12 @@ impl App {
 
     pub fn update(&mut self, message: Message) {
         match message {
+            Message::LoadChartEvents(number) => {
+                let chart_data = self.load_latest_chart_data(number);
+                self.chart_page.update(Message::UpdateChartData(chart_data));
+            }
             Message::Tick => {
-                let chart_data = self.load_latest_chart_data();
+                let chart_data = self.load_latest_chart_data(1);
                 self.chart_page.update(Message::UpdateChartData(chart_data));
             }
             Message::NavigateTo(page) => {
@@ -70,21 +72,18 @@ impl App {
         }
     }
 
-    fn load_latest_chart_data(&mut self) -> ChartData {
-        let mut chart_data: ChartData = HashMap::new();
-        let now = Utc::now();
-
-        chart_data.insert("CPU Usage".into(), (now, rand::random::<f32>() * 100.0));
-        chart_data.insert("CPU Power".into(), (now, rand::random::<f32>() * 65.0));
-        chart_data.insert("GPU Usage".into(), (now, rand::random::<f32>() * 100.0));
-        chart_data.insert("GPU Power".into(), (now, rand::random::<f32>() * 75.0));
-
-        chart_data
+    fn load_latest_chart_data(&mut self, number: i64) -> Vec<(DateTime<Utc>, SensorData)> {
+        self.database
+            .select_last_n_records(number)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(ts, data)| (ts.into(), data))
+            .collect()
     }
 
     pub fn view(&self) -> Element<'_, Message> {
         let page_content = match self.current_page {
-            Page::Chart => self.chart_page.view(),
+            Page::Dashboard => self.chart_page.view(),
             Page::Info => self.info_page.view(),
             Page::Optimization => self.optimization_page.view(),
             Page::Settings => self.settings_page.view(),

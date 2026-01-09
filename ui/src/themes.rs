@@ -16,7 +16,7 @@ macro_rules! define_themes {
             pub fn to_iced_theme(self) -> Theme {
                 match self {
                     $(AppTheme::$builtin => Theme::$iced,)+
-                    $(AppTheme::$custom => Theme::custom($name.into(), $palette),)+
+                    $(AppTheme::$custom => Theme::custom(String::from($name), $palette),)+
                 }
             }
 
@@ -70,6 +70,7 @@ define_themes! {
             primary: Color::from_rgb(0.2, 0.78, 0.35),
             success: Color::from_rgb(0.2, 0.6, 0.86),
             danger: Color::from_rgb(0.95, 0.45, 0.25),
+            warning: Color::from_rgb(0.95, 0.75, 0.25),
         },
         EcoEnergyLight => "Eco Energy Light": Palette {
             background: Color::from_rgb(0.96, 0.97, 0.98),
@@ -77,6 +78,7 @@ define_themes! {
             primary: Color::from_rgb(0.13, 0.58, 0.26),
             success: Color::from_rgb(0.15, 0.45, 0.65),
             danger: Color::from_rgb(0.85, 0.35, 0.15),
+            warning: Color::from_rgb(0.85, 0.65, 0.15),
         },
         PowerSaver => "Power Saver": Palette {
             background: Color::BLACK,
@@ -84,6 +86,7 @@ define_themes! {
             primary: Color::from_rgb(0.15, 0.5, 0.25),
             success: Color::from_rgb(0.15, 0.4, 0.55),
             danger: Color::from_rgb(0.6, 0.3, 0.15),
+            warning: Color::from_rgb(0.6, 0.5, 0.15),
         },
         HighContrast => "High Contrast": Palette {
             background: Color::BLACK,
@@ -91,6 +94,7 @@ define_themes! {
             primary: Color::from_rgb(0.0, 1.0, 0.0),
             success: Color::from_rgb(0.0, 0.8, 1.0),
             danger: Color::from_rgb(1.0, 0.4, 0.0),
+            warning: Color::from_rgb(1.0, 0.9, 0.0),
         },
     ]
 }
