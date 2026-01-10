@@ -6,6 +6,7 @@ pub mod sensors;
 use std::{thread, time::Duration};
 
 use database::Database;
+use display_info::DisplayInfo;
 use hardware_query::HardwareInfo;
 use sensors::{SensorType, create_event_from_sensors};
 
@@ -34,6 +35,12 @@ impl CollectorApp {
         };
         println!("✓ Hardware information loaded");
         println!("{:#?}", hw_info);
+
+        // Initialize display information
+        let display_infos = DisplayInfo::all().unwrap();
+        for display_info in display_infos {
+            println!("display_info {display_info:?}");
+        }
 
         // Initialize CPU sensor
         println!("\nInitializing sensors...");
