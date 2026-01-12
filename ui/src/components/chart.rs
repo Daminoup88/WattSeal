@@ -632,14 +632,6 @@ impl SensorChart {
         if let Some(desc) = &content.description {
             area.draw(&Text::new(desc.clone(), (text_x, text_y), text_style)).ok();
         }
-
-        // draw tooltip data point
-        area.draw(&Circle::new(
-            (tooltip.point_x as i32, tooltip.point_y as i32),
-            5,
-            ShapeStyle::from(series_color).filled(),
-        ))
-        .ok();
     }
 
     fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<TooltipData> {
