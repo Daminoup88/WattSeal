@@ -14,7 +14,6 @@ win_ring0 = { git = "https://github.com/alex-dow/winRing0-rs" }
 [dependencies]
 common = { path = "../common" }
 adlx = "0.0.0-alpha.1"
-chrono = { version = "0.4.42", features = ["clock"] }
 display-info = "0.5.7"
 hardware-query = "0.2.1"
 is-admin = "0.1.4"

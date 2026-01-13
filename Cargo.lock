@@ -618,7 +618,6 @@ name = "collector"
 version = "0.1.0"
 dependencies = [
  "adlx",
- "chrono",
  "common",
  "display-info",
  "hardware-query",
@@ -652,7 +651,6 @@ dependencies = [
 name = "common"
 version = "0.1.0"
 dependencies = [
- "chrono",
  "rusqlite",
 ]
 

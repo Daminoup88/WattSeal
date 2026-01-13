@@ -1,8 +1,8 @@
 mod entries;
 
+use core::time;
 use std::{collections::HashMap, time::SystemTime};
 
-use chrono::{DateTime, Utc};
 pub use entries::DatabaseEntry;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};
 
@@ -17,16 +17,23 @@ pub struct Database {
 
 #[derive(Debug)]
 pub enum DatabaseError {
-    ConversionError(String),
+    TimeError(String),
     QueryError(String),
 }
 
 impl std::fmt::Display for DatabaseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DatabaseError::ConversionError(msg) => write!(f, "Conversion Error: {}", msg),
-            DatabaseError::QueryError(msg) => write!(f, "Query Error: {}", msg),
+            DatabaseError::QueryError(msg) | DatabaseError::TimeError(msg) => {
+                write!(f, "Database error: {}", msg)
+            }
         }
+    }
+}
+
+impl From<std::time::SystemTimeError> for DatabaseError {
+    fn from(err: std::time::SystemTimeError) -> Self {
+        DatabaseError::TimeError(err.to_string())
     }
 }
 
@@ -64,7 +71,7 @@ impl Database {
         tx.execute(
             "CREATE TABLE IF NOT EXISTS timestamp (
                   id            INTEGER PRIMARY KEY,
-                  timestamp     TEXT NOT NULL
+                  timestamp     INTEGER NOT NULL
                   )",
             [],
         )?;
@@ -86,7 +93,7 @@ impl Database {
             tx.execute(&create_table_sql, [])?;
             table_names.push(name.to_string());
         }
-        Self::insert_hardware_info(&tx, Utc::now(), &table_names.join(","))?;
+        Self::insert_hardware_info(&tx, SystemTime::now(), &table_names.join(","))?;
         self.tables = Some(table_names);
         tx.commit()?;
         Ok(())
@@ -94,12 +101,12 @@ impl Database {
 
     pub fn insert_hardware_info(
         tx: &Transaction,
-        timestamp: DateTime<Utc>,
+        timestamp: SystemTime,
         detected_materials: &str,
     ) -> Result<(), DatabaseError> {
         tx.execute(
             "INSERT INTO timestamp (timestamp) VALUES (?1)",
-            params![timestamp.to_rfc3339()],
+            params![timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
         )?;
         let timestamp_id = tx.last_insert_rowid();
         tx.execute(
@@ -113,7 +120,7 @@ impl Database {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO timestamp (timestamp) VALUES (?1)",
-            params![DateTime::<Utc>::from(event.time()).to_rfc3339()],
+            params![event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
@@ -133,13 +140,8 @@ impl Database {
         let timestamps: Vec<(i64, SystemTime)> = stmt
             .query_map(params![n], |row| {
                 let id: i64 = row.get(0)?;
-                let ts_str: String = row.get(1)?;
-                let timestamp = DateTime::parse_from_rfc3339(&ts_str)
-                    .map_err(|e| {
-                        rusqlite::Error::FromSqlConversionFailure(0, rusqlite::types::Type::Text, Box::new(e))
-                    })?
-                    .with_timezone(&Utc)
-                    .into();
+                let timestamp_millis: i64 = row.get(1)?;
+                let timestamp = SystemTime::UNIX_EPOCH + time::Duration::from_millis(timestamp_millis as u64);
                 Ok((id, timestamp))
             })?
             .collect::<rusqlite::Result<Vec<_>>>()?;
