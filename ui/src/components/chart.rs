@@ -645,7 +645,7 @@ impl SensorChart {
         }
 
         let chart_cursor = Point::new(
-            cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN - CHART_MARGIN_LEFT,
+            cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN_LEFT,
             cursor.y - CHART_MARGIN,
         );
 
