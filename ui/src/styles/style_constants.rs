@@ -17,7 +17,6 @@ pub const BORDER_WIDTH: f32 = 1.5;
 pub const BORDER_RADIUS_SMALL: f32 = 4.0;
 pub const BORDER_RADIUS_MEDIUM: f32 = 8.0;
 pub const BORDER_RADIUS_LARGE: f32 = 12.0;
-pub const BORDER_RADIUS_ROUND: f32 = 100.0;
 
 // Spacing
 pub const SPACING_SMALL: f32 = 4.0;
@@ -30,12 +29,6 @@ pub const PADDING_SMALL: f32 = 4.0;
 pub const PADDING_MEDIUM: f32 = 8.0;
 pub const PADDING_LARGE: f32 = 16.0;
 pub const PADDING_XLARGE: f32 = 24.0;
-
-// Alpha values
-pub const ALPHA_SUBTLE: f32 = 0.1;
-pub const ALPHA_LIGHT: f32 = 0.2;
-pub const ALPHA_MEDIUM: f32 = 0.4;
-pub const ALPHA_STRONG: f32 = 0.7;
 
 // Fonts
 pub const FONT_BOLD: Font = Font {

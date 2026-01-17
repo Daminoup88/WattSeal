@@ -1,4 +1,5 @@
 pub mod button;
+pub mod colors;
 pub mod container;
 pub mod picklist;
 pub mod scrollable;

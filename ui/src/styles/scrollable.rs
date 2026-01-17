@@ -1,10 +1,9 @@
-//! Scrollable style
-
 use iced::{
     Background, Border, Color, Shadow,
     widget::scrollable::{AutoScroll, Catalog, Rail, Scroller, Status, Style},
 };
 
+use super::colors::{ExtendedPalette, with_alpha};
 use crate::themes::AppTheme;
 
 const SCROLLBAR_RADIUS: f32 = 4.0;
@@ -15,119 +14,6 @@ pub enum ScrollableStyle {
     Standard,
 }
 
-impl ScrollableStyle {
-    fn active(&self, theme: &AppTheme) -> Style {
-        let palette = theme.palette();
-        let scrollbar_color = Color { a: 0.3, ..palette.text };
-        let scroller_color = Color { a: 0.5, ..palette.text };
-
-        Style {
-            container: iced::widget::container::Style::default(),
-            vertical_rail: Rail {
-                background: Some(Background::Color(scrollbar_color)),
-                border: Border {
-                    radius: SCROLLBAR_RADIUS.into(),
-                    width: 0.0,
-                    color: Color::TRANSPARENT,
-                },
-                scroller: Scroller {
-                    background: Background::Color(scroller_color),
-                    border: Border {
-                        radius: SCROLLBAR_RADIUS.into(),
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                    },
-                },
-            },
-            horizontal_rail: Rail {
-                background: Some(Background::Color(scrollbar_color)),
-                border: Border {
-                    radius: SCROLLBAR_RADIUS.into(),
-                    width: 0.0,
-                    color: Color::TRANSPARENT,
-                },
-                scroller: Scroller {
-                    background: Background::Color(scroller_color),
-                    border: Border {
-                        radius: SCROLLBAR_RADIUS.into(),
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                    },
-                },
-            },
-            gap: None,
-            auto_scroll: AutoScroll {
-                background: Background::Color(palette.background),
-                border: Border::default(),
-                shadow: Shadow::default(),
-                icon: palette.text,
-            },
-        }
-    }
-
-    fn hovered(&self, theme: &AppTheme, is_horizontal_hovered: bool, is_vertical_hovered: bool) -> Style {
-        let palette = theme.palette();
-        let scrollbar_color = Color { a: 0.4, ..palette.text };
-        let scroller_color = Color { a: 0.7, ..palette.text };
-        let scroller_hovered_color = palette.primary;
-
-        let vertical_scroller_color = if is_vertical_hovered {
-            scroller_hovered_color
-        } else {
-            scroller_color
-        };
-
-        let horizontal_scroller_color = if is_horizontal_hovered {
-            scroller_hovered_color
-        } else {
-            scroller_color
-        };
-
-        Style {
-            container: iced::widget::container::Style::default(),
-            vertical_rail: Rail {
-                background: Some(Background::Color(scrollbar_color)),
-                border: Border {
-                    radius: SCROLLBAR_RADIUS.into(),
-                    width: 0.0,
-                    color: Color::TRANSPARENT,
-                },
-                scroller: Scroller {
-                    background: Background::Color(vertical_scroller_color),
-                    border: Border {
-                        radius: SCROLLBAR_RADIUS.into(),
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                    },
-                },
-            },
-            horizontal_rail: Rail {
-                background: Some(Background::Color(scrollbar_color)),
-                border: Border {
-                    radius: SCROLLBAR_RADIUS.into(),
-                    width: 0.0,
-                    color: Color::TRANSPARENT,
-                },
-                scroller: Scroller {
-                    background: Background::Color(horizontal_scroller_color),
-                    border: Border {
-                        radius: SCROLLBAR_RADIUS.into(),
-                        width: 0.0,
-                        color: Color::TRANSPARENT,
-                    },
-                },
-            },
-            gap: None,
-            auto_scroll: AutoScroll {
-                background: Background::Color(palette.background),
-                border: Border::default(),
-                shadow: Shadow::default(),
-                icon: palette.text,
-            },
-        }
-    }
-}
-
 impl Catalog for AppTheme {
     type Class<'a> = ScrollableStyle;
 
@@ -135,19 +21,54 @@ impl Catalog for AppTheme {
         Self::Class::default()
     }
 
-    fn style(&self, class: &Self::Class<'_>, status: Status) -> Style {
-        match status {
-            Status::Active { .. } => class.active(self),
+    fn style(&self, _class: &Self::Class<'_>, status: Status) -> Style {
+        let ext = ExtendedPalette::from_theme(self);
+
+        let (scrollbar_alpha, scroller_alpha, v_hovered, h_hovered) = match status {
+            Status::Active { .. } => (0.3, 0.5, false, false),
             Status::Hovered {
                 is_horizontal_scrollbar_hovered,
                 is_vertical_scrollbar_hovered,
                 ..
-            } => class.hovered(self, is_horizontal_scrollbar_hovered, is_vertical_scrollbar_hovered),
+            } => (0.4, 0.7, is_vertical_scrollbar_hovered, is_horizontal_scrollbar_hovered),
             Status::Dragged {
                 is_horizontal_scrollbar_dragged,
                 is_vertical_scrollbar_dragged,
                 ..
-            } => class.hovered(self, is_horizontal_scrollbar_dragged, is_vertical_scrollbar_dragged),
+            } => (0.4, 0.7, is_vertical_scrollbar_dragged, is_horizontal_scrollbar_dragged),
+        };
+
+        let scrollbar_bg = with_alpha(ext.text, scrollbar_alpha);
+        let scroller_default = with_alpha(ext.text, scroller_alpha);
+
+        let rail = |hovered: bool| Rail {
+            background: Some(Background::Color(scrollbar_bg)),
+            border: Border {
+                radius: SCROLLBAR_RADIUS.into(),
+                width: 0.0,
+                color: Color::TRANSPARENT,
+            },
+            scroller: Scroller {
+                background: Background::Color(if hovered { ext.primary } else { scroller_default }),
+                border: Border {
+                    radius: SCROLLBAR_RADIUS.into(),
+                    width: 0.0,
+                    color: Color::TRANSPARENT,
+                },
+            },
+        };
+
+        Style {
+            container: iced::widget::container::Style::default(),
+            vertical_rail: rail(v_hovered),
+            horizontal_rail: rail(h_hovered),
+            gap: None,
+            auto_scroll: AutoScroll {
+                background: Background::Color(ext.background),
+                border: Border::default(),
+                shadow: Shadow::default(),
+                icon: ext.text,
+            },
         }
     }
 }
