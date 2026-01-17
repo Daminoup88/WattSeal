@@ -1,4 +1,7 @@
-use iced::{Color, Theme, theme::Palette};
+use iced::{
+    Color, Theme,
+    theme::{Base, Mode, Palette, Style},
+};
 
 macro_rules! define_themes {
     (
@@ -97,6 +100,37 @@ define_themes! {
             warning: Color::from_rgb(1.0, 0.9, 0.0),
         },
     ]
+}
+
+impl Base for AppTheme {
+    fn default(preference: Mode) -> Self {
+        match preference {
+            Mode::Light => AppTheme::Light,
+            Mode::Dark | Mode::None => AppTheme::Dark,
+        }
+    }
+
+    fn mode(&self) -> Mode {
+        let pal = AppTheme::palette(*self);
+        let luminance = 0.299 * pal.background.r + 0.587 * pal.background.g + 0.114 * pal.background.b;
+        if luminance < 0.5 { Mode::Dark } else { Mode::Light }
+    }
+
+    fn base(&self) -> Style {
+        let pal = AppTheme::palette(*self);
+        Style {
+            background_color: pal.background,
+            text_color: pal.text,
+        }
+    }
+
+    fn palette(&self) -> Option<Palette> {
+        Some(self.to_iced_theme().palette())
+    }
+
+    fn name(&self) -> &str {
+        AppTheme::name(*self)
+    }
 }
 
 impl AppTheme {
