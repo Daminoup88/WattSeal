@@ -76,7 +76,7 @@ impl App {
         }
     }
 
-    fn gpu_is_integrated(chart_data: &mut Vec<(DateTime<Utc>, SensorData)>){
+    fn gpu_is_integrated(chart_data: &mut Vec<(DateTime<Utc>, SensorData)>) {
         // Check the CPU pp1_power value
         let pp1_value = chart_data.iter().find_map(|(_, sensor_data)| {
             if let SensorData::CPU(cpu_data) = sensor_data {

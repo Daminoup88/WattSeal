@@ -205,27 +205,78 @@ mod nvidia_gpu {
 }
 
 mod intel_gpu {
+    use std::time::Duration;
+
+    use windows::{
+        Win32::System::Performance::{
+            PDH_FMT_COUNTERVALUE, PDH_FMT_DOUBLE, PdhAddCounterW, PdhCloseQuery, PdhCollectQueryData,
+            PdhGetFormattedCounterValue, PdhOpenQueryW,
+        },
+        core::HSTRING,
+    };
+
     use super::{Sensor, SensorError};
     use crate::database::{GPUData, SensorData};
 
     pub struct IntelGPUSensor {
-        index: u32,
+        adapter_index: u32,
+        query: isize,
+        counter: isize,
     }
 
     impl IntelGPUSensor {
         pub fn new(index: u32) -> Result<Self, SensorError> {
-            // Initialize Intel GPU sensor here
-            Ok(IntelGPUSensor { index })
+            unsafe {
+                let mut query: isize = 0;
+                PdhOpenQueryW(None, 0, &mut query);
+
+                // Try to find Intel GPU counter
+                let counter_path = HSTRING::from(r"\GPU Engine(*engtype_3D)\Utilization Percentage");
+                let mut counter: isize = 0;
+
+                PdhAddCounterW(query, &counter_path, 0, &mut counter);
+
+                Ok(IntelGPUSensor {
+                    adapter_index: index,
+                    query,
+                    counter,
+                })
+            }
+        }
+
+        fn read_counter(&self) -> Result<f64, SensorError> {
+            unsafe {
+                PdhCollectQueryData(self.query);
+
+                let mut value = PDH_FMT_COUNTERVALUE::default();
+                PdhGetFormattedCounterValue(self.counter, PDH_FMT_DOUBLE, None, &mut value);
+
+                Ok(value.Anonymous.doubleValue)
+            }
+        }
+    }
+
+    impl Drop for IntelGPUSensor {
+        fn drop(&mut self) {
+            unsafe {
+                let _ = PdhCloseQuery(self.query);
+            }
         }
     }
 
     impl Sensor for IntelGPUSensor {
         fn read_full_data(&self) -> Result<SensorData, SensorError> {
-            // Read Intel GPU data here
-            // Placeholder implementation
+            // First collection initializes the counter
+            let _ = self.read_counter();
+
+            std::thread::sleep(Duration::from_millis(100));
+
+            // Second collection gets actual value
+            let usage_percent = self.read_counter()?;
+
             let data = GPUData {
                 total_power_watts: None,
-                usage_percent: None,
+                usage_percent: Some(usage_percent.clamp(0.0, 100.0)),
                 vram_usage_percent: None,
             };
 
@@ -233,3 +284,33 @@ mod intel_gpu {
         }
     }
 }
+
+// mod intel_gpu {
+//     use super::{Sensor, SensorError};
+//     use crate::database::{GPUData, SensorData};
+
+//     pub struct IntelGPUSensor {
+//         index: u32,
+//     }
+
+//     impl IntelGPUSensor {
+//         pub fn new(index: u32) -> Result<Self, SensorError> {
+//             // Initialize Intel GPU sensor here
+//             Ok(IntelGPUSensor { index })
+//         }
+//     }
+
+//     impl Sensor for IntelGPUSensor {
+//         fn read_full_data(&self) -> Result<SensorData, SensorError> {
+//             // Read Intel GPU data here
+//             // Placeholder implementation
+//             let data = GPUData {
+//                 total_power_watts: None,
+//                 usage_percent: None,
+//                 vram_usage_percent: None,
+//             };
+
+//             Ok(data.into())
+//         }
+//     }
+// }
