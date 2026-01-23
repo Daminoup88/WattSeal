@@ -55,11 +55,13 @@ impl App {
     pub fn update(&mut self, message: Message) {
         match message {
             Message::LoadChartEvents(number) => {
-                let chart_data = self.load_latest_chart_data(number);
+                let mut chart_data = self.load_latest_chart_data(number);
+                Self::gpu_is_integrated(&mut chart_data);
                 self.dashboard_page.update(Message::UpdateChartData(chart_data));
             }
             Message::Tick => {
-                let chart_data = self.load_latest_chart_data(1);
+                let mut chart_data = self.load_latest_chart_data(1);
+                Self::gpu_is_integrated(&mut chart_data);
                 self.dashboard_page.update(Message::UpdateChartData(chart_data));
             }
             Message::NavigateTo(page) => {
@@ -72,6 +74,27 @@ impl App {
             }
             _ => {}
         }
+    }
+
+    fn gpu_is_integrated(chart_data: &mut Vec<(DateTime<Utc>, SensorData)>){
+        // Check the CPU pp1_power value
+        let pp1_value = chart_data.iter().find_map(|(_, sensor_data)| {
+            if let SensorData::CPU(cpu_data) = sensor_data {
+                cpu_data.pp1_power_watts
+            } else {
+                None
+            }
+        });
+        if pp1_value.is_some() {
+            for (_, sensor_data) in chart_data {
+                if sensor_data.sensor_type() == "GPU" {
+                    // Change GPUData total power value for pp1 power
+                    if let SensorData::GPU(gpu_data) = sensor_data {
+                        gpu_data.total_power_watts = pp1_value;
+                    };
+                }
+            }
+        } // GPU is integrated
     }
 
     fn load_latest_chart_data(&mut self, number: i64) -> Vec<(DateTime<Utc>, SensorData)> {

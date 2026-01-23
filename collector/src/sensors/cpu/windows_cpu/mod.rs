@@ -161,22 +161,32 @@ impl MSRReader {
         if duration == 0.0 {
             return CPUValues::default(); // Division by zero protection
         }
+
+        let pp1_value = self.calculate_component_power(
+            current_energy.cpu_energy_values.pp1,
+            last_energy.cpu_energy_values.pp1,
+            duration,
+        );
+
+        let mut pkg_value = self.calculate_component_power(
+            current_energy.cpu_energy_values.pkg,
+            last_energy.cpu_energy_values.pkg,
+            duration,
+        );
+
+        // GPU is integrated in CPU
+        if !pp1_value.is_none() && !pkg_value.is_none() {
+            pkg_value = pkg_value.map(|p| p - pp1_value.unwrap());
+        }
+
         CPUValues {
-            pkg: self.calculate_component_power(
-                current_energy.cpu_energy_values.pkg,
-                last_energy.cpu_energy_values.pkg,
-                duration,
-            ),
+            pkg: pkg_value,
             pp0: self.calculate_component_power(
                 current_energy.cpu_energy_values.pp0,
                 last_energy.cpu_energy_values.pp0,
                 duration,
             ),
-            pp1: self.calculate_component_power(
-                current_energy.cpu_energy_values.pp1,
-                last_energy.cpu_energy_values.pp1,
-                duration,
-            ),
+            pp1: pp1_value,
             dram: self.calculate_component_power(
                 current_energy.cpu_energy_values.dram,
                 last_energy.cpu_energy_values.dram,
