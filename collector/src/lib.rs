@@ -1,16 +1,16 @@
 #![allow(dead_code, unused_imports)]
 
 pub mod database;
-pub mod sensors;
 pub mod process;
+pub mod sensors;
 
 use std::{thread, time::Duration};
 
 use database::Database;
 use display_info::DisplayInfo;
 use hardware_query::HardwareInfo;
+use process::{estimate_app_power_consumption, groups::group_processes_by_app};
 use sensors::{SensorType, create_event_from_sensors};
-use process::{groups::group_processes_by_app, estimate_app_power_consumption};
 
 pub struct CollectorApp {
     database: Database,
@@ -86,6 +86,36 @@ impl CollectorApp {
     }
 
     pub fn run(&mut self) {
+        println!("\n========== PROCESS MONITORING TEST ==========\n");
+
+        loop {
+            println!("\nFetching process data...\n");
+
+            // Get raw process data
+            let processes = estimate_app_power_consumption();
+
+            // Group processes by application (no need for total_cpu_power for testing)
+            let grouped_apps = group_processes_by_app(processes, 0.0);
+
+            println!(
+                "{:<30} {:<15} {:<15} {:<10}",
+                "Application", "CPU Usage (%)", "VRAM (MB)", "Processes"
+            );
+            println!("{}", "-".repeat(75));
+
+            // Print top 10 grouped applications by CPU usage
+            for app in grouped_apps.iter().take(10) {
+                if app.cpu_usage_percent > 0.001 {
+                    println!(
+                        "{:<30} {:<15.2} {:<15.2} {:<10}",
+                        app.app_name, app.cpu_usage_percent, app.vram_usage_mb, app.process_count
+                    );
+                }
+            }
+
+            thread::sleep(Duration::from_secs(1));
+        }
+
         // println!("\n========== POWER CONSUMPTION MONITORING ==========");
         // println!("Logging data to database every second. Press Ctrl+C to stop.\n");
 
@@ -96,51 +126,12 @@ impl CollectorApp {
 
         //     println!("\n--- Iteration {} ---", iteration);
 
-        //     // Get sensor data including total CPU power
         //     let event = create_event_from_sensors(&self.sensors);
-            
-        //     let total_cpu_power = 20.0; // Placeholder for total CPU power in watts
-
-        //     // Get process data and group by application
-        //     let processes = estimate_app_power_consumption();
-        //     let grouped_apps = group_processes_by_app(processes, total_cpu_power);
-
-        //     println!("\n{:<30} {:<15} {:<15} {:<10}", 
-        //              "Application", "Power (W)", "CPU Usage (%)", "Processes");
-        //     println!("{}", "-".repeat(75));
-            
-        //     for app in grouped_apps.iter().take(15) {
-        //         if app.power_watts > 0.01 {
-        //             println!("{:<30} {:<15.2} {:<15.2} {:<10}",
-        //                      app.app_name,
-        //                      app.power_watts,
-        //                      app.cpu_usage_percent,
-        //                      app.process_count);
-        //         }
-        //     }
-
         //     match self.database.insert_event(&event) {
-        //         Ok(_) => println!("\n✓ Event data saved to database"),
-        //         Err(e) => eprintln!("\n✗ Failed to save event data: {:?}", e),
+        //         Ok(_) => println!("✓ Event data saved to database"),
+        //         Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
         //     }
         // }
-
-        println!("\n========== POWER CONSUMPTION MONITORING ==========");
-        println!("Logging data to database every second. Press Ctrl+C to stop.\n");
-
-        let mut iteration = 0;
-        loop {
-            thread::sleep(Duration::from_millis(1000));
-            iteration += 1;
-
-            println!("\n--- Iteration {} ---", iteration);
-
-            let event = create_event_from_sensors(&self.sensors);
-            match self.database.insert_event(&event) {
-                Ok(_) => println!("✓ Event data saved to database"),
-                Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
-            }
-        }
     }
 }
 
