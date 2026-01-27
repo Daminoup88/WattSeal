@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use super::AppPowerData;
 use common::ProcessData;
+
+use super::AppPowerData;
 
 /// Group processes by application name and calculate power consumption
 pub fn group_processes_by_app(processes: Vec<AppPowerData>, total_cpu_power_watts: f64) -> Vec<ProcessData> {

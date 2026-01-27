@@ -1,6 +1,6 @@
 use std::time;
 
-use common::DatabaseTable;
+use common::{DatabaseTable, ProcessData};
 
 use super::{CPUData, DatabaseEntry, GPUData, TotalData};
 use crate::sensors::{CPUSensor, GPUSensor, SensorType};
@@ -11,6 +11,7 @@ impl DatabaseTable for SensorType {
             SensorType::CPU(s) => s.table_name(),
             SensorType::GPU(s) => s.table_name(),
             SensorType::Total => TotalData::table_name_static(),
+            SensorType::Process => "process_data",
         }
     }
 
@@ -23,6 +24,14 @@ impl DatabaseTable for SensorType {
                 for (name, type_) in TotalData::columns_static() {
                     cols.push(format!("{} {}", name, type_));
                 }
+                cols
+            }
+            SensorType::Process => {
+                let mut cols = timestamp_columns();
+                cols.push("app_name TEXT NOT NULL".to_string());
+                cols.push("cpu_usage_watts REAL NOT NULL".to_string());
+                cols.push("vram_usage REAL NOT NULL".to_string());
+                cols.push("subprocess_count INTEGER NOT NULL".to_string());
                 cols
             }
         }

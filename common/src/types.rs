@@ -178,7 +178,11 @@ impl Display for SensorData {
 
 impl Display for ProcessData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "App: {} | VRAM: {:.2}MB | Power(CPU): {:.3}W | Nb: {}", self.app_name, self.vram_usage, self.cpu_usage_watts, self.subprocess_count)?;
+        writeln!(
+            f,
+            "App: {} | VRAM: {:.2}MB | Power(CPU): {:.3}W | Nb: {}",
+            self.app_name, self.vram_usage, self.cpu_usage_watts, self.subprocess_count
+        )?;
         Ok(())
     }
 }

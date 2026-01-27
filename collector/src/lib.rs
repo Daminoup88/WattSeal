@@ -74,6 +74,8 @@ impl CollectorApp {
 
         // Add total power sensor
         self.sensors.push(SensorType::Total);
+        // Add process sensor
+        self.sensors.push(SensorType::Process);
 
         println!("\n========== SETTING UP DATABASE ==========");
         // Initialize database

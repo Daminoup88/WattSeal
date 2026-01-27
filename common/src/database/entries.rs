@@ -1,6 +1,9 @@
 use rusqlite::{Row, ToSql};
 
-use crate::{database, types::{CPUData, GPUData, SensorData, ProcessData, TotalData}};
+use crate::{
+    database,
+    types::{CPUData, GPUData, ProcessData, SensorData, TotalData},
+};
 
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;

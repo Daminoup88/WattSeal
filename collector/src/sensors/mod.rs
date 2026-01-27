@@ -12,6 +12,7 @@ pub use crate::process::{estimate_app_power_consumption, groups::group_processes
 pub enum SensorType {
     CPU(CPUSensor),
     GPU(GPUSensor),
+    Process,
     Total,
 }
 
@@ -20,6 +21,7 @@ impl Sensor for SensorType {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
+            SensorType::Process => Err(SensorError::NotSupported),
             SensorType::Total => Err(SensorError::NotSupported),
         }
     }
@@ -43,6 +45,9 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event {
     let mut total_power = 0.0;
     for sensor in sensors {
         if let SensorType::Total = sensor {
+            continue;
+        }
+        if let SensorType::Process = sensor {
             continue;
         }
         let sensor_data = sensor.read_full_data();
