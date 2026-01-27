@@ -134,9 +134,19 @@ impl Database {
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            let insert_sql = sensor_data.insert_sql();
-            let params = sensor_data.insert_params(&timestamp_id);
-            tx.execute(&insert_sql, params.as_slice())?;
+            if sensor_data.sensor_type() == "Processes" {
+                if let SensorData::Process(process_data) = sensor_data {
+                    for process in process_data {
+                        let insert_sql = process.insert_sql();
+                        let params = process.insert_params(&timestamp_id);
+                        tx.execute(&insert_sql, params.as_slice())?;
+                    }
+                }
+            } else {
+                let insert_sql = sensor_data.insert_sql();
+                let params = sensor_data.insert_params(&timestamp_id);
+                tx.execute(&insert_sql, params.as_slice())?;
+            }
         }
         tx.commit()?;
         Ok(())

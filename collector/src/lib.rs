@@ -110,7 +110,7 @@ impl CollectorApp {
                 }
                 // PRINT PROCESS DATA
                 else {
-                    //println!("{}", sensor_data);
+                    println!("{}", sensor_data);
                 }
             }
         }

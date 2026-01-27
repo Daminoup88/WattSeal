@@ -1,6 +1,6 @@
 use rusqlite::{Row, ToSql};
 
-use crate::types::{CPUData, GPUData, SensorData, TotalData};
+use crate::{database, types::{CPUData, GPUData, SensorData, ProcessData, TotalData}};
 
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;
@@ -161,6 +161,48 @@ impl DatabaseEntry for TotalData {
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(TotalData {
             total_power_watts: row.get("total_power_watts")?,
+        })
+    }
+}
+
+impl DatabaseEntry for ProcessData {
+    fn generic_name() -> &'static str {
+        "Process"
+    }
+
+    fn table_name_static() -> &'static str {
+        "process_data"
+    }
+
+    fn insert_sql(&self) -> String {
+        format!("INSERT INTO {} (timestamp_id, app_name, vram_usage, cpu_usage_watts, subprocess_count) VALUES (?1, ?2, ?3, ?4, ?5)", Self::table_name_static()).to_string()
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            timestamp_id,
+            &self.app_name,
+            &self.vram_usage,
+            &self.cpu_usage_watts,
+            &(self.subprocess_count),
+        ]
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("app_name", "TEXT NOT NULL"),
+            ("vram_usage", "REAL"),
+            ("cpu_usage_watts", "REAL"),
+            ("subprocess_count", "INTEGER"),
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(ProcessData {
+            app_name: row.get("app_name")?,
+            vram_usage: row.get("vram_usage")?,
+            cpu_usage_watts: row.get("cpu_usage_watts")?,
+            subprocess_count: row.get::<_, i64>("subprocess_count")? as u32,
         })
     }
 }

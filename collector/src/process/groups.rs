@@ -5,7 +5,7 @@ use common::ProcessData;
 
 /// Group processes by application name and calculate power consumption
 pub fn group_processes_by_app(processes: Vec<AppPowerData>, total_cpu_power_watts: f64) -> Vec<ProcessData> {
-    let mut grouped: HashMap<String, (f64, f64, usize)> = HashMap::new();
+    let mut grouped: HashMap<String, (f64, f64, u32)> = HashMap::new();
     let mut total_cpu_percent = 0.0;
 
     // Calculate total CPU percentage across all processes
@@ -19,7 +19,7 @@ pub fn group_processes_by_app(processes: Vec<AppPowerData>, total_cpu_power_watt
         let entry = grouped.entry(app_name).or_insert((0.0, 0.0, 0));
         entry.0 += process.cpu_usage_percent;
         entry.1 += process.gpu_memory_mb; // Add VRAM per app
-        entry.2 += process.process_count;
+        entry.2 += process.process_count as u32;
     }
 
     // Convert to power consumption

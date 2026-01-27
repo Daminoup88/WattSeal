@@ -73,7 +73,7 @@ pub struct ProcessData {
     pub app_name: String,
     pub vram_usage: f64,
     pub cpu_usage_watts: f64,
-    pub subprocess_count: usize,
+    pub subprocess_count: u32,
 }
 
 #[derive(Debug, Clone)]
