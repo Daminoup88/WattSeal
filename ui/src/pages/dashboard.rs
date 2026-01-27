@@ -1,4 +1,8 @@
-use std::collections::HashMap;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, VecDeque},
+    rc::Rc,
+};
 
 use chrono::{DateTime, Utc};
 use common::{CPUData, DatabaseEntry, SensorData, TotalData};
@@ -10,7 +14,10 @@ use iced::{
 };
 
 use crate::{
-    components::chart::{AxisType, LineType, SensorChart},
+    components::{
+        self,
+        chart::{LineType, SensorChart},
+    },
     message::Message,
     styles::{
         container::ContainerStyle,
@@ -25,125 +32,215 @@ use crate::{
 
 const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
 
-#[derive(Debug, Clone, Default)]
-pub struct PowerSnapshot {
-    pub components_power: HashMap<String, Option<SensorData>>,
+#[derive(Default)]
+pub enum MetricType {
+    #[default]
+    Power,
+    Usage,
 }
 
-impl PowerSnapshot {
-    pub fn from_components_list(components: &Vec<String>) -> Self {
-        let mut readings = PowerSnapshot::default();
-
-        for component in components.iter() {
-            let sensor_data =
-                SensorData::get_matching_sensor_data(component).unwrap_or(SensorData::Total(TotalData::default()));
-            readings
-                .components_power
-                .insert(sensor_data.sensor_type().to_string(), Some(sensor_data));
-        }
-        readings
-    }
-
-    pub fn update_from_sensor_data(&mut self, data: &[(DateTime<Utc>, SensorData)]) {
-        for (_, sensor) in data.iter() {
-            self.components_power
-                .insert(sensor.sensor_type().to_string(), Some(sensor.clone()));
+impl MetricType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            MetricType::Power => "Power",
+            MetricType::Usage => "Usage",
         }
     }
 
-    pub fn total_power(&self) -> f64 {
-        match self.components_power.get(TotalData::generic_name()) {
-            Some(Some(SensorData::Total(p))) => p.total_power_watts,
-            _ => 0.0,
+    pub fn unit(&self) -> &'static str {
+        match self {
+            MetricType::Power => "W",
+            MetricType::Usage => "%",
         }
     }
 
-    pub fn power_details(&self) -> Vec<(&String, &Option<SensorData>)> {
-        let mut details: Vec<(&String, &Option<SensorData>)> = self
-            .components_power
-            .iter()
-            .filter(|(_, data)| {
-                if let Some(SensorData::Total(_)) = data {
-                    false
+    pub fn legend(&self, component_name: &str) -> String {
+        format!("{} {}", component_name, self.label())
+    }
+}
+
+#[derive(Default, Clone)]
+pub enum TimeRange {
+    #[default]
+    LastMinute = 60,
+    LastHour = 3600,
+    Last24Hours = 86400,
+}
+
+pub struct ComponentState<'a> {
+    name: String,
+    sensor_type: String,
+    latest_reading: Option<SensorData>,
+    power_history: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
+    usage_history: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
+    chart: SensorChart<'a>,
+    line_type: LineType,
+    time_range: TimeRange,
+    metric_type: MetricType,
+    show_in_total: bool,
+}
+
+impl<'a> ComponentState<'a> {
+    fn new(name: String, sensor_type: String, theme: AppTheme) -> Self {
+        let chart = SensorChart::new(theme);
+        let mut state = Self {
+            name,
+            sensor_type,
+            latest_reading: None,
+            chart,
+            power_history: Rc::new(RefCell::new(VecDeque::new())),
+            usage_history: Rc::new(RefCell::new(VecDeque::new())),
+            time_range: TimeRange::default(),
+            metric_type: MetricType::default(),
+            show_in_total: false,
+            line_type: LineType::default(),
+        };
+        state.update_metric_type(MetricType::default());
+        state.update_time_range(TimeRange::default());
+        state
+    }
+
+    fn push_data(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
+        self.latest_reading = Some(data.clone());
+
+        let power = data.total_power_watts();
+        let usage = data.usage_percent();
+        if let Some(p) = power {
+            if let Ok(mut history) = self.power_history.try_borrow_mut() {
+                history.push_back((timestamp, p as f32));
+            }
+        }
+        if let Some(u) = usage {
+            if let Ok(mut history) = self.usage_history.try_borrow_mut() {
+                history.push_back((timestamp, u as f32));
+            }
+        }
+
+        let cutoff = timestamp - chrono::Duration::seconds(self.time_range.clone() as i64);
+        if let Ok(mut history) = self.usage_history.try_borrow_mut() {
+            while let Some(&(ts, _)) = history.front() {
+                if ts < cutoff {
+                    history.pop_front();
                 } else {
-                    true
+                    break;
                 }
+            }
+        }
+
+        self.chart.refresh_cache();
+    }
+
+    fn update_time_range(&mut self, time_range: TimeRange) {
+        self.time_range = time_range;
+        let label = "Time";
+        let unit = match self.time_range {
+            TimeRange::LastMinute => "s",
+            TimeRange::LastHour => "min",
+            TimeRange::Last24Hours => "h",
+        };
+        self.chart.set_x_axis_label_and_unit(label, unit);
+        self.chart
+            .set_x_range(chrono::Duration::seconds(self.time_range.clone() as i64));
+        // TODO: fetch data
+    }
+
+    fn update_metric_type(&mut self, metric_type: MetricType) {
+        self.metric_type = metric_type;
+        self.chart.clear();
+        let (label, unit) = match self.metric_type {
+            MetricType::Power => ("Power", "W"),
+            MetricType::Usage => ("Usage", "%"),
+        };
+        let legend = self.metric_type.legend(&self.sensor_type);
+        self.chart.add_series(&legend, self.line_type);
+        self.chart.set_y_axis_label_and_unit(label, unit);
+        self.chart.set_data(
+            &legend,
+            match self.metric_type {
+                MetricType::Power => self.power_history.clone(),
+                MetricType::Usage => self.usage_history.clone(),
+            },
+        );
+    }
+
+    fn update_theme(&mut self, theme: AppTheme) {
+        self.chart.update_style(theme);
+    }
+
+    fn chart_card<'b>(&'b self, title: &'b str) -> Element<'b, Message, AppTheme> {
+        let title = Text::new(title)
+            .size(FONT_SIZE_SUBTITLE)
+            .font(FONT_BOLD)
+            .class(TextStyle::Subtitle);
+
+        let chart_container = Container::new(self.chart.view())
+            .width(Length::Fill)
+            .height(Length::Fill);
+
+        let content = Column::new()
+            .spacing(SPACING_MEDIUM)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .push(title)
+            .push(chart_container);
+
+        Container::new(content)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .padding(Padding::from(PADDING_LARGE))
+            .class(ContainerStyle::Card)
+            .into()
+    }
+}
+
+pub struct DashboardPage<'a> {
+    components: HashMap<String, ComponentState<'a>>,
+}
+
+impl<'a> DashboardPage<'a> {
+    pub fn new(theme: AppTheme, components: Vec<String>) -> (Self, Task<Message>) {
+        let components = components
+            .into_iter()
+            .map(|name| {
+                let sensor_type = SensorData::get_matching_sensor_data(name.as_str())
+                    .map(|data| data.sensor_type().to_string())
+                    .unwrap_or(name.clone());
+                (sensor_type.clone(), ComponentState::new(name, sensor_type, theme))
             })
             .collect();
-        details.sort_by(|a, b| a.0.cmp(b.0));
-        details
-    }
-}
-
-pub struct DashboardPage {
-    chart: SensorChart,
-    current_readings: PowerSnapshot,
-}
-
-impl DashboardPage {
-    pub fn new(theme: AppTheme, components: Vec<String>) -> (Self, Task<Message>) {
-        let series = vec![
-            (
-                "CPU Power".to_string(),
-                LineType::Line,
-                AxisType::Primary("CPU Power".to_string(), "W".to_string()),
-            ),
-            (
-                "GPU Power".to_string(),
-                LineType::Line,
-                AxisType::Primary("GPU Power".to_string(), "W".to_string()),
-            ),
-            // (
-            //     "CPU Usage".to_string(),
-            //     LineType::Dashed,
-            //     AxisType::Secondary("CPU Usage".to_string(), "%".to_string()),
-            // ),
-            // (
-            //     "GPU Usage".to_string(),
-            //     LineType::Dashed,
-            //     AxisType::Secondary("GPU Usage".to_string(), "%".to_string()),
-            // ),
-        ];
-        let x_axis = AxisType::Primary("Time".to_string(), "s".to_string());
-        let y_axis = AxisType::Primary("Power".to_string(), "W".to_string());
-        // AxisType::Secondary("Usage".to_string(), "%".to_string()),
-        let chart = SensorChart::new(series, None, None, theme, x_axis, y_axis);
-        (
-            Self {
-                chart,
-                current_readings: PowerSnapshot::from_components_list(&components),
-            },
-            Task::none(),
-        )
+        (Self { components }, Task::none())
     }
 
     pub fn update_theme(&mut self, theme: AppTheme) {
-        self.chart.update_style(theme);
+        for component in self.components.values_mut() {
+            component.update_theme(theme);
+        }
     }
 
     pub fn update(&mut self, message: Message) {
         match message {
             Message::UpdateChartData(data) => {
-                self.current_readings.update_from_sensor_data(&data);
-                let labeled_data: Vec<(String, DateTime<Utc>, f32)> = data
-                    .iter()
-                    .filter_map(|(timestamp, sensor)| match sensor {
-                        SensorData::CPU(cpu_data) => cpu_data
-                            .total_power_watts
-                            .map(|power| ("CPU Power".to_string(), *timestamp, power as f32)),
-                        SensorData::GPU(gpu_data) => gpu_data
-                            .total_power_watts
-                            .map(|power| ("GPU Power".to_string(), *timestamp, power as f32)),
-                        _ => None,
-                    })
-                    .collect();
-                self.chart.push_data(labeled_data);
+                for (timestamp, sensor) in data.iter() {
+                    if let Some(component) = self.components.get_mut(sensor.sensor_type()) {
+                        component.push_data(*timestamp, sensor);
+                    }
+                }
             }
             _ => {}
         }
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
+        let chart_card = self
+            .components
+            .get("Total")
+            .map(|c| c.chart_card("Total Power Over Time"))
+            .unwrap_or_else(|| {
+                Text::new("No data available")
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted)
+                    .into()
+            });
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
@@ -151,13 +248,20 @@ impl DashboardPage {
             .height(Length::Fill)
             .push(self.view_power_summary())
             .push(self.view_component_cards())
-            .push(self.view_chart_section());
+            .push(chart_card);
 
         Container::new(content).width(Length::Fill).height(Length::Fill).into()
     }
 
     fn view_power_summary(&self) -> Element<'_, Message, AppTheme> {
-        let power_value = format!("{:.1}", self.current_readings.total_power());
+        let power_value = format!(
+            "{:.1}",
+            self.components
+                .get("Total")
+                .and_then(|c| c.latest_reading.as_ref())
+                .and_then(|data| data.total_power_watts())
+                .unwrap_or(0.0)
+        );
         let power_unit = "W";
 
         let title = Text::new("Total Power Consumption")
@@ -196,10 +300,13 @@ impl DashboardPage {
         let mut row = Row::new().spacing(SPACING_LARGE).width(Length::Fill);
         let mut items_in_row = 0;
 
-        for (i, sensor) in self.current_readings.power_details().iter().enumerate() {
-            let power = sensor.1.as_ref().and_then(|data| data.total_power_watts());
-            let usage = sensor.1.as_ref().and_then(|data| data.usage_percent());
-            let card = self.component_snapshot_card(sensor.0, power, usage);
+        for (i, (name, component)) in self.components.iter().filter(|(name, _)| *name != "Total").enumerate() {
+            let power = component
+                .latest_reading
+                .as_ref()
+                .and_then(|data| data.total_power_watts());
+            let usage = component.latest_reading.as_ref().and_then(|data| data.usage_percent());
+            let card = self.component_snapshot_card(name, power, usage);
 
             row = row.push(card);
             items_in_row += 1;
@@ -284,15 +391,20 @@ impl DashboardPage {
             .into()
     }
 
-    fn view_chart_section(&self) -> Element<'_, Message, AppTheme> {
-        let title = Text::new("Power History")
+    fn chart_card<'b>(&'b self, title: &'b str) -> Element<'b, Message, AppTheme> {
+        let title = Text::new(title)
             .size(FONT_SIZE_SUBTITLE)
             .font(FONT_BOLD)
             .class(TextStyle::Subtitle);
 
-        let chart_container = Container::new(self.chart.view(300.0))
-            .width(Length::Fill)
-            .height(Length::Fill);
+        let chart = self.components.get("Total").map(|c| c.chart.view()).unwrap_or_else(|| {
+            Text::new("No data available")
+                .size(FONT_SIZE_BODY)
+                .class(TextStyle::Muted)
+                .into()
+        });
+
+        let chart_container = Container::new(chart).width(Length::Fill).height(Length::Fill);
 
         let content = Column::new()
             .spacing(SPACING_MEDIUM)

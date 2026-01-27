@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     collections::{HashMap, VecDeque},
+    rc::Rc,
 };
 
 use chrono::{DateTime, Duration, TimeZone, Utc};
@@ -17,6 +18,7 @@ use iced::{
 };
 use plotters::{
     coord::Shift,
+    data,
     prelude::ChartBuilder,
     style::{Color, RGBAColor, RGBColor},
 };
@@ -94,21 +96,21 @@ pub enum TooltipSide {
 pub struct TooltipContent {
     pub title: String,
     pub value: f32,
+    pub unit: String,
     pub time: DateTime<Utc>,
     pub description: Option<String>,
     pub series_index: usize,
-    pub axis_type: AxisType,
 }
 
 impl TooltipContent {
-    pub fn new(title: String, value: f32, time: DateTime<Utc>, series_index: usize, axis_type: AxisType) -> Self {
+    pub fn new(title: String, value: f32, unit: String, time: DateTime<Utc>, series_index: usize) -> Self {
         Self {
             title,
             value,
+            unit,
             time,
             description: None,
             series_index,
-            axis_type,
         }
     }
 
@@ -117,12 +119,8 @@ impl TooltipContent {
         self
     }
 
-    fn unit(&self) -> &str {
-        &self.axis_type.unit()
-    }
-
     fn value_text(&self) -> String {
-        format!("{:.1}{}", self.value, self.unit())
+        format!("{:.1}{}", self.value, self.unit)
     }
 
     fn timestamp_text(&self) -> String {
@@ -211,14 +209,16 @@ impl TooltipData {
     }
 }
 
-pub struct SensorChart {
+pub struct SensorChart<'a> {
     cache: RefCell<Cache>,
-    data: ChartData,
-    limit: Duration,
+    data: ChartData<'a>,
     hovered: RefCell<Option<TooltipData>>,
+    x_range: Duration,
     y_range: Range,
-    x_axis: AxisType,
-    y_axis: AxisType,
+    x_axis_label: &'a str,
+    y_axis_label: &'a str,
+    x_unit: &'a str,
+    y_unit: &'a str,
     dynamic_range: bool,
     style: ChartStyle,
 }
@@ -233,120 +233,110 @@ pub enum LineType {
     Points,
 }
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum AxisType {
-    Primary(String, String),
-    // Secondary(String, String),
-}
-
-impl AxisType {
-    pub fn label(&self) -> &str {
-        match self {
-            AxisType::Primary(label, _) => label,
-        }
-    }
-
-    pub fn unit(&self) -> &str {
-        match self {
-            AxisType::Primary(_, unit) => unit,
-        }
-    }
-}
-
-impl Default for AxisType {
-    fn default() -> Self {
-        AxisType::Primary("Value".to_string(), "Units".to_string())
-    }
-}
-
 #[derive(Default, Debug, Clone)]
 struct TimeSeries {
-    points: VecDeque<(DateTime<Utc>, f32)>,
+    points: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
     line_type: LineType,
-    axis_type: AxisType,
 }
 
 impl TimeSeries {
-    fn iter(&self) -> impl Iterator<Item = (DateTime<Utc>, f32)> + '_ {
-        self.points.iter().copied()
+    fn iter(&self) -> Vec<(DateTime<Utc>, f32)> {
+        self.points
+            .try_borrow()
+            .map(|points| points.iter().copied().collect())
+            .unwrap_or_default()
     }
 
     fn newest_time(&self) -> Option<DateTime<Utc>> {
-        self.points.back().map(|(time, _)| *time)
+        self.points
+            .try_borrow()
+            .ok()
+            .and_then(|points| points.back().map(|(t, _)| *t))
     }
 
     fn oldest_time(&self) -> Option<DateTime<Utc>> {
-        self.points.front().map(|(time, _)| *time)
+        self.points
+            .try_borrow()
+            .ok()
+            .and_then(|points| points.front().map(|(t, _)| *t))
     }
 }
 
-#[derive(Debug, Clone, Default)]
-struct ChartData {
-    series: HashMap<String, TimeSeries>,
-}
-
-pub type SeriesSettings = Vec<(String, LineType, AxisType)>;
-
-impl ChartData {
-    fn from(series: SeriesSettings) -> Self {
-        let mut ts = Self::default();
-        for (label, line_type, axis_type) in series {
-            ts.series.insert(
-                label,
-                TimeSeries {
-                    points: VecDeque::new(),
-                    line_type,
-                    axis_type,
-                },
-            );
-        }
-        ts
-    }
-
-    fn newest_time(&self) -> Option<DateTime<Utc>> {
-        self.series.values().filter_map(|series| series.newest_time()).max()
-    }
-
-    fn oldest_time(&self) -> Option<DateTime<Utc>> {
-        self.series.values().filter_map(|series| series.oldest_time()).min()
-    }
-
-    fn push_data(&mut self, time: DateTime<Utc>, label: String, value: f32) {
-        if let Some(series) = self.series.get_mut(&label) {
-            series.points.push_back((time, value));
-        } else {
-            let mut series = TimeSeries::default();
-            series.points.push_back((time, value));
-            self.series.insert(label, series);
-        }
-    }
-}
+type ChartData<'a> = HashMap<String, TimeSeries>;
 
 fn to_plotters_color(color: iced::Color) -> RGBColor {
     let rgba = color.into_rgba8();
     RGBColor(rgba[0], rgba[1], rgba[2])
 }
 
-impl SensorChart {
-    pub fn new(
-        series: SeriesSettings,
-        min_y: Option<f32>,
-        max_y: Option<f32>,
-        theme: AppTheme,
-        x_axis: AxisType,
-        y_axis: AxisType,
-    ) -> Self {
+impl<'a> SensorChart<'a> {
+    pub fn new(theme: AppTheme) -> Self {
         Self {
             cache: RefCell::default(),
-            data: ChartData::from(series),
-            limit: Duration::seconds(PLOT_SECONDS as i64),
+            data: ChartData::default(),
             hovered: RefCell::default(),
-            y_range: (min_y.unwrap_or(VALUE_MIN), max_y.unwrap_or(VALUE_MAX)),
-            dynamic_range: min_y.is_none() || max_y.is_none(),
+            x_range: Duration::seconds(PLOT_SECONDS as i64),
+            y_range: (VALUE_MIN, VALUE_MAX),
+            dynamic_range: true,
             style: theme.into(),
-            x_axis,
-            y_axis,
+            x_axis_label: "Time",
+            y_axis_label: "Value",
+            x_unit: "",
+            y_unit: "",
         }
+    }
+
+    pub fn add_series(&mut self, label: &str, line_type: LineType) {
+        self.data.insert(
+            label.to_string(),
+            TimeSeries {
+                points: Rc::new(RefCell::new(VecDeque::new())),
+                line_type,
+            },
+        );
+    }
+
+    pub fn remove_series(&mut self, label: &str) {
+        self.data.remove(label);
+    }
+
+    pub fn set_data(&mut self, label: &str, points: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>) {
+        if let Some(series) = self.data.get_mut(label) {
+            series.points = points;
+            self.refresh_cache();
+        }
+    }
+
+    pub fn refresh_cache(&mut self) {
+        if self.dynamic_range {
+            self.recalculate_range();
+        }
+        self.cache.borrow_mut().clear();
+    }
+
+    pub fn set_x_axis_label_and_unit(&mut self, label: &'a str, unit: &'a str) {
+        self.x_axis_label = label;
+        self.x_unit = unit;
+        self.cache.borrow_mut().clear();
+    }
+
+    pub fn set_y_axis_label_and_unit(&mut self, label: &'a str, unit: &'a str) {
+        self.y_axis_label = label;
+        self.y_unit = unit;
+        self.cache.borrow_mut().clear();
+    }
+
+    pub fn newest_time(&self) -> Option<DateTime<Utc>> {
+        self.data.values().filter_map(|series| series.newest_time()).max()
+    }
+
+    pub fn oldest_time(&self) -> Option<DateTime<Utc>> {
+        self.data.values().filter_map(|series| series.oldest_time()).min()
+    }
+
+    pub fn clear(&mut self) {
+        self.data.clear();
+        self.cache.borrow_mut().clear();
     }
 
     pub fn update_style(&mut self, theme: AppTheme) {
@@ -354,59 +344,41 @@ impl SensorChart {
         self.cache.borrow_mut().clear();
     }
 
-    pub fn push_data(&mut self, data: Vec<(String, DateTime<Utc>, f32)>) {
-        if data.is_empty() {
-            return;
-        }
-
-        let mut max = Utc.timestamp_opt(0, 0).unwrap();
-        for (label, time, value) in data {
-            if time > max {
-                max = time;
-            }
-
-            self.data.push_data(time, label, value);
-        }
-
-        let cutoff = max - self.limit;
-        for series in self.data.series.values_mut() {
-            series.points.retain(|(time, _)| *time >= cutoff);
-        }
-
-        if self.dynamic_range {
-            self.recalculate_range();
-        }
-
+    pub fn set_x_range(&mut self, duration: Duration) {
+        self.x_range = duration;
         self.cache.borrow_mut().clear();
     }
 
     fn recalculate_range(&mut self) {
-        let max = self
-            .data
-            .series
-            .values()
-            .filter(|series| matches!(series.axis_type, AxisType::Primary(_, _)))
-            .flat_map(|series| series.points.iter().map(|(_, v)| *v))
-            .fold(f32::MIN, |max, v| max.max(v));
+        let mut max = f32::MIN;
+        for series in self.data.values() {
+            if let Ok(points) = series.points.try_borrow() {
+                for &(_, value) in points.iter() {
+                    if value > max {
+                        max = value;
+                    }
+                }
+            }
+        }
 
         if max >= 0.0 {
             self.y_range = (0.0, max);
         }
     }
 
-    pub fn view(&self, chart_height: f32) -> Element<'_, Message, AppTheme> {
+    pub fn view(&self) -> Element<'_, Message, AppTheme> {
         Column::new()
             .width(Length::Fill)
             .height(Length::Shrink)
             .spacing(5)
             .align_x(Alignment::Center)
-            .push(ChartWidget::new(self).height(Length::Fixed(chart_height)))
+            .push(ChartWidget::new(self).height(Length::Fill))
             .into()
     }
 
     fn time_bounds(&self) -> (DateTime<Utc>, DateTime<Utc>) {
-        let newest = self.data.newest_time().unwrap_or_else(Utc::now);
-        let oldest = newest - self.limit;
+        let newest = self.newest_time().unwrap_or(Utc::now());
+        let oldest = newest - self.x_range;
         (oldest, newest)
     }
 
@@ -433,8 +405,8 @@ impl SensorChart {
             .axis_style(ShapeStyle::from(style.axis).stroke_width(1))
             .y_labels(5)
             .y_label_style(label_style.clone())
-            .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_axis.unit()))
-            .y_desc(format!("{} ({})", self.y_axis.label(), self.y_axis.unit()))
+            .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_unit))
+            .y_desc(format!("{} ({})", self.y_axis_label, self.y_unit))
             .axis_desc_style(label_style.clone().transform(FontTransform::Rotate90))
             .x_label_style(label_style.clone())
             .x_labels(60)
@@ -442,13 +414,13 @@ impl SensorChart {
                 let t = (newest_time.timestamp_millis() - x.timestamp_millis()) / 1000;
                 if t % 5 == 0 { format!("{}", t) } else { "".to_string() }
             })
-            .x_desc(format!("{} ({})", self.x_axis.label(), self.x_axis.unit()))
+            .x_desc(format!("{} ({})", self.x_axis_label, self.x_unit))
             .draw()
             .expect("failed to draw chart mesh");
 
-        for (i, (label, series)) in self.data.series.iter().enumerate() {
+        for (i, (label, series)) in self.data.iter().enumerate() {
             let color = style.series_color(i);
-            let data: Vec<_> = series.iter().collect();
+            let data = series.iter();
 
             let annotation = match series.line_type {
                 LineType::Line => chart.draw_series(LineSeries::new(data, color.stroke_width(2))),
@@ -597,27 +569,31 @@ impl SensorChart {
             cursor.y - CHART_MARGIN,
         );
 
-        let (oldest, _) = self.time_bounds();
-        let total_ms = self.limit.num_milliseconds() as f32;
+        let (oldest, newest) = self.time_bounds();
+        let total_ms = (newest - oldest).num_milliseconds() as f32;
         let snap_sq = snap_distance * snap_distance;
 
         self.data
-            .series
             .iter()
             .enumerate()
             .filter_map(|(idx, (label, s))| s.newest_time().map(|_| (idx, label.clone(), s)))
             .flat_map(|(idx, label, s)| {
-                s.points
-                    .iter()
-                    .map(move |d| (idx, label.clone(), d, s.axis_type.clone()))
+                if let Ok(points) = s.points.try_borrow() {
+                    points
+                        .iter()
+                        .map(move |(time, value)| (idx, label.clone(), (*time, *value)))
+                        .collect::<Vec<_>>()
+                } else {
+                    Vec::new()
+                }
             })
-            .filter_map(|(series_idx, label, (time, value), axis_type)| {
-                let px = self.point_x_for_time(*time, oldest, total_ms, chart_bounds.width);
-                let py = self.point_y_for_value(*value, chart_bounds.height);
+            .filter_map(|(series_idx, label, (time, value))| {
+                let px = self.point_x_for_time(time, oldest, total_ms, chart_bounds.width);
+                let py = self.point_y_for_value(value, chart_bounds.height);
                 let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
 
                 if dist_sq <= snap_sq {
-                    let content = TooltipContent::new(label, *value, *time, series_idx, axis_type);
+                    let content = TooltipContent::new(label, value, self.y_unit.to_string(), time, series_idx);
                     let tooltip = TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height);
                     Some((tooltip, dist_sq))
                 } else {
@@ -683,7 +659,7 @@ impl SensorChart {
     }
 }
 
-impl Chart<Message> for SensorChart {
+impl<'a> Chart<Message> for SensorChart<'a> {
     type State = ();
 
     fn update(

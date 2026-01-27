@@ -18,9 +18,9 @@ use crate::{
 
 const FPS: u64 = 1;
 
-pub struct App {
+pub struct App<'a> {
     current_page: Page,
-    dashboard_page: DashboardPage,
+    dashboard_page: DashboardPage<'a>,
     info_page: InfoPage,
     optimization_page: OptimizationPage,
     settings_page: SettingsPage,
@@ -29,7 +29,7 @@ pub struct App {
     database: Database,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::Dracula;
         let current_page = Page::Dashboard;
