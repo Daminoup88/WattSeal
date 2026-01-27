@@ -97,15 +97,21 @@ impl CollectorApp {
             println!("\n--- Iteration {} ---", iteration);
 
             let event = create_event_from_sensors(&self.sensors);
-            
+
             match self.database.insert_event(&event) {
                 Ok(_) => println!("✓ Event data saved to database"),
                 Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
             }
 
-            // PRINT DATA
             for sensor_data in event.data().iter() {
-                println!("{}", sensor_data);
+                // PRINT HARDWARE DATA
+                if !(sensor_data.sensor_type() == "Processes") {
+                    println!("{}", sensor_data);
+                }
+                // PRINT PROCESS DATA
+                else {
+                    //println!("{}", sensor_data);
+                }
             }
         }
     }

@@ -157,9 +157,18 @@ impl Display for SensorData {
             SensorData::Peripherals(data) => write!(f, "Peripherals Data: {:?}", data),
             SensorData::Total(power) => write!(f, "Total Power: {:.3} W", power.total_power_watts),
             SensorData::Process(processes) => {
-                writeln!(f, "Processes:")?;
+                writeln!(f, "Top Processes by CPU Usage:")?;
+                writeln!(
+                    f,
+                    "{:<30} {:>10} {:>15} {:>10}",
+                    "Application", "CPU (W)", "VRAM (MB)", "Subprocesses"
+                )?;
                 for process in processes {
-                    writeln!(f, "{}", process)?;
+                    writeln!(
+                        f,
+                        "{:<30} {:>10.2} {:>15.2} {:>10}",
+                        process.app_name, process.cpu_usage_watts, process.vram_usage, process.subprocess_count
+                    )?;
                 }
                 Ok(())
             }
