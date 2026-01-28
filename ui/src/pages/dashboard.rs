@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, VecDeque},
+    collections::{BTreeMap, VecDeque},
     rc::Rc,
 };
 
@@ -286,7 +286,7 @@ impl<'a> ComponentState<'a> {
 }
 
 pub struct DashboardPage<'a> {
-    components: HashMap<String, ComponentState<'a>>,
+    components: BTreeMap<String, ComponentState<'a>>,
 }
 
 impl<'a> DashboardPage<'a> {
