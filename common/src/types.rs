@@ -117,6 +117,15 @@ impl SensorData {
         }
     }
 
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            SensorData::CPU(_) => CPUData::table_name_static(),
+            SensorData::GPU(_) => GPUData::table_name_static(),
+            SensorData::Total(_) => TotalData::table_name_static(),
+            _ => "",
+        }
+    }
+
     pub fn total_power_watts(&self) -> Option<f64> {
         match self {
             SensorData::CPU(data) => data.total_power_watts,

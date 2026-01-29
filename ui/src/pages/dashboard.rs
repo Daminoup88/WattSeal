@@ -96,7 +96,7 @@ impl Display for TimeRange {
 }
 
 pub struct ComponentState<'a> {
-    name: String,
+    table_name: String,
     sensor_type: String,
     latest_reading: Option<SensorData>,
     power_history: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
@@ -112,7 +112,7 @@ impl<'a> ComponentState<'a> {
     fn new(name: String, sensor_type: String, theme: AppTheme) -> Self {
         let chart = SensorChart::new(theme);
         let mut state = Self {
-            name,
+            table_name: name,
             sensor_type,
             latest_reading: None,
             chart,
@@ -204,6 +204,14 @@ impl<'a> ComponentState<'a> {
         // TODO: fetch data
     }
 
+    fn switch_metric_type(&mut self) {
+        let new_metric = match self.metric_type {
+            MetricType::Power => MetricType::Usage,
+            MetricType::Usage => MetricType::Power,
+        };
+        self.update_metric_type(new_metric);
+    }
+
     fn update_metric_type(&mut self, metric_type: MetricType) {
         self.metric_type = metric_type;
         self.chart.clear();
@@ -237,7 +245,7 @@ impl<'a> ComponentState<'a> {
         let time_range_selector: PickList<'_, _, _, _, _, AppTheme, Renderer> = pick_list(
             [TimeRange::LastMinute, TimeRange::LastHour, TimeRange::Last24Hours],
             Some(self.time_range.clone()),
-            |tr| Message::ChangeChartTimeRange(self.name.clone(), tr),
+            |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
         );
 
         let metric_type_button: Button<'_, _, AppTheme, Renderer> = iced::widget::button(
@@ -247,7 +255,7 @@ impl<'a> ComponentState<'a> {
             })
             .size(FONT_SIZE_BODY),
         )
-        .on_press(Message::ChangeChartMetricType(self.name.clone()));
+        .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
 
         let first_row = Row::new()
             .spacing(SPACING_XLARGE)
@@ -343,11 +351,11 @@ impl<'a> DashboardPage<'a> {
     pub fn new(theme: AppTheme, components: Vec<String>) -> (Self, Task<Message>) {
         let components = components
             .into_iter()
-            .map(|name| {
-                let sensor_type = SensorData::get_matching_sensor_data(name.as_str())
+            .map(|table_name| {
+                let sensor_type = SensorData::get_matching_sensor_data(table_name.as_str())
                     .map(|data| data.sensor_type().to_string())
-                    .unwrap_or(name.clone());
-                (sensor_type.clone(), ComponentState::new(name, sensor_type, theme))
+                    .unwrap_or(table_name.clone());
+                (table_name.clone(), ComponentState::new(table_name, sensor_type, theme))
             })
             .collect();
         (Self { components }, Task::none())
@@ -363,9 +371,19 @@ impl<'a> DashboardPage<'a> {
         match message {
             Message::UpdateChartData(data) => {
                 for (timestamp, sensor) in data.iter() {
-                    if let Some(component) = self.components.get_mut(sensor.sensor_type()) {
+                    if let Some(component) = self.components.get_mut(sensor.table_name()) {
                         component.push_data(*timestamp, sensor);
                     }
+                }
+            }
+            Message::ChangeChartMetricType(sensor_type) => {
+                if let Some(component) = self.components.get_mut(&sensor_type) {
+                    component.switch_metric_type();
+                }
+            }
+            Message::ChangeChartTimeRange(sensor_type, time_range) => {
+                if let Some(component) = self.components.get_mut(&sensor_type) {
+                    component.update_time_range(time_range);
                 }
             }
             _ => {}
@@ -375,7 +393,7 @@ impl<'a> DashboardPage<'a> {
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let chart_card = self
             .components
-            .get("Total")
+            .get(TotalData::table_name_static())
             .map(|c| c.chart_card("Total Power Over Time", 300.0))
             .unwrap_or_else(|| {
                 Text::new("No data available")
@@ -414,7 +432,7 @@ impl<'a> DashboardPage<'a> {
         let power_value = format!(
             "{:.1}",
             self.components
-                .get("Total")
+                .get(TotalData::table_name_static())
                 .and_then(|c| c.latest_reading.as_ref())
                 .and_then(|data| data.total_power_watts())
                 .unwrap_or(0.0)
@@ -457,7 +475,12 @@ impl<'a> DashboardPage<'a> {
         let mut row = Row::new().spacing(SPACING_LARGE).width(Length::Fill);
         let mut items_in_row = 0;
 
-        for (i, (_, component)) in self.components.iter().filter(|(name, _)| *name != "Total").enumerate() {
+        for (i, (_, component)) in self
+            .components
+            .iter()
+            .filter(|(table_name, _)| *table_name != TotalData::table_name_static())
+            .enumerate()
+        {
             let card = component.snapshot_card();
 
             row = row.push(card);

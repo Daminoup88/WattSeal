@@ -72,6 +72,13 @@ impl<'a> App<'a> {
                 self.theme = theme;
                 self.dashboard_page.update_theme(theme);
             }
+            Message::ChangeChartMetricType(sensor_type) => {
+                self.dashboard_page.update(Message::ChangeChartMetricType(sensor_type));
+            }
+            Message::ChangeChartTimeRange(sensor_type, time_range) => {
+                self.dashboard_page
+                    .update(Message::ChangeChartTimeRange(sensor_type, time_range));
+            }
             _ => {}
         }
     }
