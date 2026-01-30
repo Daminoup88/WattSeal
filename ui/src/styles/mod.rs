@@ -5,3 +5,4 @@ pub mod picklist;
 pub mod scrollable;
 pub mod style_constants;
 pub mod text;
+pub mod toggler;

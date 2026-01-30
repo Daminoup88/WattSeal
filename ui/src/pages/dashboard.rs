@@ -13,7 +13,7 @@ use iced::{
     alignment::{Horizontal, Vertical},
     time::Duration,
     widget::{
-        Column, Container, PickList, Row, Scrollable, Text,
+        Column, Container, PickList, Row, Scrollable, Text, Toggler,
         button::{self, Button},
         pick_list,
     },
@@ -35,13 +35,14 @@ use crate::{
             SPACING_LARGE, SPACING_MEDIUM, SPACING_XLARGE,
         },
         text::TextStyle,
+        toggler::TogglerStyle,
     },
     themes::AppTheme,
 };
 
 const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
 
-#[derive(Default)]
+#[derive(Default, PartialEq)]
 pub enum MetricType {
     #[default]
     Power,
@@ -235,7 +236,12 @@ impl<'a> ComponentState<'a> {
         self.chart.update_style(theme);
     }
 
-    fn chart_card<'b>(&'b self, title: &'b str, height: f32) -> Element<'b, Message, AppTheme> {
+    fn chart_card<'b>(
+        &'b self,
+        title: &'b str,
+        height: f32,
+        show_switch_metric: bool,
+    ) -> Element<'b, Message, AppTheme> {
         let title = Text::new(title)
             .size(FONT_SIZE_SUBTITLE)
             .font(FONT_BOLD)
@@ -248,21 +254,26 @@ impl<'a> ComponentState<'a> {
             |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
         );
 
-        let metric_type_button: Button<'_, _, AppTheme, Renderer> = iced::widget::button(
-            Text::new(match self.metric_type {
-                MetricType::Power => MetricType::Usage.to_string(),
-                MetricType::Usage => MetricType::Power.to_string(),
-            })
-            .size(FONT_SIZE_BODY),
-        )
-        .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
-
-        let first_row = Row::new()
+        let mut first_row = Row::new()
             .spacing(SPACING_XLARGE)
             .align_y(Alignment::Center)
             .push(title)
-            .push(time_range_selector)
-            .push(metric_type_button);
+            .push(time_range_selector);
+
+        if show_switch_metric {
+            let metric_type_button: Button<'_, _, AppTheme, Renderer> = iced::widget::button(
+                Text::new(match self.metric_type {
+                    MetricType::Power => MetricType::Usage.to_string(),
+                    MetricType::Usage => MetricType::Power.to_string(),
+                })
+                .size(FONT_SIZE_BODY),
+            )
+            .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
+
+            first_row = first_row.push(metric_type_button);
+        } else {
+            first_row = first_row.push(Container::new(Text::new("")).width(Length::Fixed(90.0)));
+        }
 
         let chart_container = Container::new(self.chart.view(height))
             .width(Length::Fill)
@@ -394,7 +405,18 @@ impl<'a> DashboardPage<'a> {
         let chart_card = self
             .components
             .get(TotalData::table_name_static())
-            .map(|c| c.chart_card("Total Power Over Time", 300.0))
+            .map(|c| c.chart_card("Total Power Over Time", 300.0, false))
+            .unwrap_or_else(|| {
+                Text::new("No data available")
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted)
+                    .into()
+            });
+
+        let chart_card2 = self
+            .components
+            .get(CPUData::table_name_static())
+            .map(|c| c.chart_card("CPU Power Over Time", 300.0, true))
             .unwrap_or_else(|| {
                 Text::new("No data available")
                     .size(FONT_SIZE_BODY)
@@ -415,6 +437,7 @@ impl<'a> DashboardPage<'a> {
             .width(Length::Fill)
             .height(Length::Fill)
             .push(chart_card)
+            .push(chart_card2)
             .push(self.view_component_cards());
 
         // Container::new(content).width(Length::Fill).height(Length::Fill).into()
