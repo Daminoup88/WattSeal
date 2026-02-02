@@ -231,6 +231,7 @@ pub enum LineType {
     Area,
     Dotted,
     Points,
+    Step,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -244,6 +245,28 @@ impl TimeSeries {
         self.points
             .try_borrow()
             .map(|points| points.iter().copied().collect())
+            .unwrap_or_default()
+    }
+
+    fn steps_iter(&self) -> Vec<(DateTime<Utc>, f32)> {
+        self.points
+            .try_borrow()
+            .map(|points| {
+                let pts: Vec<_> = points.iter().copied().collect();
+                if pts.len() < 2 {
+                    return pts;
+                }
+                let mut result = Vec::with_capacity(pts.len() * 2);
+                for i in 0..pts.len() {
+                    let (time, value) = pts[i];
+                    result.push((time, value));
+                    if i + 1 < pts.len() {
+                        let (next_time, _) = pts[i + 1];
+                        result.push((next_time, value));
+                    }
+                }
+                result
+            })
             .unwrap_or_default()
     }
 
@@ -420,7 +443,10 @@ impl<'a> SensorChart<'a> {
 
         for (i, (label, series)) in self.data.iter().enumerate() {
             let color = style.series_color(i);
-            let data = series.iter();
+            let data = match series.line_type {
+                LineType::Step => series.steps_iter(),
+                _ => series.iter(),
+            };
 
             let annotation = match series.line_type {
                 LineType::Line => chart.draw_series(LineSeries::new(data, color.stroke_width(2))),
@@ -445,6 +471,7 @@ impl<'a> SensorChart<'a> {
                         stroke_width: 1,
                     },
                 )),
+                LineType::Step => chart.draw_series(LineSeries::new(data, color.stroke_width(2))),
             };
 
             annotation
@@ -573,35 +600,76 @@ impl<'a> SensorChart<'a> {
         let total_ms = (newest - oldest).num_milliseconds() as f32;
         let snap_sq = snap_distance * snap_distance;
 
-        self.data
-            .iter()
-            .enumerate()
-            .filter_map(|(idx, (label, s))| s.newest_time().map(|_| (idx, label.clone(), s)))
-            .flat_map(|(idx, label, s)| {
-                if let Ok(points) = s.points.try_borrow() {
-                    points
-                        .iter()
-                        .map(move |(time, value)| (idx, label.clone(), (*time, *value)))
-                        .collect::<Vec<_>>()
-                } else {
-                    Vec::new()
-                }
-            })
-            .filter_map(|(series_idx, label, (time, value))| {
-                let px = self.point_x_for_time(time, oldest, total_ms, chart_bounds.width);
-                let py = self.point_y_for_value(value, chart_bounds.height);
-                let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
+        let mut best: Option<(TooltipData, f32)> = None;
 
-                if dist_sq <= snap_sq {
-                    let content = TooltipContent::new(label, value, self.y_unit.to_string(), time, series_idx);
-                    let tooltip = TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height);
-                    Some((tooltip, dist_sq))
-                } else {
-                    None
+        let mut update_best_tooltip = |tooltip: TooltipData, dist_sq: f32| {
+            if best.as_ref().map(|b| dist_sq < b.1).unwrap_or(true) {
+                best = Some((tooltip, dist_sq));
+            }
+        };
+
+        let create_tooltip = |label: &str, value: f32, time: DateTime<Utc>, idx: usize| {
+            let content = TooltipContent::new(label.to_string(), value, self.y_unit.to_string(), time, idx);
+            TooltipData::new(content, 0.0, 0.0, chart_bounds.width, chart_bounds.height)
+        };
+
+        for (idx, (label, s)) in self.data.iter().enumerate() {
+            if s.newest_time().is_none() {
+                continue;
+            }
+
+            let points = match s.points.try_borrow() {
+                Ok(p) => p.iter().copied().collect::<Vec<_>>(),
+                Err(_) => continue,
+            };
+
+            if points.is_empty() {
+                continue;
+            }
+
+            match s.line_type {
+                LineType::Step => {
+                    for i in 0..points.len() {
+                        let (time, value) = points[i];
+                        let py = self.point_y_for_value(value, chart_bounds.height);
+
+                        let y_dist = (py - chart_cursor.y).abs();
+                        if y_dist > snap_distance {
+                            continue;
+                        }
+
+                        let start_x = self.point_x_for_time(time, oldest, total_ms, chart_bounds.width);
+                        let end_x = if i + 1 < points.len() {
+                            self.point_x_for_time(points[i + 1].0, oldest, total_ms, chart_bounds.width)
+                        } else {
+                            chart_bounds.width
+                        };
+
+                        if chart_cursor.x >= start_x && chart_cursor.x <= end_x {
+                            let cursor_time_ms = (chart_cursor.x / chart_bounds.width) * total_ms;
+                            let cursor_time = oldest + Duration::milliseconds(cursor_time_ms as i64);
+
+                            let tooltip = create_tooltip(label, value, cursor_time, idx);
+                            update_best_tooltip(tooltip, y_dist * y_dist);
+                        }
+                    }
                 }
-            })
-            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap())
-            .map(|(tooltip, _)| tooltip)
+                _ => {
+                    for (time, value) in points {
+                        let px = self.point_x_for_time(time, oldest, total_ms, chart_bounds.width);
+                        let py = self.point_y_for_value(value, chart_bounds.height);
+                        let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
+
+                        if dist_sq <= snap_sq {
+                            let tooltip = create_tooltip(label, value, time, idx);
+                            update_best_tooltip(tooltip, dist_sq);
+                        }
+                    }
+                }
+            }
+        }
+
+        best.map(|(tooltip, _)| tooltip)
     }
 
     fn point_y_for_value(&self, value: f32, height: f32) -> f32 {
