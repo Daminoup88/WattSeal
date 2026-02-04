@@ -608,9 +608,9 @@ impl<'a> SensorChart<'a> {
             }
         };
 
-        let create_tooltip = |label: &str, value: f32, time: DateTime<Utc>, idx: usize| {
+        let create_tooltip = |label: &str, value: f32, time: DateTime<Utc>, idx: usize, px: f32, py: f32| {
             let content = TooltipContent::new(label.to_string(), value, self.y_unit.to_string(), time, idx);
-            TooltipData::new(content, 0.0, 0.0, chart_bounds.width, chart_bounds.height)
+            TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
         };
 
         for (idx, (label, s)) in self.data.iter().enumerate() {
@@ -649,7 +649,7 @@ impl<'a> SensorChart<'a> {
                             let cursor_time_ms = (chart_cursor.x / chart_bounds.width) * total_ms;
                             let cursor_time = oldest + Duration::milliseconds(cursor_time_ms as i64);
 
-                            let tooltip = create_tooltip(label, value, cursor_time, idx);
+                            let tooltip = create_tooltip(label, value, cursor_time, idx, chart_cursor.x, py);
                             update_best_tooltip(tooltip, y_dist * y_dist);
                         }
                     }
@@ -661,7 +661,7 @@ impl<'a> SensorChart<'a> {
                         let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
 
                         if dist_sq <= snap_sq {
-                            let tooltip = create_tooltip(label, value, time, idx);
+                            let tooltip = create_tooltip(label, value, time, idx, px, py);
                             update_best_tooltip(tooltip, dist_sq);
                         }
                     }
