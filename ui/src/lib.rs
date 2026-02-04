@@ -8,6 +8,7 @@ pub mod message;
 pub mod pages;
 pub mod styles;
 pub mod themes;
+pub mod types;
 
 use app::App;
 
