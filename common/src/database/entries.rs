@@ -82,7 +82,7 @@ impl DatabaseEntry for CPUData {
             ("pp0_power_watts", "REAL"),
             ("pp1_power_watts", "REAL"),
             ("dram_power_watts", "REAL"),
-            ("usage_percent", "REAL NOT NULL"),
+            ("usage_percent", "REAL"),
         ]
     }
 
@@ -147,7 +147,7 @@ impl DatabaseEntry for TotalData {
 
     fn insert_sql(&self) -> String {
         format!(
-            "INSERT INTO {} (timestamp_id, total_power_watts) VALUES (?1, ?2)",
+            "INSERT INTO {} (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2)",
             Self::table_name_static()
         )
         .to_string()
@@ -158,7 +158,7 @@ impl DatabaseEntry for TotalData {
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_power_watts", "REAL")]
+        &[("total_power_watts", "REAL"), ("period_type", "TEXT NOT NULL")]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
