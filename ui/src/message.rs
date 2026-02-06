@@ -1,10 +1,7 @@
 use chrono::{DateTime, Utc};
 use common::SensorData;
 
-use crate::{
-    pages::{Page, dashboard::TimeRange},
-    themes::AppTheme,
-};
+use crate::{pages::Page, themes::AppTheme, types::TimeRange};
 
 #[derive(Debug, Clone)]
 pub enum Message {
@@ -14,6 +11,8 @@ pub enum Message {
     ChangeChartMetricType(String),
     ChangeChartTimeRange(String, TimeRange),
     UpdateChartData(Vec<(DateTime<Utc>, SensorData)>),
+    ReplaceChartData(String, Vec<(DateTime<Utc>, SensorData)>),
+    FetchChartData(String, TimeRange),
     Redraw,
     LoadChartEvents(i64),
 }

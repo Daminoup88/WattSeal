@@ -112,7 +112,7 @@ impl Sensor for WindowsCPUSensor {
             pp0_power_watts: cpu_power_values.pp0,
             pp1_power_watts: cpu_power_values.pp1,
             dram_power_watts: cpu_power_values.dram,
-            usage_percent: usage,
+            usage_percent: Some(usage),
         };
         Ok(data.into())
     }

@@ -32,7 +32,7 @@ pub struct CPUData {
     pub pp0_power_watts: Option<f64>,
     pub pp1_power_watts: Option<f64>,
     pub dram_power_watts: Option<f64>,
-    pub usage_percent: f64,
+    pub usage_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -137,7 +137,7 @@ impl SensorData {
 
     pub fn usage_percent(&self) -> Option<f64> {
         match self {
-            SensorData::CPU(data) => Some(data.usage_percent),
+            SensorData::CPU(data) => data.usage_percent,
             SensorData::GPU(data) => data.usage_percent,
             _ => None,
         }
@@ -152,7 +152,7 @@ impl Display for SensorData {
                 writeln!(f, "  Power PP0:  {:.3} W", data.pp0_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Power PP1:  {:.3} W", data.pp1_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Power DRAM: {:.3} W", data.dram_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Usage:      {:.2} %", data.usage_percent)?;
+                writeln!(f, "  Usage:      {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
             SensorData::GPU(data) => {

@@ -1,11 +1,11 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, VecDeque},
+    collections::{BTreeMap, HashSet, VecDeque},
     fmt::Display,
     rc::Rc,
 };
 
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, TimeDelta, Timelike, Utc};
 use common::{CPUData, DatabaseEntry, SensorData, TotalData};
 use iced::{
     Alignment, Color, Element, Length, Padding, Renderer, Task, Theme,
@@ -15,7 +15,7 @@ use iced::{
     widget::{
         Column, Container, PickList, Row, Scrollable, Text, Toggler,
         button::{self, Button},
-        pick_list,
+        pick_list, table,
     },
 };
 
@@ -38,6 +38,7 @@ use crate::{
         toggler::TogglerStyle,
     },
     themes::AppTheme,
+    types::TimeRange,
 };
 
 const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
@@ -78,24 +79,6 @@ impl MetricType {
     }
 }
 
-#[derive(Default, Clone, PartialEq, Debug)]
-pub enum TimeRange {
-    #[default]
-    LastMinute = 60,
-    LastHour = 3600,
-    Last24Hours = 86400,
-}
-
-impl Display for TimeRange {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            TimeRange::LastMinute => write!(f, "Last Minute"),
-            TimeRange::LastHour => write!(f, "Last Hour"),
-            TimeRange::Last24Hours => write!(f, "Last 24 Hours"),
-        }
-    }
-}
-
 pub struct ComponentState<'a> {
     table_name: String,
     sensor_type: String,
@@ -125,18 +108,18 @@ impl<'a> ComponentState<'a> {
             line_type: LineType::default(),
         };
         state.update_metric_type(MetricType::default());
-        state.update_time_range(TimeRange::default());
+        let _ = state.update_time_range(TimeRange::default());
         state
     }
 
     fn push_data(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
-        let timestamp = if timestamp.nanosecond() >= 500_000_000 {
-            timestamp.with_nanosecond(0).unwrap_or(timestamp) + chrono::Duration::seconds(1)
-        } else {
-            timestamp.with_nanosecond(0).unwrap_or(timestamp)
-        };
+        let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
 
         self.latest_reading = Some(data.clone());
+
+        if !self.time_range.is_real_time() {
+            return;
+        }
 
         let power = data.total_power_watts();
         let usage = data.usage_percent();
@@ -151,7 +134,7 @@ impl<'a> ComponentState<'a> {
             }
         }
 
-        let cutoff = timestamp - chrono::Duration::seconds(self.time_range.clone() as i64);
+        let cutoff = timestamp - self.time_range.duration_seconds();
 
         let prune_history = |history: &Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>| {
             if let Ok(mut h) = history.try_borrow_mut() {
@@ -171,38 +154,42 @@ impl<'a> ComponentState<'a> {
         self.chart.refresh_cache();
     }
 
-    fn prune_history(&mut self) {
-        let now = Utc::now();
-        let cutoff = now - chrono::Duration::seconds(self.time_range.clone() as i64);
+    fn push_history(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
+        let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
 
-        let prune_history = |history: &Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>| {
-            if let Ok(mut h) = history.try_borrow_mut() {
-                while let Some(&(ts, _)) = h.front() {
-                    if ts < cutoff {
-                        h.pop_front();
-                    } else {
-                        break;
-                    }
-                }
+        let power = data.total_power_watts();
+        let usage = data.usage_percent();
+        if let Some(p) = power {
+            if let Ok(mut history) = self.power_history.try_borrow_mut() {
+                history.push_back((timestamp, p as f32));
             }
-        };
-
-        prune_history(&self.power_history);
-        prune_history(&self.usage_history);
+        }
+        if let Some(u) = usage {
+            if let Ok(mut history) = self.usage_history.try_borrow_mut() {
+                history.push_back((timestamp, u as f32));
+            }
+        }
     }
 
-    fn update_time_range(&mut self, time_range: TimeRange) {
+    fn update_time_range(&mut self, time_range: TimeRange) -> Task<Message> {
+        if self.time_range == time_range {
+            return Task::none();
+        }
         self.time_range = time_range;
         let label = "Time";
-        let unit = match self.time_range {
-            TimeRange::LastMinute => "s",
-            TimeRange::LastHour => "min",
-            TimeRange::Last24Hours => "h",
+        let unit = self.time_range.unit();
+        let line_type = match self.time_range {
+            TimeRange::LastMinute => LineType::Line,
+            _ => LineType::Step,
         };
+        self.chart.set_all_line_types(line_type);
         self.chart.set_x_axis_label_and_unit(label, unit);
-        self.chart
-            .set_x_range(chrono::Duration::seconds(self.time_range.clone() as i64));
-        // TODO: fetch data
+        self.chart.set_x_range(self.time_range.duration_seconds());
+        self.clear_data();
+        Task::done(Message::FetchChartData(
+            self.table_name.clone(),
+            self.time_range.clone(),
+        ))
     }
 
     fn switch_metric_type(&mut self) {
@@ -215,7 +202,7 @@ impl<'a> ComponentState<'a> {
 
     fn update_metric_type(&mut self, metric_type: MetricType) {
         self.metric_type = metric_type;
-        self.chart.clear();
+        self.chart.clear_all();
         let (label, unit) = match self.metric_type {
             MetricType::Power => ("Power", "W"),
             MetricType::Usage => ("Usage", "%"),
@@ -234,6 +221,15 @@ impl<'a> ComponentState<'a> {
 
     fn update_theme(&mut self, theme: AppTheme) {
         self.chart.update_style(theme);
+    }
+
+    fn clear_data(&mut self) {
+        if let Ok(mut power_history) = self.power_history.try_borrow_mut() {
+            power_history.clear();
+        }
+        if let Ok(mut usage_history) = self.usage_history.try_borrow_mut() {
+            usage_history.clear();
+        }
     }
 
     fn chart_card<'b>(
@@ -378,7 +374,7 @@ impl<'a> DashboardPage<'a> {
         }
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::UpdateChartData(data) => {
                 for (timestamp, sensor) in data.iter() {
@@ -387,18 +383,27 @@ impl<'a> DashboardPage<'a> {
                     }
                 }
             }
-            Message::ChangeChartMetricType(sensor_type) => {
-                if let Some(component) = self.components.get_mut(&sensor_type) {
+            Message::ChangeChartMetricType(table_name) => {
+                if let Some(component) = self.components.get_mut(&table_name) {
                     component.switch_metric_type();
                 }
             }
             Message::ChangeChartTimeRange(sensor_type, time_range) => {
                 if let Some(component) = self.components.get_mut(&sensor_type) {
-                    component.update_time_range(time_range);
+                    return component.update_time_range(time_range);
+                }
+            }
+            Message::ReplaceChartData(table_name, data) => {
+                if let Some(component) = self.components.get_mut(&table_name) {
+                    for (timestamp, sensor) in data.iter() {
+                        component.push_history(*timestamp, sensor);
+                    }
+                    component.chart.refresh_cache();
                 }
             }
             _ => {}
         }
+        Task::none()
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
