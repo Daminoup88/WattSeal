@@ -45,3 +45,39 @@ impl Display for TimeRange {
         }
     }
 }
+
+#[derive(Default, PartialEq)]
+pub enum MetricType {
+    #[default]
+    Power,
+    Usage,
+}
+
+impl Display for MetricType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MetricType::Power => write!(f, "Power"),
+            MetricType::Usage => write!(f, "Usage"),
+        }
+    }
+}
+
+impl MetricType {
+    pub fn label(&self) -> &'static str {
+        match self {
+            MetricType::Power => "Power",
+            MetricType::Usage => "Usage",
+        }
+    }
+
+    pub fn unit(&self) -> &'static str {
+        match self {
+            MetricType::Power => "W",
+            MetricType::Usage => "%",
+        }
+    }
+
+    pub fn legend(&self, component_name: &str) -> String {
+        format!("{} {}", component_name, self.label())
+    }
+}
