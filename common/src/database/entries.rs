@@ -164,6 +164,7 @@ impl DatabaseEntry for TotalData {
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(TotalData {
             total_power_watts: row.get("total_power_watts")?,
+            period_type: row.get("period_type")?,
         })
     }
 }

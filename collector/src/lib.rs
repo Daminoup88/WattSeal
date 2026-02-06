@@ -19,7 +19,7 @@ use sensors::{SensorType, create_event_from_sensors, gpu::get_gpu_list};
 pub struct CollectorApp {
     database: Database,
     sensors: Vec<SensorType>,
-    itteration: u64,
+    iteration: u64,
 }
 
 impl CollectorApp {
@@ -28,15 +28,13 @@ impl CollectorApp {
         Ok(CollectorApp {
             database,
             sensors: Vec::new(),
-            itteration: 0,
+            iteration: 0,
         })
     }
 
     pub fn initialize(&mut self) -> Result<(), String> {
         check_permissions()?;
-
-        println!("\n========== INITIALIZING SYSTEM ==========\n");
-
+        
         // Initialize hardware information
         // let time = Instant::now();
         // let hw_info = match HardwareInfo::query() {
@@ -46,6 +44,8 @@ impl CollectorApp {
         // println!("Time taken to query hardware info: {:?}", time.elapsed());
         // println!("✓ Hardware information loaded");
         // println!("{:#?}", hw_info);
+
+        println!("\n========== INITIALIZING SYSTEM ==========\n");
 
         // Initialize display information
         let display_infos = DisplayInfo::all().unwrap();
@@ -103,12 +103,11 @@ impl CollectorApp {
         println!("\n========== POWER CONSUMPTION MONITORING ==========");
         println!("Logging data to database every second. Press Ctrl+C to stop.\n");
 
-        let mut iteration = 0;
         loop {
             thread::sleep(Duration::from_millis(1000));
-            iteration += 1;
+            self.iteration += 1;
 
-            println!("\n--- Iteration {} ---", iteration);
+            println!("\n--- Iteration {} ---", self.iteration);
 
             let event = create_event_from_sensors(&self.sensors);
 

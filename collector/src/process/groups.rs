@@ -7,18 +7,18 @@ use super::AppPowerData;
 /// Group processes by application name and calculate power consumption
 pub fn group_processes_by_app(processes: Vec<AppPowerData>, total_cpu_power_watts: f64) -> Vec<ProcessData> {
     let mut grouped: HashMap<String, (f64, f64, u32)> = HashMap::new();
-    let mut total_cpu_percent = 0.0;
+    let mut total_cpu_usage = 0.0;
 
-    // Calculate total CPU percentage across all processes
+    // Calculate total CPU usage across all processes
     for process in &processes {
-        total_cpu_percent += process.cpu_usage_percent;
+        total_cpu_usage += process.app_cpu_usage;
     }
 
     // Group by application name
     for process in processes {
         let app_name = normalize_app_name(&process.app_name);
         let entry = grouped.entry(app_name).or_insert((0.0, 0.0, 0));
-        entry.0 += process.cpu_usage_percent;
+        entry.0 += process.app_cpu_usage;
         entry.1 += process.gpu_memory_mb; // Add VRAM per app
         entry.2 += process.process_count as u32;
     }
@@ -26,9 +26,9 @@ pub fn group_processes_by_app(processes: Vec<AppPowerData>, total_cpu_power_watt
     // Convert to power consumption
     let mut results: Vec<ProcessData> = grouped
         .into_iter()
-        .map(|(app_name, (cpu_percent, vram_mb, count))| {
-            let power_watts = if total_cpu_percent > 0.0 {
-                (cpu_percent / total_cpu_percent) * total_cpu_power_watts
+        .map(|(app_name, (cpu_use, vram_mb, count))| {
+            let power_watts = if total_cpu_usage > 0.0 {
+                (cpu_use / total_cpu_usage) * total_cpu_power_watts
             } else {
                 0.0
             };

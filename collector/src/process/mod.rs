@@ -15,7 +15,7 @@ use windows::Win32::{
 #[derive(Debug, Clone)]
 pub struct AppPowerData {
     pub app_name: String,
-    pub cpu_usage_percent: f64,
+    pub app_cpu_usage: f64,
     pub gpu_memory_mb: f64,
     pub process_count: usize,
 }
@@ -55,10 +55,10 @@ pub fn estimate_app_power_consumption() -> Vec<AppPowerData> {
             let time_delta = times2.system_time - times1.system_time;
 
             if time_delta > 0 {
-                // CPU usage as percentage (can be > 100% on multi-core systems)
-                let cpu_percent = (cpu_delta as f64 / time_delta as f64) * 100.0;
+                // CPU usage out of 1
+                let cpu_usage = cpu_delta as f64 / time_delta as f64;
 
-                *app_cpu_usage.entry(name.clone()).or_insert(0.0) += cpu_percent;
+                *app_cpu_usage.entry(name.clone()).or_insert(0.0) += cpu_usage;
                 *app_process_count.entry(name.clone()).or_insert(0) += 1;
             }
         }
@@ -71,15 +71,15 @@ pub fn estimate_app_power_consumption() -> Vec<AppPowerData> {
 
     let mut results: Vec<AppPowerData> = app_cpu_usage
         .into_iter()
-        .map(|(app_name, cpu_usage_percent)| AppPowerData {
+        .map(|(app_name, app_cpu_usage)| AppPowerData {
             app_name: app_name.clone(),
-            cpu_usage_percent,
+            app_cpu_usage,
             gpu_memory_mb: *app_gpu_memory.get(&app_name).unwrap_or(&0.0),
             process_count: *app_process_count.get(&app_name).unwrap_or(&0),
         })
         .collect();
 
-    results.sort_by(|a, b| b.cpu_usage_percent.partial_cmp(&a.cpu_usage_percent).unwrap());
+    results.sort_by(|a, b| b.app_cpu_usage.partial_cmp(&a.app_cpu_usage).unwrap());
     results
 }
 

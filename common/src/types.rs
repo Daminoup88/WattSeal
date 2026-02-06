@@ -90,6 +90,7 @@ pub enum SensorData {
 #[derive(Debug, Clone, Default)]
 pub struct TotalData {
     pub total_power_watts: f64,
+    pub period_type: String,
 }
 
 impl SensorData {
@@ -148,6 +149,7 @@ impl Display for SensorData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             SensorData::CPU(data) => {
+                writeln!(f, "CPU Data:")?;
                 writeln!(f, "  Power PKG:  {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Power PP0:  {:.3} W", data.pp0_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Power PP1:  {:.3} W", data.pp1_power_watts.unwrap_or(-1.0))?;
@@ -156,15 +158,20 @@ impl Display for SensorData {
                 Ok(())
             }
             SensorData::GPU(data) => {
+                writeln!(f, "GPU Data:")?;
                 writeln!(f, "  Power:       {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 writeln!(f, "  VRAM Usage:  {:.2} %", data.vram_usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
-            SensorData::Screen(data) => write!(f, "Screen Data: {:?}", data),
-            SensorData::Battery(data) => write!(f, "Battery Data: {:?}", data),
-            SensorData::Peripherals(data) => write!(f, "Peripherals Data: {:?}", data),
-            SensorData::Total(power) => write!(f, "Total Power: {:.3} W", power.total_power_watts),
+            SensorData::Screen(data) => writeln!(f, "Screen Data: {:?}", data),
+            SensorData::Battery(data) => writeln!(f, "Battery Data: {:?}", data),
+            SensorData::Peripherals(data) => writeln!(f, "Peripherals Data: {:?}", data),
+            SensorData::Total(total) => writeln!(
+                f,
+                "Total Power during 1 {}: {:.3} W",
+                total.period_type, total.total_power_watts
+            ),
             SensorData::Process(processes) => {
                 writeln!(f, "Top Processes by CPU Usage:")?;
                 writeln!(
