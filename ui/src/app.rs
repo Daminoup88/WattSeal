@@ -1,9 +1,11 @@
-use std::collections::HashMap;
+use core::time;
+use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Utc};
-use common::{CPUData, Database, DatabaseEntry, GPUData, SensorData};
+use common::{CPUData, Database, DatabaseEntry, DatabaseError, GPUData, SensorData};
 use iced::{
     Element, Subscription, Task,
+    advanced::graphics::core::window,
     time::{Duration, every},
     widget::{Column, Container, pick_list},
 };
@@ -14,6 +16,7 @@ use crate::{
     pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
     styles::container::ContainerStyle,
     themes::AppTheme,
+    types::TimeRange,
 };
 
 const FPS: u64 = 1;
@@ -52,34 +55,45 @@ impl<'a> App<'a> {
         )
     }
 
-    pub fn update(&mut self, message: Message) {
+    pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::LoadChartEvents(number) => {
                 let mut chart_data = self.load_latest_chart_data(number);
                 Self::gpu_is_integrated(&mut chart_data);
-                self.dashboard_page.update(Message::UpdateChartData(chart_data));
+                self.dashboard_page.update(Message::UpdateChartData(chart_data))
             }
             Message::Tick => {
                 let mut chart_data = self.load_latest_chart_data(1);
                 Self::gpu_is_integrated(&mut chart_data);
-                self.dashboard_page.update(Message::UpdateChartData(chart_data));
+                self.dashboard_page.update(Message::UpdateChartData(chart_data))
             }
             Message::NavigateTo(page) => {
                 self.current_page = page;
                 self.header.change_page(page);
+                Task::none()
             }
             Message::ChangeTheme(theme) => {
                 self.theme = theme;
                 self.dashboard_page.update_theme(theme);
+                Task::none()
             }
-            Message::ChangeChartMetricType(sensor_type) => {
-                self.dashboard_page.update(Message::ChangeChartMetricType(sensor_type));
+            Message::ChangeChartMetricType(table_name) => {
+                self.dashboard_page.update(Message::ChangeChartMetricType(table_name))
             }
-            Message::ChangeChartTimeRange(sensor_type, time_range) => {
+            Message::ChangeChartTimeRange(sensor_type, time_range) => self
+                .dashboard_page
+                .update(Message::ChangeChartTimeRange(sensor_type, time_range)),
+            Message::FetchChartData(table_name, time_range) => {
+                println!(
+                    "Fetching chart data for table: {} with time range: {:?}",
+                    table_name, time_range
+                );
+                let mut chart_data = self.load_chart_data(&table_name, time_range);
+                Self::gpu_is_integrated(&mut chart_data);
                 self.dashboard_page
-                    .update(Message::ChangeChartTimeRange(sensor_type, time_range));
+                    .update(Message::ReplaceChartData(table_name, chart_data))
             }
-            _ => {}
+            _ => Task::none(),
         }
     }
 
@@ -105,12 +119,25 @@ impl<'a> App<'a> {
     }
 
     fn load_latest_chart_data(&mut self, number: i64) -> Vec<(DateTime<Utc>, SensorData)> {
-        self.database
-            .select_last_n_records(number)
-            .unwrap_or_default()
-            .into_iter()
-            .map(|(ts, data)| (ts.into(), data))
-            .collect()
+        from_db(self.database.select_last_n_records(number))
+    }
+
+    fn load_chart_data(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Utc>, SensorData)> {
+        from_db(match time_range {
+            TimeRange::LastMinute => self.database.select_data_in_time_range(
+                table_name,
+                (Utc::now() - time_range.duration_seconds()).into(),
+                Utc::now().into(),
+            ),
+            _ => {
+                let window_size = time_range.granularity_seconds();
+                let a = self
+                    .database
+                    .select_last_n_seconds_average(time_range as i64, table_name, window_size);
+                println!("{:?}", a);
+                a
+            }
+        })
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
@@ -138,4 +165,11 @@ impl<'a> App<'a> {
     pub fn theme(&self) -> AppTheme {
         self.theme
     }
+}
+
+fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Utc>, SensorData)> {
+    data.unwrap_or_default()
+        .into_iter()
+        .map(|(ts, data)| (ts.into(), data))
+        .collect()
 }
