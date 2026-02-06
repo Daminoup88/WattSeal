@@ -1,7 +1,11 @@
 mod entries;
 
 use core::time;
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::format,
+    time::SystemTime,
+};
 
 pub use entries::DatabaseEntry;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};
@@ -152,6 +156,67 @@ impl Database {
         Ok(())
     }
 
+    pub fn select_data_in_time_range(
+        &mut self,
+        table_name: &str,
+        start_time: SystemTime,
+        end_time: SystemTime,
+    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+        let query = format!(
+            "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
+             WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC",
+            table_name
+        );
+        let start_time_millis = start_time.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
+        let end_time_millis = end_time.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
+        let sensor_data_list =
+            self.execute_sensor_query(table_name, &query, params![start_time_millis, end_time_millis])?;
+        let mut records = Vec::<(SystemTime, SensorData)>::new();
+        for (ts_millis, sensor_data) in sensor_data_list {
+            let timestamp = SystemTime::UNIX_EPOCH + time::Duration::from_millis(ts_millis as u64);
+            records.push((timestamp, sensor_data));
+        }
+        Ok(records)
+    }
+
+    // pub fn select_last_n_seconds_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {}
+
+    pub fn select_last_n_seconds_average(
+        &mut self,
+        n: i64,
+        table_name: &str,
+        window_seconds: i64,
+    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+        let query = format!(
+            "SELECT t.timestamp, {} FROM timestamp t \
+             JOIN {} d ON t.id = d.timestamp_id \
+             WHERE t.timestamp >= ?1 \
+             GROUP BY (t.timestamp / (?2 * 1000)) \
+             ORDER BY t.timestamp ASC",
+            get_avg_columns(table_name, "d."),
+            table_name
+        );
+        println!("Executing query: {}", query);
+        let start_time_millis = (SystemTime::now() - time::Duration::from_secs(n as u64))
+            .duration_since(SystemTime::UNIX_EPOCH)?
+            .as_millis() as i64;
+        let sensor_data_list =
+            self.execute_sensor_query(table_name, &query, params![start_time_millis, window_seconds])?;
+        let mut records = Vec::<(SystemTime, SensorData)>::new();
+        for (ts_millis, sensor_data) in sensor_data_list {
+            let timestamp = SystemTime::UNIX_EPOCH + time::Duration::from_millis(ts_millis as u64);
+            records.push((timestamp, sensor_data));
+        }
+        Ok(records)
+    }
+
+    // pub fn select_last_n_in_table(
+    //     &mut self,
+    //     n: i64,
+    //     table_name: &str,
+    // ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+    // }
+
     pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
         let mut records = Vec::<(SystemTime, SensorData)>::new();
         let mut stmt = self
@@ -229,5 +294,26 @@ impl Database {
         })?;
 
         rows.collect()
+    }
+}
+
+fn get_avg_columns(table_name: &str, prefix: &str) -> String {
+    match table_name {
+        s if s == CPUData::table_name_static() => CPUData::columns_static()
+            .iter()
+            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
+            .collect::<Vec<String>>()
+            .join(", "),
+        s if s == GPUData::table_name_static() => GPUData::columns_static()
+            .iter()
+            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
+            .collect::<Vec<String>>()
+            .join(", "),
+        s if s == TotalData::table_name_static() => TotalData::columns_static()
+            .iter()
+            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
+            .collect::<Vec<String>>()
+            .join(", "),
+        _ => "".to_string(),
     }
 }
