@@ -34,7 +34,7 @@ impl CollectorApp {
 
     pub fn initialize(&mut self) -> Result<(), String> {
         check_permissions()?;
-        
+
         // Initialize hardware information
         // let time = Instant::now();
         // let hw_info = match HardwareInfo::query() {

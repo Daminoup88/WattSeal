@@ -147,14 +147,14 @@ impl DatabaseEntry for TotalData {
 
     fn insert_sql(&self) -> String {
         format!(
-            "INSERT INTO {} (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2)",
+            "INSERT INTO {} (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2, ?3)",
             Self::table_name_static()
         )
         .to_string()
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![timestamp_id, &self.total_power_watts]
+        vec![timestamp_id, &self.total_power_watts, &self.period_type]
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
