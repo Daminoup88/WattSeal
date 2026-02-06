@@ -1,48 +1,27 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashSet, VecDeque},
-    fmt::Display,
-    rc::Rc,
-};
+use std::collections::BTreeMap;
 
-use chrono::{DateTime, TimeDelta, Timelike, Utc};
+use chrono::{DateTime, Utc};
 use common::{CPUData, DatabaseEntry, SensorData, TotalData};
 use iced::{
-    Alignment, Color, Element, Length, Padding, Renderer, Task, Theme,
-    advanced::graphics::text::cosmic_text::skrifa::raw::tables::aat::class,
+    Alignment, Element, Length, Padding, Task,
     alignment::{Horizontal, Vertical},
-    time::Duration,
-    widget::{
-        Column, Container, PickList, Row, Scrollable, Text, Toggler,
-        button::{self, Button},
-        pick_list, table,
-    },
+    widget::{Column, Container, Row, Scrollable, Text},
 };
 
 use crate::{
-    components::{
-        self,
-        chart::{LineType, SensorChart},
-        component_state::ComponentState,
-    },
+    components::component_state::ComponentState,
     message::Message,
     styles::{
-        button::ButtonStyle,
         container::ContainerStyle,
-        picklist::PickListStyle,
         scrollable::ScrollableStyle,
         style_constants::{
             FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HUGE, FONT_SIZE_SUBTITLE, FONT_SIZE_TITLE, PADDING_LARGE,
             SPACING_LARGE, SPACING_MEDIUM, SPACING_XLARGE,
         },
         text::TextStyle,
-        toggler::TogglerStyle,
     },
     themes::AppTheme,
-    types::{MetricType, TimeRange},
 };
-
-const SAMPLE_EVERY: Duration = Duration::from_millis(1000);
 
 pub struct DashboardPage<'a> {
     components: BTreeMap<String, ComponentState<'a>>,
@@ -89,10 +68,7 @@ impl<'a> DashboardPage<'a> {
             }
             Message::ReplaceChartData(table_name, data) => {
                 if let Some(component) = self.components.get_mut(&table_name) {
-                    for (timestamp, sensor) in data.iter() {
-                        component.push_history(*timestamp, sensor);
-                    }
-                    component.refresh_chart();
+                    component.load_history_batch(&data);
                 }
             }
             _ => {}
@@ -101,28 +77,6 @@ impl<'a> DashboardPage<'a> {
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
-        let chart_card = self
-            .components
-            .get(TotalData::table_name_static())
-            .map(|c| c.chart_card("Total Power Over Time", 300.0, false))
-            .unwrap_or_else(|| {
-                Text::new("No data available")
-                    .size(FONT_SIZE_BODY)
-                    .class(TextStyle::Muted)
-                    .into()
-            });
-
-        let chart_card2 = self
-            .components
-            .get(CPUData::table_name_static())
-            .map(|c| c.chart_card("CPU Power Over Time", 300.0, true))
-            .unwrap_or_else(|| {
-                Text::new("No data available")
-                    .size(FONT_SIZE_BODY)
-                    .class(TextStyle::Muted)
-                    .into()
-            });
-
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
@@ -135,11 +89,10 @@ impl<'a> DashboardPage<'a> {
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(chart_card)
-            .push(chart_card2)
+            .push(self.chart_or_placeholder(TotalData::table_name_static(), "Total Power Over Time", 300.0, false))
+            .push(self.chart_or_placeholder(CPUData::table_name_static(), "CPU Power Over Time", 300.0, true))
             .push(self.view_component_cards());
 
-        // Container::new(content).width(Length::Fill).height(Length::Fill).into()
         content
             .push(
                 Scrollable::new(additional_content)
@@ -148,6 +101,24 @@ impl<'a> DashboardPage<'a> {
                     .class(ScrollableStyle::Standard),
             )
             .into()
+    }
+
+    fn chart_or_placeholder<'b>(
+        &'b self,
+        table_name: &str,
+        title: &'b str,
+        height: f32,
+        show_metric_switch: bool,
+    ) -> Element<'b, Message, AppTheme> {
+        self.components
+            .get(table_name)
+            .map(|c| c.chart_card(title, height, show_metric_switch))
+            .unwrap_or_else(|| {
+                Text::new("No data available")
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted)
+                    .into()
+            })
     }
 
     fn view_power_summary(&self) -> Element<'_, Message, AppTheme> {

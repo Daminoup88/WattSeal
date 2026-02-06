@@ -1,11 +1,9 @@
-use core::time;
-use std::{collections::HashMap, time::SystemTime};
+use std::time::SystemTime;
 
 use chrono::{DateTime, Utc};
-use common::{CPUData, Database, DatabaseEntry, DatabaseError, GPUData, SensorData};
+use common::{Database, DatabaseError, GPUData, SensorData};
 use iced::{
     Element, Subscription, Task,
-    advanced::graphics::core::window,
     time::{Duration, every},
     widget::{Column, Container, pick_list},
 };
@@ -14,7 +12,6 @@ use crate::{
     components::header::Header,
     message::Message,
     pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
-    styles::container::ContainerStyle,
     themes::AppTheme,
     types::TimeRange,
 };
@@ -57,15 +54,13 @@ impl<'a> App<'a> {
 
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
-            Message::LoadChartEvents(number) => {
-                let mut chart_data = self.load_latest_chart_data(number);
-                Self::gpu_is_integrated(&mut chart_data);
-                self.dashboard_page.update(Message::UpdateChartData(chart_data))
-            }
             Message::Tick => {
-                let mut chart_data = self.load_latest_chart_data(1);
-                Self::gpu_is_integrated(&mut chart_data);
-                self.dashboard_page.update(Message::UpdateChartData(chart_data))
+                let data = self.load_latest_data(1);
+                self.dashboard_page.update(Message::UpdateChartData(data))
+            }
+            Message::LoadChartEvents(n) => {
+                let data = self.load_latest_data(n);
+                self.dashboard_page.update(Message::UpdateChartData(data))
             }
             Message::NavigateTo(page) => {
                 self.current_page = page;
@@ -77,70 +72,36 @@ impl<'a> App<'a> {
                 self.dashboard_page.update_theme(theme);
                 Task::none()
             }
-            Message::ChangeChartMetricType(table_name) => {
-                self.dashboard_page.update(Message::ChangeChartMetricType(table_name))
-            }
-            Message::ChangeChartTimeRange(sensor_type, time_range) => self
-                .dashboard_page
-                .update(Message::ChangeChartTimeRange(sensor_type, time_range)),
             Message::FetchChartData(table_name, time_range) => {
-                println!(
-                    "Fetching chart data for table: {} with time range: {:?}",
-                    table_name, time_range
-                );
-                let mut chart_data = self.load_chart_data(&table_name, time_range);
-                Self::gpu_is_integrated(&mut chart_data);
-                self.dashboard_page
-                    .update(Message::ReplaceChartData(table_name, chart_data))
+                let data = self.load_history(&table_name, time_range);
+                self.dashboard_page.update(Message::ReplaceChartData(table_name, data))
+            }
+            msg @ (Message::ChangeChartMetricType(_) | Message::ChangeChartTimeRange(..)) => {
+                self.dashboard_page.update(msg)
             }
             _ => Task::none(),
         }
     }
 
-    fn gpu_is_integrated(chart_data: &mut Vec<(DateTime<Utc>, SensorData)>) {
-        // Check the CPU pp1_power value
-        let pp1_value = chart_data.iter_mut().find_map(|(_, sensor_data)| {
-            if let SensorData::CPU(cpu_data) = sensor_data {
-                if let Some(total_power) = cpu_data.total_power_watts {
-                    cpu_data.total_power_watts = Some(total_power - cpu_data.pp1_power_watts.unwrap_or(0.0));
-                }
-                cpu_data.pp1_power_watts
-            } else {
-                None
-            }
-        });
-        if pp1_value.is_some() {
-            for (_, sensor_data) in chart_data {
-                if sensor_data.sensor_type() == "GPU" {
-                    // Change GPUData total power value for pp1 power
-                    if let SensorData::GPU(gpu_data) = sensor_data {
-                        gpu_data.total_power_watts = pp1_value;
-                    };
-                }
-            }
-        } // GPU is integrated
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Utc>, SensorData)> {
+        let data = from_db(self.database.select_last_n_records(n));
+        normalize_integrated_cpu(data)
     }
 
-    fn load_latest_chart_data(&mut self, number: i64) -> Vec<(DateTime<Utc>, SensorData)> {
-        from_db(self.database.select_last_n_records(number))
-    }
-
-    fn load_chart_data(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Utc>, SensorData)> {
-        from_db(match time_range {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Utc>, SensorData)> {
+        let result = match time_range {
             TimeRange::LastMinute => self.database.select_data_in_time_range(
                 table_name,
                 (Utc::now() - time_range.duration_seconds()).into(),
                 Utc::now().into(),
             ),
             _ => {
-                let window_size = time_range.granularity_seconds();
-                let a = self
-                    .database
-                    .select_last_n_seconds_average(time_range as i64, table_name, window_size);
-                println!("{:?}", a);
-                a
+                let window = time_range.granularity_seconds();
+                self.database
+                    .select_last_n_seconds_average(time_range as i64, table_name, window)
             }
-        })
+        };
+        normalize_integrated_cpu(from_db(result))
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
@@ -168,6 +129,38 @@ impl<'a> App<'a> {
     pub fn theme(&self) -> AppTheme {
         self.theme
     }
+}
+
+fn normalize_integrated_cpu(mut data: Vec<(DateTime<Utc>, SensorData)>) -> Vec<(DateTime<Utc>, SensorData)> {
+    let mut latest_pp1: Option<f64> = None;
+    let mut latest_pp1_timestamp: Option<DateTime<Utc>> = None;
+
+    for (time, sensor) in data.iter_mut() {
+        if let SensorData::CPU(cpu) = sensor {
+            if let Some(pp1) = cpu.pp1_power_watts {
+                latest_pp1 = Some(pp1);
+                latest_pp1_timestamp = Some(time.clone());
+                if let Some(total) = cpu.total_power_watts {
+                    cpu.total_power_watts = Some(total - pp1);
+                }
+            }
+        }
+    }
+
+    if let Some(pp1) = latest_pp1
+        && let Some(pp1_time) = latest_pp1_timestamp
+    {
+        data.push((
+            pp1_time,
+            SensorData::GPU(GPUData {
+                total_power_watts: Some(pp1),
+                usage_percent: None,
+                vram_usage_percent: None,
+            }),
+        ));
+    }
+
+    data
 }
 
 fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Utc>, SensorData)> {

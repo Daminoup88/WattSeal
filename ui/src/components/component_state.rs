@@ -1,41 +1,21 @@
-use std::{
-    cell::RefCell,
-    collections::{BTreeMap, HashSet, VecDeque},
-    fmt::Display,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-use chrono::{DateTime, TimeDelta, Timelike, Utc};
-use common::{CPUData, DatabaseEntry, SensorData, TotalData};
+use chrono::{DateTime, Timelike, Utc};
+use common::SensorData;
 use iced::{
-    Alignment, Color, Element, Length, Padding, Renderer, Task, Theme,
-    advanced::graphics::text::cosmic_text::skrifa::raw::tables::aat::class,
-    alignment::{Horizontal, Vertical},
-    time::Duration,
-    widget::{
-        Column, Container, PickList, Row, Scrollable, Text, Toggler,
-        button::{self, Button},
-        pick_list, table,
-    },
+    Alignment, Element, Length, Padding, Task,
+    widget::{Column, Container, Row, Text, button, pick_list},
 };
 
 use crate::{
-    components::{
-        self,
-        chart::{LineType, SensorChart},
-    },
+    components::chart::{LineType, SensorChart},
     message::Message,
     styles::{
-        button::ButtonStyle,
         container::ContainerStyle,
-        picklist::PickListStyle,
-        scrollable::ScrollableStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HUGE, FONT_SIZE_SUBTITLE, FONT_SIZE_TITLE, PADDING_LARGE,
-            SPACING_LARGE, SPACING_MEDIUM, SPACING_XLARGE,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE, SPACING_MEDIUM, SPACING_XLARGE,
         },
         text::TextStyle,
-        toggler::TogglerStyle,
     },
     themes::AppTheme,
     types::{MetricType, TimeRange},
@@ -74,63 +54,52 @@ impl<'a> ComponentState<'a> {
         state
     }
 
+    fn append_to_history(&self, timestamp: DateTime<Utc>, data: &SensorData) {
+        if let Some(power) = data.total_power_watts() {
+            if let Ok(mut h) = self.power_history.try_borrow_mut() {
+                h.push_back((timestamp, power as f32));
+            }
+        }
+        if let Some(usage) = data.usage_percent() {
+            if let Ok(mut h) = self.usage_history.try_borrow_mut() {
+                h.push_back((timestamp, usage as f32));
+            }
+        }
+    }
+
+    fn prune_before(&self, cutoff: DateTime<Utc>) {
+        for history in [&self.power_history, &self.usage_history] {
+            if let Ok(mut h) = history.try_borrow_mut() {
+                while h.front().is_some_and(|&(ts, _)| ts < cutoff) {
+                    h.pop_front();
+                }
+            }
+        }
+    }
+
     pub fn push_data(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
-
         self.latest_reading = Some(data.clone());
 
         if !self.time_range.is_real_time() {
             return;
         }
 
-        let power = data.total_power_watts();
-        let usage = data.usage_percent();
-        if let Some(p) = power {
-            if let Ok(mut history) = self.power_history.try_borrow_mut() {
-                history.push_back((timestamp, p as f32));
-            }
-        }
-        if let Some(u) = usage {
-            if let Ok(mut history) = self.usage_history.try_borrow_mut() {
-                history.push_back((timestamp, u as f32));
-            }
-        }
-
-        let cutoff = timestamp - self.time_range.duration_seconds();
-
-        let prune_history = |history: &Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>| {
-            if let Ok(mut h) = history.try_borrow_mut() {
-                while let Some(&(ts, _)) = h.front() {
-                    if ts < cutoff {
-                        h.pop_front();
-                    } else {
-                        break;
-                    }
-                }
-            }
-        };
-
-        prune_history(&self.power_history);
-        prune_history(&self.usage_history);
-
+        self.append_to_history(timestamp, data);
+        self.prune_before(timestamp - self.time_range.duration_seconds());
         self.chart.refresh_cache();
     }
 
     pub fn push_history(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
+        self.append_to_history(timestamp, data);
+    }
 
-        let power = data.total_power_watts();
-        let usage = data.usage_percent();
-        if let Some(p) = power {
-            if let Ok(mut history) = self.power_history.try_borrow_mut() {
-                history.push_back((timestamp, p as f32));
-            }
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Utc>, SensorData)]) {
+        for (timestamp, sensor) in data {
+            self.push_history(*timestamp, sensor);
         }
-        if let Some(u) = usage {
-            if let Ok(mut history) = self.usage_history.try_borrow_mut() {
-                history.push_back((timestamp, u as f32));
-            }
-        }
+        self.refresh_chart();
     }
 
     pub fn update_time_range(&mut self, time_range: TimeRange) -> Task<Message> {
@@ -155,11 +124,7 @@ impl<'a> ComponentState<'a> {
     }
 
     pub fn switch_metric_type(&mut self) {
-        let new_metric = match self.metric_type {
-            MetricType::Power => MetricType::Usage,
-            MetricType::Usage => MetricType::Power,
-        };
-        self.update_metric_type(new_metric);
+        self.update_metric_type(self.metric_type.toggled());
     }
 
     pub fn get_latest_reading(&self) -> Option<&SensorData> {
@@ -169,13 +134,10 @@ impl<'a> ComponentState<'a> {
     fn update_metric_type(&mut self, metric_type: MetricType) {
         self.metric_type = metric_type;
         self.chart.clear_all();
-        let (label, unit) = match self.metric_type {
-            MetricType::Power => ("Power", "W"),
-            MetricType::Usage => ("Usage", "%"),
-        };
         let legend = self.metric_type.legend(&self.sensor_type);
         self.chart.add_series(&legend, self.line_type);
-        self.chart.set_y_axis_label_and_unit(label, unit);
+        self.chart
+            .set_y_axis_label_and_unit(self.metric_type.label(), self.metric_type.unit());
         self.chart.set_data(
             &legend,
             match self.metric_type {
@@ -214,7 +176,7 @@ impl<'a> ComponentState<'a> {
             .class(TextStyle::Subtitle)
             .width(Length::Fill);
 
-        let time_range_selector: PickList<'_, _, _, _, _, AppTheme, Renderer> = pick_list(
+        let time_range_selector = pick_list(
             [TimeRange::LastMinute, TimeRange::LastHour, TimeRange::Last24Hours],
             Some(self.time_range.clone()),
             |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
@@ -227,14 +189,8 @@ impl<'a> ComponentState<'a> {
             .push(time_range_selector);
 
         if show_switch_metric {
-            let metric_type_button: Button<'_, _, AppTheme, Renderer> = iced::widget::button(
-                Text::new(match self.metric_type {
-                    MetricType::Power => MetricType::Usage.to_string(),
-                    MetricType::Usage => MetricType::Power.to_string(),
-                })
-                .size(FONT_SIZE_BODY),
-            )
-            .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
+            let metric_type_button = button(Text::new(self.metric_type.toggled().to_string()).size(FONT_SIZE_BODY))
+                .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
 
             first_row = first_row.push(metric_type_button);
         } else {

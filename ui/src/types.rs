@@ -63,6 +63,13 @@ impl Display for MetricType {
 }
 
 impl MetricType {
+    pub fn toggled(&self) -> Self {
+        match self {
+            MetricType::Power => MetricType::Usage,
+            MetricType::Usage => MetricType::Power,
+        }
+    }
+
     pub fn label(&self) -> &'static str {
         match self {
             MetricType::Power => "Power",
