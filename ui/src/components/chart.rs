@@ -361,7 +361,7 @@ impl<'a> SensorChart<'a> {
         self.data.values().filter_map(|series| series.oldest_time()).min()
     }
 
-    pub fn clear(&mut self) {
+    pub fn clear_all(&mut self) {
         self.data.clear();
         self.cache.borrow_mut().clear();
     }
