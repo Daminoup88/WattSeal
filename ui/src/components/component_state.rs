@@ -1,6 +1,6 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-use chrono::{DateTime, Timelike, Utc};
+use chrono::{DateTime, Local, Timelike};
 use common::SensorData;
 use iced::{
     Alignment, Element, Length, Padding, Task,
@@ -25,8 +25,8 @@ pub struct ComponentState<'a> {
     table_name: String,
     sensor_type: String,
     latest_reading: Option<SensorData>,
-    power_history: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
-    usage_history: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
+    power_history: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>,
+    usage_history: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>,
     chart: SensorChart<'a>,
     line_type: LineType,
     time_range: TimeRange,
@@ -54,7 +54,7 @@ impl<'a> ComponentState<'a> {
         state
     }
 
-    fn append_to_history(&self, timestamp: DateTime<Utc>, data: &SensorData) {
+    fn append_to_history(&self, timestamp: DateTime<Local>, data: &SensorData) {
         if let Some(power) = data.total_power_watts() {
             if let Ok(mut h) = self.power_history.try_borrow_mut() {
                 h.push_back((timestamp, power as f32));
@@ -67,7 +67,7 @@ impl<'a> ComponentState<'a> {
         }
     }
 
-    fn prune_before(&self, cutoff: DateTime<Utc>) {
+    fn prune_before(&self, cutoff: DateTime<Local>) {
         for history in [&self.power_history, &self.usage_history] {
             if let Ok(mut h) = history.try_borrow_mut() {
                 while h.front().is_some_and(|&(ts, _)| ts < cutoff) {
@@ -77,7 +77,7 @@ impl<'a> ComponentState<'a> {
         }
     }
 
-    pub fn push_data(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         self.latest_reading = Some(data.clone());
 
@@ -90,12 +90,12 @@ impl<'a> ComponentState<'a> {
         self.chart.refresh_cache();
     }
 
-    pub fn push_history(&mut self, timestamp: DateTime<Utc>, data: &SensorData) {
+    pub fn push_history(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         self.append_to_history(timestamp, data);
     }
 
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Utc>, SensorData)]) {
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorData)]) {
         for (timestamp, sensor) in data {
             self.push_history(*timestamp, sensor);
         }

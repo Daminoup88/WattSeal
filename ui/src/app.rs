@@ -1,6 +1,6 @@
 use std::time::SystemTime;
 
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, Local};
 use common::{Database, DatabaseError, GPUData, SensorData};
 use iced::{
     Element, Subscription, Task,
@@ -83,17 +83,17 @@ impl<'a> App<'a> {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Utc>, SensorData)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
         let data = from_db(self.database.select_last_n_records(n));
         normalize_integrated_cpu(data)
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Utc>, SensorData)> {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
         let result = match time_range {
             TimeRange::LastMinute => self.database.select_data_in_time_range(
                 table_name,
-                (Utc::now() - time_range.duration_seconds()).into(),
-                Utc::now().into(),
+                (Local::now() - time_range.duration_seconds()).into(),
+                Local::now().into(),
             ),
             _ => {
                 let window = time_range.granularity_seconds();
@@ -131,9 +131,9 @@ impl<'a> App<'a> {
     }
 }
 
-fn normalize_integrated_cpu(mut data: Vec<(DateTime<Utc>, SensorData)>) -> Vec<(DateTime<Utc>, SensorData)> {
+fn normalize_integrated_cpu(mut data: Vec<(DateTime<Local>, SensorData)>) -> Vec<(DateTime<Local>, SensorData)> {
     let mut latest_pp1: Option<f64> = None;
-    let mut latest_pp1_timestamp: Option<DateTime<Utc>> = None;
+    let mut latest_pp1_timestamp: Option<DateTime<Local>> = None;
 
     for (time, sensor) in data.iter_mut() {
         if let SensorData::CPU(cpu) = sensor {
@@ -163,7 +163,7 @@ fn normalize_integrated_cpu(mut data: Vec<(DateTime<Utc>, SensorData)>) -> Vec<(
     data
 }
 
-fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Utc>, SensorData)> {
+fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorData)> {
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))

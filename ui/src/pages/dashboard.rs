@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 
-use chrono::{DateTime, Utc};
 use common::{CPUData, DatabaseEntry, SensorData, TotalData};
 use iced::{
     Alignment, Element, Length, Padding, Task,

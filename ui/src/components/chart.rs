@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use chrono::{DateTime, Duration, TimeZone, Utc};
+use chrono::{DateTime, Duration, Local, TimeZone};
 use common::SensorData;
 use iced::{
     Element, Length, Point, Rectangle, Size,
@@ -97,13 +97,13 @@ pub struct TooltipContent {
     pub title: String,
     pub value: f32,
     pub unit: String,
-    pub time: DateTime<Utc>,
+    pub time: DateTime<Local>,
     pub description: Option<String>,
     pub series_index: usize,
 }
 
 impl TooltipContent {
-    pub fn new(title: String, value: f32, unit: String, time: DateTime<Utc>, series_index: usize) -> Self {
+    pub fn new(title: String, value: f32, unit: String, time: DateTime<Local>, series_index: usize) -> Self {
         Self {
             title,
             value,
@@ -236,19 +236,19 @@ pub enum LineType {
 
 #[derive(Default, Debug, Clone)]
 struct TimeSeries {
-    points: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>,
+    points: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>,
     line_type: LineType,
 }
 
 impl TimeSeries {
-    fn iter(&self) -> Vec<(DateTime<Utc>, f32)> {
+    fn iter(&self) -> Vec<(DateTime<Local>, f32)> {
         self.points
             .try_borrow()
             .map(|points| points.iter().copied().collect())
             .unwrap_or_default()
     }
 
-    fn steps_iter(&self) -> Vec<(DateTime<Utc>, f32)> {
+    fn steps_iter(&self) -> Vec<(DateTime<Local>, f32)> {
         self.points
             .try_borrow()
             .map(|points| {
@@ -270,14 +270,14 @@ impl TimeSeries {
             .unwrap_or_default()
     }
 
-    fn newest_time(&self) -> Option<DateTime<Utc>> {
+    fn newest_time(&self) -> Option<DateTime<Local>> {
         self.points
             .try_borrow()
             .ok()
             .and_then(|points| points.back().map(|(t, _)| *t))
     }
 
-    fn oldest_time(&self) -> Option<DateTime<Utc>> {
+    fn oldest_time(&self) -> Option<DateTime<Local>> {
         self.points
             .try_borrow()
             .ok()
@@ -329,7 +329,7 @@ impl<'a> SensorChart<'a> {
         self.data.remove(label);
     }
 
-    pub fn set_data(&mut self, label: &str, points: Rc<RefCell<VecDeque<(DateTime<Utc>, f32)>>>) {
+    pub fn set_data(&mut self, label: &str, points: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>) {
         if let Some(series) = self.data.get_mut(label) {
             series.points = points;
             self.refresh_cache();
@@ -353,11 +353,11 @@ impl<'a> SensorChart<'a> {
         self.y_unit = unit;
     }
 
-    pub fn newest_time(&self) -> Option<DateTime<Utc>> {
+    pub fn newest_time(&self) -> Option<DateTime<Local>> {
         self.data.values().filter_map(|series| series.newest_time()).max()
     }
 
-    pub fn oldest_time(&self) -> Option<DateTime<Utc>> {
+    pub fn oldest_time(&self) -> Option<DateTime<Local>> {
         self.data.values().filter_map(|series| series.oldest_time()).min()
     }
 
@@ -403,8 +403,8 @@ impl<'a> SensorChart<'a> {
             .into()
     }
 
-    fn time_bounds(&self) -> (DateTime<Utc>, DateTime<Utc>) {
-        let newest = self.newest_time().unwrap_or(Utc::now());
+    fn time_bounds(&self) -> (DateTime<Local>, DateTime<Local>) {
+        let newest = self.newest_time().unwrap_or(Local::now());
         let oldest = newest - self.x_range;
         (oldest, newest)
     }
@@ -437,7 +437,7 @@ impl<'a> SensorChart<'a> {
             .axis_desc_style(label_style.clone().transform(FontTransform::Rotate90))
             .x_label_style(label_style.clone())
             .x_labels(60)
-            .x_label_formatter(&|x: &DateTime<Utc>| {
+            .x_label_formatter(&|x: &DateTime<Local>| {
                 let t = (newest_time.timestamp_millis() - x.timestamp_millis()) / 1000;
                 if t % 5 == 0 { format!("{}", t) } else { "".to_string() }
             })
@@ -612,7 +612,7 @@ impl<'a> SensorChart<'a> {
             }
         };
 
-        let create_tooltip = |label: &str, value: f32, time: DateTime<Utc>, idx: usize, px: f32, py: f32| {
+        let create_tooltip = |label: &str, value: f32, time: DateTime<Local>, idx: usize, px: f32, py: f32| {
             let content = TooltipContent::new(label.to_string(), value, self.y_unit.to_string(), time, idx);
             TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
         };
@@ -686,7 +686,7 @@ impl<'a> SensorChart<'a> {
         height * (1.0 - (value.clamp(min, max) - min) / range)
     }
 
-    fn point_x_for_time(&self, time: DateTime<Utc>, oldest: DateTime<Utc>, total_ms: f32, width: f32) -> f32 {
+    fn point_x_for_time(&self, time: DateTime<Local>, oldest: DateTime<Local>, total_ms: f32, width: f32) -> f32 {
         let ratio = ((time - oldest).num_milliseconds() as f32 / total_ms).clamp(0.0, 1.0);
         ratio * width
     }
