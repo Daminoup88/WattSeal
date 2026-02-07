@@ -109,11 +109,11 @@ impl<'a> ComponentState<'a> {
         self.time_range = time_range;
         let label = "Time";
         let unit = self.time_range.unit();
-        let line_type = match self.time_range {
+        self.line_type = match self.time_range {
             TimeRange::LastMinute => LineType::Line,
             _ => LineType::Step,
         };
-        self.chart.set_all_line_types(line_type);
+        self.chart.set_all_line_types(self.line_type);
         self.chart.set_x_axis_label_and_unit(label, unit);
         self.chart.set_x_range(self.time_range.duration_seconds());
         self.clear_data();
@@ -193,8 +193,6 @@ impl<'a> ComponentState<'a> {
                 .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
 
             first_row = first_row.push(metric_type_button);
-        } else {
-            first_row = first_row.push(Container::new(Text::new("")).width(Length::Fixed(90.0)));
         }
 
         let chart_container = Container::new(self.chart.view(height))
