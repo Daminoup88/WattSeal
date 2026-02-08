@@ -11,6 +11,7 @@ use crate::{
     components::chart::{LineType, SensorChart},
     message::Message,
     styles::{
+        button::ButtonStyle,
         container::ContainerStyle,
         picklist::PickListStyle,
         style_constants::{
@@ -196,7 +197,7 @@ impl<'a> ComponentState<'a> {
             Some(self.time_range.clone()),
             |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
         )
-        .class(PickListStyle::Standard);
+        .class(PickListStyle::TimeRange);
 
         let power_style = if power.is_some() {
             TextStyle::Primary
@@ -241,7 +242,8 @@ impl<'a> ComponentState<'a> {
                 TextStyle::Muted
             };
             let metric_type_button = button(Text::new(self.metric_type.toggled().to_string()).size(FONT_SIZE_BODY))
-                .on_press(Message::ChangeChartMetricType(self.table_name.clone()));
+                .on_press(Message::ChangeChartMetricType(self.table_name.clone()))
+                .class(ButtonStyle::Toggle(self.metric_type.into()));
 
             second_row_left = second_row_left.push(
                 Row::new()

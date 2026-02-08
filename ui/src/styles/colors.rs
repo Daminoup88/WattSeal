@@ -105,3 +105,12 @@ pub fn contrast_text(background: Color) -> Color {
         Color::WHITE
     }
 }
+
+pub fn blend(base: Color, overlay: Color) -> Color {
+    Color {
+        r: (base.r + overlay.r * overlay.a).min(1.0),
+        g: (base.g + overlay.g * overlay.a).min(1.0),
+        b: (base.b + overlay.b * overlay.a).min(1.0),
+        a: base.a,
+    }
+}

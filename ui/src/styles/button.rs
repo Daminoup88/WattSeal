@@ -4,7 +4,7 @@ use iced::{
 };
 
 use super::{
-    colors::{ExtendedPalette, with_alpha},
+    colors::{ExtendedPalette, blend, with_alpha},
     style_constants::{BORDER_RADIUS_SMALL, BORDER_WIDTH},
 };
 use crate::themes::AppTheme;
@@ -13,6 +13,7 @@ use crate::themes::AppTheme;
 pub enum ButtonStyle {
     #[default]
     Standard,
+    Toggle(bool),
     Nav,
     NavActive,
 }
@@ -51,6 +52,22 @@ impl ButtonStyle {
                 shadow: Shadow::default(),
                 ..Default::default()
             },
+
+            Self::Toggle(active) => {
+                let color = if *active { ext.success } else { ext.primary };
+
+                button::Style {
+                    background: Some(Background::Color(ext.card_background)),
+                    text_color: color,
+                    border: Border {
+                        color,
+                        width: BORDER_WIDTH,
+                        radius: BORDER_RADIUS_SMALL.into(),
+                    },
+                    shadow: Shadow::default(),
+                    ..Default::default()
+                }
+            }
 
             Self::Nav => button::Style {
                 background: Some(Background::Color(Color::TRANSPARENT)),
@@ -92,6 +109,18 @@ impl ButtonStyle {
             } else {
                 base.text_color
             },
+            border: if let Self::Toggle(_) = self {
+                base.border
+            } else {
+                Border {
+                    color: if matches!(self, Self::Standard) {
+                        ext.primary
+                    } else {
+                        base.border.color
+                    },
+                    ..base.border
+                }
+            },
             shadow: Shadow {
                 color: with_alpha(Color::BLACK, 0.1),
                 offset: Vector::new(0.0, 2.0),
@@ -127,14 +156,5 @@ fn disabled_style(ext: &ExtendedPalette) -> button::Style {
         },
         shadow: Shadow::default(),
         ..Default::default()
-    }
-}
-
-fn blend(base: Color, overlay: Color) -> Color {
-    Color {
-        r: (base.r + overlay.r * overlay.a).min(1.0),
-        g: (base.g + overlay.g * overlay.a).min(1.0),
-        b: (base.b + overlay.b * overlay.a).min(1.0),
-        a: base.a,
     }
 }

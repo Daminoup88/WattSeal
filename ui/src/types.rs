@@ -46,7 +46,7 @@ impl Display for TimeRange {
     }
 }
 
-#[derive(Default, PartialEq)]
+#[derive(Default, PartialEq, Clone, Copy)]
 pub enum MetricType {
     #[default]
     Power,
@@ -86,5 +86,11 @@ impl MetricType {
 
     pub fn legend(&self, component_name: &str) -> String {
         format!("{} {}", component_name, self.label())
+    }
+}
+
+impl Into<bool> for MetricType {
+    fn into(self) -> bool {
+        matches!(self, MetricType::Power)
     }
 }
