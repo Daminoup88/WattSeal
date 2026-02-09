@@ -11,6 +11,7 @@ use std::{
 };
 
 use adlx::gpu;
+use common::database::purge::averaging_and_purging_data;
 use database::Database;
 use display_info::DisplayInfo;
 use process::{estimate_app_power_consumption, groups::group_processes_by_app};
@@ -100,6 +101,12 @@ impl CollectorApp {
     }
 
     pub fn run(&mut self) {
+        println!("\n========== PURGING & AVERAGING OLD DATA ==========");
+        // averaging data every hour and purge the database until the last X_hours
+        averaging_and_purging_data(&mut self.database, 24)
+            .map_err(|e| format!("Failed averaging/purging data: {}", e))
+            .unwrap();
+
         println!("\n========== POWER CONSUMPTION MONITORING ==========");
         println!("Logging data to database every second. Press Ctrl+C to stop.\n");
 
@@ -115,7 +122,6 @@ impl CollectorApp {
                 Ok(_) => println!("✓ Event data saved to database"),
                 Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
             }
-
             for sensor_data in event.data().iter() {
                 // PRINT HARDWARE DATA
                 if !(sensor_data.sensor_type() == "Processes") {

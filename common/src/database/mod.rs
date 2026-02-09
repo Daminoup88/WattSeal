@@ -1,4 +1,5 @@
-mod entries;
+pub mod entries;
+pub mod purge;
 
 use core::time;
 use std::{
@@ -8,6 +9,7 @@ use std::{
 };
 
 pub use entries::DatabaseEntry;
+pub use purge::averaging_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};
 
 use crate::types::{CPUData, Event, GPUData, ProcessData, SensorData, TotalData};
@@ -162,15 +164,16 @@ impl Database {
         start_time: SystemTime,
         end_time: SystemTime,
     ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
-        let query = format!(
-            "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
-             WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC",
-            table_name
-        );
         let start_time_millis = start_time.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
         let end_time_millis = end_time.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
-        let sensor_data_list =
-            self.execute_sensor_query(table_name, &query, params![start_time_millis, end_time_millis])?;
+
+        let query = format!(
+            "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
+             WHERE t.timestamp >= {} AND t.timestamp <= {} ORDER BY t.timestamp ASC",
+            table_name, start_time_millis, end_time_millis
+        );
+
+        let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
         let mut records = Vec::<(SystemTime, SensorData)>::new();
         for (ts_millis, sensor_data) in sensor_data_list {
             let timestamp = SystemTime::UNIX_EPOCH + time::Duration::from_millis(ts_millis as u64);

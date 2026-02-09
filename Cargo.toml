@@ -12,3 +12,4 @@ collector = { path = "collector" }
 ui = { path = "ui" }
 common = { path = "common" }
 tray-icon = "0.21.2"
+chrono = "0.4.43"
