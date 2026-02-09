@@ -44,29 +44,43 @@ fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(),
     let mut end_ts = next_oclock(start_ts);
 
     while end_ts <= cutoff_end_timestamp {
-        let avg_power: Option<f64> = {
+        let (avg_power, value_count): (Option<f64>, i64) = {
             let mut stmt = database
                 .conn
                 .prepare(
-                    "SELECT AVG(d.total_power_watts) FROM timestamp t \
-                     JOIN total_data d ON t.id = d.timestamp_id \
-                     WHERE t.timestamp >= ?1 AND t.timestamp < ?2 \
-                     AND d.period_type = 'second'",
+                    "SELECT AVG(d.total_power_watts) AS avg_power, \
+                        COUNT(d.total_power_watts) AS value_count \
+                        FROM timestamp t \
+                        JOIN total_data d ON t.id = d.timestamp_id \
+                        WHERE t.timestamp >= ?1 AND t.timestamp < ?2 \
+                        AND d.period_type = 'second'",
                 )
                 .map_err(|e| format!("Failed to prepare query: {}", e))?;
-            stmt.query_row(params![start_ts, end_ts], |row| row.get(0))
-                .map_err(|e| format!("Failed to execute query: {}", e))?
+            stmt.query_row(params![start_ts, end_ts], |row| {
+                Ok((
+                    row.get::<_, Option<f64>>(0)?, 
+                    row.get::<_, i64>(1)?
+                ))
+            })
+            .map_err(|e| format!("Failed to execute query: {}", e))?
         };
-
+        
         if let Some(avg_power) = avg_power {
             println!(
                 "Averaging data from {} to {}",
                 get_datetime_from_ts(start_ts),
                 get_datetime_from_ts(end_ts)
             );
+            
+            let mut power = avg_power;
+            if value_count > 0 {
+                println!("Number of absent values: {}", value_count);
+                power = avg_power * (value_count as f64) / (3600.0);
+                // We assume missing values = 0W
+            }
 
             let total_data = TotalData {
-                total_power_watts: avg_power,
+                total_power_watts: power,
                 period_type: "hour".to_string(),
             };
 
