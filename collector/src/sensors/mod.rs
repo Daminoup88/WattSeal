@@ -1,7 +1,7 @@
 pub mod cpu;
 pub mod gpu;
 
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 pub use common::{Event, ProcessData, SensorData, TotalData};
 pub use cpu::CPUSensor;

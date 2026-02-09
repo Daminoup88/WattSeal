@@ -7,7 +7,7 @@ pub mod sensors;
 use core::time;
 use std::{
     thread,
-    time::{Duration, Instant},
+    time::{Duration, Instant, SystemTime},
 };
 
 use adlx::gpu;
@@ -111,9 +111,9 @@ impl CollectorApp {
         println!("Logging data to database every second. Press Ctrl+C to stop.\n");
 
         loop {
-            thread::sleep(Duration::from_millis(1000));
-            self.iteration += 1;
+            let start_time = Instant::now();
 
+            self.iteration += 1;
             println!("\n--- Iteration {} ---", self.iteration);
 
             let event = create_event_from_sensors(&self.sensors);
@@ -131,6 +131,19 @@ impl CollectorApp {
                 else {
                     println!("{}", sensor_data);
                 }
+            }
+
+            // ADJUST SLEEP DURATION TO MAINTAIN 1 SECOND INTERVALS
+            let elapsed_time = start_time.elapsed();
+            if elapsed_time < Duration::from_millis(1000) {
+                let now = SystemTime::now();
+                let time_before_next_second = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() % 1000;
+                thread::sleep(Duration::from_millis(1000 - time_before_next_second as u64));
+            } else {
+                println!(
+                    "WARNING: Iteration {} took longer than 1 second. Consider optimizing.",
+                    self.iteration
+                );
             }
         }
     }
