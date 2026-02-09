@@ -103,7 +103,7 @@ impl CollectorApp {
     pub fn run(&mut self) {
         println!("\n========== PURGING & AVERAGING OLD DATA ==========");
         // averaging data every hour and purge the database until the last X_hours
-        averaging_and_purging_data(&mut self.database, 24)
+        averaging_and_purging_data(&mut self.database, 24, 24)
             .map_err(|e| format!("Failed averaging/purging data: {}", e))
             .unwrap();
 

@@ -85,7 +85,7 @@ impl Database {
         tx.execute(
             "CREATE TABLE IF NOT EXISTS hardware_info (
                     id                 INTEGER PRIMARY KEY,
-                    timestamp_id       INTEGER REFERENCES timestamp(id),
+                    timestamp_id       INTEGER REFERENCES timestamp(id) ON DELETE CASCADE,
                     detected_materials TEXT
             )",
             [],

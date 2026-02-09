@@ -146,7 +146,8 @@ impl<'a> ComponentState<'a> {
         self.metric_type = metric_type;
         self.chart.clear_all();
         let legend = self.metric_type.legend(&self.sensor_type);
-        self.chart.add_series(&legend, self.line_type);
+        self.chart
+            .add_series(&legend, self.line_type, Some(self.metric_type as usize));
         self.chart
             .set_y_axis_label_and_unit(self.metric_type.label(), self.metric_type.unit());
         self.chart.set_data(

@@ -8,11 +8,15 @@ use crate::{
     types::{Event, SensorData, TotalData},
 };
 
-pub fn averaging_and_purging_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
-    averaging_data(database, duration_in_hours)
+pub fn averaging_and_purging_data(
+    database: &mut Database,
+    average_until_time: i64,
+    purge_until_time: i64,
+) -> Result<(), String> {
+    averaging_data(database, average_until_time)
         .map_err(|e| format!("Failed to average data: {}", e))
         .unwrap();
-    purge_old_events(/*database, duration_in_hours*/)
+    purge_old_events(database, purge_until_time)
         .map_err(|e| format!("Failed to purge data: {}", e))
         .unwrap();
     Ok(())
@@ -57,21 +61,18 @@ fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(),
                 )
                 .map_err(|e| format!("Failed to prepare query: {}", e))?;
             stmt.query_row(params![start_ts, end_ts], |row| {
-                Ok((
-                    row.get::<_, Option<f64>>(0)?, 
-                    row.get::<_, i64>(1)?
-                ))
+                Ok((row.get::<_, Option<f64>>(0)?, row.get::<_, i64>(1)?))
             })
             .map_err(|e| format!("Failed to execute query: {}", e))?
         };
-        
+
         if let Some(avg_power) = avg_power {
             println!(
                 "Averaging data from {} to {}",
                 get_datetime_from_ts(start_ts),
                 get_datetime_from_ts(end_ts)
             );
-            
+
             let mut power = avg_power;
             if value_count > 0 {
                 println!("Number of absent values: {}", value_count);
@@ -88,7 +89,8 @@ fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(),
             if start_ts == first_timestamp {
                 println!("First timestamp\n");
                 // If first timestamp -> set event time to the time oclock before.
-                event_time = UNIX_EPOCH + time::Duration::from_millis(next_oclock(start_ts - 3600 * 1000) as u64);
+                let ts_oclock = start_ts - (start_ts % (3600 * 1000));
+                event_time = UNIX_EPOCH + time::Duration::from_millis(ts_oclock as u64);
             }
 
             let event = Event::new(event_time, vec![SensorData::Total(total_data)]);
@@ -107,31 +109,25 @@ fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(),
 
 // Delete in Cascade every events of the DB until the duration specified (ex: 24h ago)
 // Except if total_data period_type is "hour"
-fn purge_old_events(/*database: &mut Database, duration_in_hours: i64*/) -> Result<(), String> {
-    // let cutoff_timestamp = get_timestamp_oclock() - duration_in_hours * 3600 * 1000;
+fn purge_old_events(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
+    let cutoff_timestamp = get_timestamp_oclock() - duration_in_hours * 3600 * 1000;
 
-    // database
-    //     .conn
-    //     .execute(
-    //         "DELETE FROM event
-    //          WHERE timestamp_id IN (
-    //              SELECT t.id FROM timestamp t
-    //              JOIN total_data d ON t.id = d.timestamp_id
-    //              WHERE t.timestamp < ?1 AND d.period_type != 'hour'
-    //          )",
-    //         params![cutoff_timestamp],
-    //     )
-    //     .map_err(|e| format!("Failed to delete events: {}", e))?;
-
-    // // Clean up orphaned timestamps that are no longer referenced by any event
-    // database
-    //     .conn
-    //     .execute(
-    //         "DELETE FROM timestamp
-    //          WHERE id NOT IN (SELECT DISTINCT timestamp_id FROM event)",
-    //         [],
-    //     )
-    //     .map_err(|e| format!("Failed to clean up orphaned timestamps: {}", e))?;
+    // Delete timestamps (and cascade to all related records) that:
+    // 1. Are older than the cutoff
+    // 2. Have NO hourly (averaged) data
+    database
+        .conn
+        .execute(
+            "DELETE FROM timestamp 
+             WHERE timestamp < ?1 
+             AND id NOT IN (
+                 SELECT DISTINCT d.timestamp_id 
+                 FROM total_data d 
+                 WHERE d.period_type = 'hour'
+             )",
+            params![cutoff_timestamp],
+        )
+        .map_err(|e| format!("Failed to delete old events: {}", e))?;
 
     Ok(())
 }

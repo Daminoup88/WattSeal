@@ -4,10 +4,11 @@ use std::{
     rc::Rc,
 };
 
-use chrono::{DateTime, Duration, Local, TimeZone};
+use chrono::{DateTime, Duration, Local, TimeZone, Timelike};
 use common::SensorData;
 use iced::{
     Element, Length, Point, Rectangle, Size,
+    advanced::graphics::text::cosmic_text::skrifa::color,
     alignment::Alignment,
     event::Status,
     mouse::{self, Cursor},
@@ -31,12 +32,12 @@ const PLOT_SECONDS: usize = 60;
 const SNAP_DISTANCE_PX: f32 = 30.0;
 const VALUE_MIN: f32 = 0.0;
 const VALUE_MAX: f32 = 100.0;
-const X_LABEL_AREA_SIZE: f32 = 50.0;
-const Y_LABEL_AREA_SIZE: f32 = 80.0;
+const X_LABEL_AREA_SIZE: f32 = 15.0;
+const Y_LABEL_AREA_SIZE: f32 = 50.0;
 // const RIGHT_Y_LABEL_AREA_SIZE: f32 = 90.0;
 const CHART_MARGIN: f32 = 20.0;
-const CHART_MARGIN_LEFT: f32 = 40.0;
-const CHART_MARGIN_RIGHT: f32 = 40.0;
+const CHART_MARGIN_LEFT: f32 = 0.0;
+const CHART_MARGIN_RIGHT: f32 = 10.0;
 
 const TOOLTIP_WIDTH: f32 = 150.0;
 const TOOLTIP_MIN_HEIGHT: f32 = 60.0;
@@ -100,10 +101,18 @@ pub struct TooltipContent {
     pub time: DateTime<Local>,
     pub description: Option<String>,
     pub series_index: usize,
+    pub color: Option<RGBColor>,
 }
 
 impl TooltipContent {
-    pub fn new(title: String, value: f32, unit: String, time: DateTime<Local>, series_index: usize) -> Self {
+    pub fn new(
+        title: String,
+        value: f32,
+        unit: String,
+        time: DateTime<Local>,
+        series_index: usize,
+        color: Option<RGBColor>,
+    ) -> Self {
         Self {
             title,
             value,
@@ -111,6 +120,7 @@ impl TooltipContent {
             time,
             description: None,
             series_index,
+            color,
         }
     }
 
@@ -238,6 +248,7 @@ pub enum LineType {
 struct TimeSeries {
     points: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>,
     line_type: LineType,
+    color: Option<RGBColor>,
 }
 
 impl TimeSeries {
@@ -309,12 +320,13 @@ impl<'a> SensorChart<'a> {
         }
     }
 
-    pub fn add_series(&mut self, label: &str, line_type: LineType) {
+    pub fn add_series(&mut self, label: &str, line_type: LineType, color_idx: Option<usize>) {
         self.data.insert(
             label.to_string(),
             TimeSeries {
                 points: Rc::new(RefCell::new(VecDeque::new())),
                 line_type,
+                color: color_idx.map(|idx| self.style.series_color(idx)),
             },
         );
     }
@@ -409,12 +421,35 @@ impl<'a> SensorChart<'a> {
         (oldest, newest)
     }
 
+    fn format_x_label(&self, x: &DateTime<Local>, total_secs: i64, newest: &DateTime<Local>) -> String {
+        match total_secs {
+            0..=120 => {
+                let seconds_ago = (newest.timestamp() - x.timestamp()).max(0);
+                if seconds_ago % 10 == 0 {
+                    format!("{}s", seconds_ago)
+                } else {
+                    "".to_string()
+                }
+            }
+            121..=86400 => x.format("%H:%M").to_string(),
+            _ => {
+                if x.hour() == 0 && x.minute() == 0 {
+                    x.format("%Y-%m-%d").to_string()
+                } else {
+                    "".to_string()
+                }
+            }
+        }
+    }
+
     fn build_chart_2d<DB: DrawingBackend>(&self, mut builder: ChartBuilder<DB>) {
         use plotters::prelude::*;
 
         let style = &self.style;
         let (oldest_time, newest_time) = self.time_bounds();
         let label_style = ("sans-serif", 15).into_font().color(&style.text);
+
+        let x_seconds = self.x_range.num_seconds();
 
         let mut chart = builder
             .x_label_area_size(X_LABEL_AREA_SIZE)
@@ -433,20 +468,14 @@ impl<'a> SensorChart<'a> {
             .y_labels(5)
             .y_label_style(label_style.clone())
             .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_unit))
-            .y_desc(format!("{} ({})", self.y_axis_label, self.y_unit))
-            .axis_desc_style(label_style.clone().transform(FontTransform::Rotate90))
             .x_label_style(label_style.clone())
-            .x_labels(60)
-            .x_label_formatter(&|x: &DateTime<Local>| {
-                let t = (newest_time.timestamp_millis() - x.timestamp_millis()) / 1000;
-                if t % 5 == 0 { format!("{}", t) } else { "".to_string() }
-            })
-            .x_desc(format!("{} ({})", self.x_axis_label, self.x_unit))
+            .x_labels(if x_seconds <= 120 { x_seconds as usize } else { 7 })
+            .x_label_formatter(&|x: &DateTime<Local>| self.format_x_label(x, x_seconds, &newest_time))
             .draw()
             .expect("failed to draw chart mesh");
 
         for (i, (label, series)) in self.data.iter().enumerate() {
-            let color = style.series_color(i);
+            let color = series.color.unwrap_or_else(|| style.series_color(i));
             let data = match series.line_type {
                 LineType::Step => series.steps_iter(),
                 _ => series.iter(),
@@ -493,7 +522,10 @@ impl<'a> SensorChart<'a> {
             .expect("failed to draw legend");
 
         if let Some(tooltip) = self.hovered.borrow().as_ref() {
-            let series_color = style.series_color(tooltip.content.series_index);
+            let series_color = tooltip
+                .content
+                .color
+                .unwrap_or_else(|| style.series_color(tooltip.content.series_index));
             let point = (tooltip.content.time, tooltip.content.value);
             chart
                 .draw_series(PointSeries::of_element(
@@ -523,7 +555,9 @@ impl<'a> SensorChart<'a> {
 
         let bounds = &tooltip.bounds;
         let content = &tooltip.content;
-        let series_color = style.series_color(content.series_index);
+        let series_color = content
+            .color
+            .unwrap_or_else(|| style.series_color(content.series_index));
         let series_color_rgba = series_color.to_rgba();
 
         let rect_style = ShapeStyle {
@@ -583,11 +617,19 @@ impl<'a> SensorChart<'a> {
         if let Some(desc) = &content.description {
             area.draw(&Text::new(desc.clone(), (text_x, text_y), text_style)).ok();
         }
+
+        // draw tooltip point to test position
+        // area.draw(&Circle::new(
+        //     (tooltip.point_x as i32, tooltip.point_y as i32),
+        //     5,
+        //     ShapeStyle::from(series_color).filled(),
+        // ))
+        // .ok();
     }
 
     fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<TooltipData> {
         let chart_bounds = Size::new(
-            bounds.width - Y_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN - CHART_MARGIN_LEFT,
+            bounds.width - Y_LABEL_AREA_SIZE - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT,
             bounds.height - X_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
         );
 
@@ -612,10 +654,11 @@ impl<'a> SensorChart<'a> {
             }
         };
 
-        let create_tooltip = |label: &str, value: f32, time: DateTime<Local>, idx: usize, px: f32, py: f32| {
-            let content = TooltipContent::new(label.to_string(), value, self.y_unit.to_string(), time, idx);
-            TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
-        };
+        let create_tooltip =
+            |label: &str, value: f32, time: DateTime<Local>, idx: usize, px: f32, py: f32, color: Option<RGBColor>| {
+                let content = TooltipContent::new(label.to_string(), value, self.y_unit.to_string(), time, idx, color);
+                TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
+            };
 
         for (idx, (label, s)) in self.data.iter().enumerate() {
             if s.newest_time().is_none() {
@@ -653,7 +696,7 @@ impl<'a> SensorChart<'a> {
                             let cursor_time_ms = (chart_cursor.x / chart_bounds.width) * total_ms;
                             let cursor_time = oldest + Duration::milliseconds(cursor_time_ms as i64);
 
-                            let tooltip = create_tooltip(label, value, cursor_time, idx, chart_cursor.x, py);
+                            let tooltip = create_tooltip(label, value, cursor_time, idx, chart_cursor.x, py, s.color);
                             update_best_tooltip(tooltip, y_dist * y_dist);
                         }
                     }
@@ -665,7 +708,7 @@ impl<'a> SensorChart<'a> {
                         let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
 
                         if dist_sq <= snap_sq {
-                            let tooltip = create_tooltip(label, value, time, idx, px, py);
+                            let tooltip = create_tooltip(label, value, time, idx, px, py, s.color);
                             update_best_tooltip(tooltip, dist_sq);
                         }
                     }
