@@ -3194,6 +3194,7 @@ dependencies = [
  "common",
  "tray-icon",
  "ui",
+ "winit",
 ]
 
 [[package]]
