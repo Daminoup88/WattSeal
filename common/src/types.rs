@@ -43,6 +43,33 @@ pub struct GPUData {
 }
 
 #[derive(Debug, Clone, Default)]
+pub struct RamData {
+    pub total_power_watts: Option<f64>,
+    pub total_gb: f64,
+    pub used_gb: f64,
+    pub free_gb: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct DiskData {
+    pub total_power_watts: Option<f64>,
+    pub total_gb: f64,
+    pub used_gb: f64,
+    pub free_gb: f64,
+    pub read_usage_mb_s: f64,
+    pub write_usage_mb_s: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct NetworkData {
+    pub total_power_watts: Option<f64>,
+    pub download_speed_mb_s: f64,
+    pub upload_speed_mb_s: f64,
+    pub total_download_gb: f64,
+    pub total_upload_gb: f64,
+}
+
+#[derive(Debug, Clone, Default)]
 pub struct ScreenData {
     pub resolution: (u32, u32),
     pub refresh_rate_hz: u32,
@@ -80,6 +107,9 @@ pub struct ProcessData {
 pub enum SensorData {
     CPU(CPUData),
     GPU(GPUData),
+    Ram(RamData),
+    Disk(DiskData),
+    Network(NetworkData),
     Screen(ScreenData),
     Battery(BatteryData),
     Peripherals(PeripheralsData),
@@ -110,6 +140,9 @@ impl SensorData {
         match self {
             SensorData::CPU(_) => "CPU",
             SensorData::GPU(_) => "GPU",
+            SensorData::Ram(_) => "RAM",
+            SensorData::Disk(_) => "Disk",
+            SensorData::Network(_) => "Network",
             SensorData::Screen(_) => "Screen",
             SensorData::Battery(_) => "Battery",
             SensorData::Peripherals(_) => "Peripherals",
@@ -162,6 +195,33 @@ impl Display for SensorData {
                 writeln!(f, "  Power:       {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 writeln!(f, "  VRAM Usage:  {:.2} %", data.vram_usage_percent.unwrap_or(-1.0))?;
+                Ok(())
+            }
+            SensorData::Ram(data) => {
+                writeln!(f, "RAM Data:")?;
+                writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Total: {:.2} GB", data.total_gb)?;
+                writeln!(f, "  Used:  {:.2} GB", data.used_gb)?;
+                writeln!(f, "  Free:  {:.2} GB", data.free_gb)?;
+                Ok(())
+            }
+            SensorData::Disk(data) => {
+                writeln!(f, "Disk Data:")?;
+                writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Total: {:.2} GB", data.total_gb)?;
+                writeln!(f, "  Used:  {:.2} GB", data.used_gb)?;
+                writeln!(f, "  Free:  {:.2} GB", data.free_gb)?;
+                writeln!(f, "  Read Speed:  {:.2} MB/s", data.read_usage_mb_s)?;
+                writeln!(f, "  Write Speed: {:.2} MB/s", data.write_usage_mb_s)?;
+                Ok(())
+            }
+            SensorData::Network(data) => {
+                writeln!(f, "Network Data:")?;
+                writeln!(f, "  Power:        {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Download Speed: {:.2} MB/s", data.download_speed_mb_s)?;
+                writeln!(f, "  Upload Speed:   {:.2} MB/s", data.upload_speed_mb_s)?;
+                writeln!(f, "  Total Download: {:.2} GB", data.total_download_gb)?;
+                writeln!(f, "  Total Upload:   {:.2} GB", data.total_upload_gb)?;
                 Ok(())
             }
             SensorData::Screen(data) => writeln!(f, "Screen Data: {:?}", data),

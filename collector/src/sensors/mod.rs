@@ -1,5 +1,9 @@
 pub mod cpu;
+pub mod disk;
 pub mod gpu;
+pub mod network;
+pub mod ram;
+// pub mod process;
 
 use std::time::{Instant, SystemTime};
 
