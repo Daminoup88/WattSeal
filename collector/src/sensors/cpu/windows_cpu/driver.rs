@@ -12,7 +12,7 @@ impl WinRing0Reader {
         let mut handler = panic::catch_unwind(|| WinRing0Reader { ring0: WinRing0::new() })
             .unwrap_or_else(WinRing0Reader::free_stuck_driver);
         println!("Installing WinRing0 driver...");
-        handler.ring0.install()?;
+        handler.ring0.install().or_else(|_| handler.retry_install())?;
         println!("Opening WinRing0 driver...");
         handler.ring0.open()?;
         println!("WinRing0 driver opened successfully.");
@@ -21,6 +21,14 @@ impl WinRing0Reader {
 
     pub fn read_msr(&self, msr: c_ulong) -> Result<u64, String> {
         self.ring0.readMsr(msr)
+    }
+
+    fn retry_install(&mut self) -> Result<(), String> {
+        println!("Uninstalling existing WinRing0 driver...");
+        self.ring0.uninstall()?;
+        println!("Retrying WinRing0 driver installation...");
+        self.ring0.install()?;
+        Ok(())
     }
 
     fn free_stuck_driver(_err: Box<dyn Any + Send>) -> Self {
