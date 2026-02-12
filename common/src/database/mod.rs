@@ -12,7 +12,7 @@ pub use entries::DatabaseEntry;
 pub use purge::averaging_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Row, ToSql, Transaction, params};
 
-use crate::types::{CPUData, Event, GPUData, ProcessData, SensorData, TotalData};
+use crate::types::{CPUData, DiskData, Event, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 

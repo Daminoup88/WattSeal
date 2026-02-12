@@ -1,10 +1,8 @@
 use std::{cell::RefCell, rc::Rc};
 
-use sysinfo::System;
-
 use crate::{
     database::{RamData, SensorData},
-    sensors::{Sensor, SensorError},
+    sensors::{Sensor, SensorError, System},
 };
 
 pub struct RamSensor {
@@ -27,13 +25,15 @@ impl Sensor for RamSensor {
 
         let total_memory = system.total_memory() as f64 / 1024.0; // Convert to GB
         let used_memory = system.used_memory() as f64 / 1024.0; // Convert to GB
-        let free_memory = system.free_memory() as f64 / 1024.0; // Convert to GB
+        let usage_percent = if total_memory > 0.0 {
+            (used_memory / total_memory) * 100.0
+        } else {
+            0.0
+        };
 
         Ok(SensorData::Ram(RamData {
             total_power_watts: Some(5.0),
-            total_gb: total_memory,
-            used_gb: used_memory,
-            free_gb: free_memory,
+            usage_percent: Some(usage_percent),
         }))
     }
 }

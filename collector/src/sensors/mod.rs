@@ -9,13 +9,20 @@ use std::time::{Instant, SystemTime};
 
 pub use common::{Event, ProcessData, SensorData, TotalData};
 pub use cpu::CPUSensor;
+pub use disk::DiskSensor;
 pub use gpu::GPUSensor;
+pub use network::NetworkSensor;
+pub use ram::RamSensor;
+use sysinfo::System;
 
 pub use crate::process::{estimate_app_power_consumption, groups::group_processes_by_app};
 
 pub enum SensorType {
     CPU(CPUSensor),
     GPU(GPUSensor),
+    RAM(RamSensor),
+    Disk(DiskSensor),
+    Network(NetworkSensor),
     Process,
     Total,
 }
@@ -25,6 +32,9 @@ impl Sensor for SensorType {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
+            SensorType::RAM(sensor) => sensor.read_full_data(),
+            SensorType::Disk(sensor) => sensor.read_full_data(),
+            SensorType::Network(sensor) => sensor.read_full_data(),
             SensorType::Process => Err(SensorError::NotSupported),
             SensorType::Total => Err(SensorError::NotSupported),
         }

@@ -45,17 +45,16 @@ pub struct GPUData {
 #[derive(Debug, Clone, Default)]
 pub struct RamData {
     pub total_power_watts: Option<f64>,
-    pub total_gb: f64,
-    pub used_gb: f64,
-    pub free_gb: f64,
+    // pub total_gb: f64,
+    pub usage_percent: Option<f64>,
 }
 
 #[derive(Debug, Clone, Default)]
 pub struct DiskData {
     pub total_power_watts: Option<f64>,
-    pub total_gb: f64,
-    pub used_gb: f64,
-    pub free_gb: f64,
+    // pub total_gb: f64,
+    // pub used_gb: f64,
+    // pub free_gb: f64,
     pub read_usage_mb_s: f64,
     pub write_usage_mb_s: f64,
 }
@@ -65,34 +64,6 @@ pub struct NetworkData {
     pub total_power_watts: Option<f64>,
     pub download_speed_mb_s: f64,
     pub upload_speed_mb_s: f64,
-    pub total_download_gb: f64,
-    pub total_upload_gb: f64,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct ScreenData {
-    pub resolution: (u32, u32),
-    pub refresh_rate_hz: u32,
-    pub technology: String,
-    pub luminosity_nits: u32,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct BatteryData {
-    pub manufacturer: String,
-    pub model: String,
-    pub serial_number: String,
-    pub design_capacity_mwh: u32,
-    pub full_charge_capacity_mwh: u32,
-    pub cycle_count: u32,
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct PeripheralsData {
-    pub device_name: String,
-    pub device_type: String,
-    pub manufacturer: String,
-    pub is_connected: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -110,9 +81,6 @@ pub enum SensorData {
     Ram(RamData),
     Disk(DiskData),
     Network(NetworkData),
-    Screen(ScreenData),
-    Battery(BatteryData),
-    Peripherals(PeripheralsData),
     Total(TotalData),
     Process(Vec<ProcessData>),
 }
@@ -128,9 +96,9 @@ impl SensorData {
         match table_name {
             s if s == CPUData::table_name_static() => Some(SensorData::CPU(CPUData::default())),
             s if s == GPUData::table_name_static() => Some(SensorData::GPU(GPUData::default())),
-            // s if s == ScreenData::table_name_static() => Some(SensorData::Screen(ScreenData::default())),
-            // s if s == BatteryData::table_name_static() => Some(SensorData::Battery(BatteryData::default())),
-            // s if s == PeripheralsData::table_name_static() => Some(SensorData::Peripherals(PeripheralsData::default())),
+            s if s == RamData::table_name_static() => Some(SensorData::Ram(RamData::default())),
+            s if s == DiskData::table_name_static() => Some(SensorData::Disk(DiskData::default())),
+            s if s == NetworkData::table_name_static() => Some(SensorData::Network(NetworkData::default())),
             s if s == TotalData::table_name_static() => Some(SensorData::Total(TotalData::default())),
             _ => None,
         }
@@ -143,9 +111,6 @@ impl SensorData {
             SensorData::Ram(_) => "RAM",
             SensorData::Disk(_) => "Disk",
             SensorData::Network(_) => "Network",
-            SensorData::Screen(_) => "Screen",
-            SensorData::Battery(_) => "Battery",
-            SensorData::Peripherals(_) => "Peripherals",
             SensorData::Total(_) => "Total",
             SensorData::Process(_) => "Processes",
         }
@@ -164,6 +129,9 @@ impl SensorData {
         match self {
             SensorData::CPU(data) => data.total_power_watts,
             SensorData::GPU(data) => data.total_power_watts,
+            SensorData::Ram(data) => data.total_power_watts,
+            SensorData::Disk(data) => data.total_power_watts,
+            SensorData::Network(data) => data.total_power_watts,
             SensorData::Total(power) => Some(power.total_power_watts),
             _ => None,
         }
@@ -173,6 +141,7 @@ impl SensorData {
         match self {
             SensorData::CPU(data) => data.usage_percent,
             SensorData::GPU(data) => data.usage_percent,
+            SensorData::Ram(data) => data.usage_percent,
             _ => None,
         }
     }
@@ -200,17 +169,12 @@ impl Display for SensorData {
             SensorData::Ram(data) => {
                 writeln!(f, "RAM Data:")?;
                 writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Total: {:.2} GB", data.total_gb)?;
-                writeln!(f, "  Used:  {:.2} GB", data.used_gb)?;
-                writeln!(f, "  Free:  {:.2} GB", data.free_gb)?;
+                writeln!(f, " Usage: {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
             SensorData::Disk(data) => {
                 writeln!(f, "Disk Data:")?;
                 writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Total: {:.2} GB", data.total_gb)?;
-                writeln!(f, "  Used:  {:.2} GB", data.used_gb)?;
-                writeln!(f, "  Free:  {:.2} GB", data.free_gb)?;
                 writeln!(f, "  Read Speed:  {:.2} MB/s", data.read_usage_mb_s)?;
                 writeln!(f, "  Write Speed: {:.2} MB/s", data.write_usage_mb_s)?;
                 Ok(())
@@ -220,13 +184,8 @@ impl Display for SensorData {
                 writeln!(f, "  Power:        {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
                 writeln!(f, "  Download Speed: {:.2} MB/s", data.download_speed_mb_s)?;
                 writeln!(f, "  Upload Speed:   {:.2} MB/s", data.upload_speed_mb_s)?;
-                writeln!(f, "  Total Download: {:.2} GB", data.total_download_gb)?;
-                writeln!(f, "  Total Upload:   {:.2} GB", data.total_upload_gb)?;
                 Ok(())
             }
-            SensorData::Screen(data) => writeln!(f, "Screen Data: {:?}", data),
-            SensorData::Battery(data) => writeln!(f, "Battery Data: {:?}", data),
-            SensorData::Peripherals(data) => writeln!(f, "Peripherals Data: {:?}", data),
             SensorData::Total(total) => writeln!(
                 f,
                 "Total Power during 1 {}: {:.3} W",
@@ -272,24 +231,6 @@ impl From<CPUData> for SensorData {
 impl From<GPUData> for SensorData {
     fn from(data: GPUData) -> Self {
         SensorData::GPU(data)
-    }
-}
-
-impl From<ScreenData> for SensorData {
-    fn from(data: ScreenData) -> Self {
-        SensorData::Screen(data)
-    }
-}
-
-impl From<BatteryData> for SensorData {
-    fn from(data: BatteryData) -> Self {
-        SensorData::Battery(data)
-    }
-}
-
-impl From<PeripheralsData> for SensorData {
-    fn from(data: PeripheralsData) -> Self {
-        SensorData::Peripherals(data)
     }
 }
 

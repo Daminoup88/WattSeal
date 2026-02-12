@@ -2,7 +2,7 @@ use rusqlite::{Row, ToSql};
 
 use crate::{
     database,
-    types::{CPUData, GPUData, ProcessData, SensorData, TotalData},
+    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
 };
 
 pub trait DatabaseEntry {
@@ -29,8 +29,11 @@ impl DatabaseEntry for SensorData {
         match self {
             SensorData::CPU(data) => data.insert_sql(),
             SensorData::GPU(data) => data.insert_sql(),
+            SensorData::Ram(data) => data.insert_sql(),
+            SensorData::Disk(data) => data.insert_sql(),
+            SensorData::Network(data) => data.insert_sql(),
             SensorData::Total(data) => data.insert_sql(),
-            _ => "".to_string(),
+            SensorData::Process(_) => "".to_string(),
         }
     }
 
@@ -38,6 +41,9 @@ impl DatabaseEntry for SensorData {
         match self {
             SensorData::CPU(data) => data.insert_params(timestamp_id),
             SensorData::GPU(data) => data.insert_params(timestamp_id),
+            SensorData::Ram(data) => data.insert_params(timestamp_id),
+            SensorData::Disk(data) => data.insert_params(timestamp_id),
+            SensorData::Network(data) => data.insert_params(timestamp_id),
             SensorData::Total(data) => data.insert_params(timestamp_id),
             _ => vec![],
         }
@@ -132,6 +138,117 @@ impl DatabaseEntry for GPUData {
             total_power_watts: row.get("total_power_watts")?,
             usage_percent: row.get("usage_percent")?,
             vram_usage_percent: row.get("vram_usage_percent")?,
+        })
+    }
+}
+
+impl DatabaseEntry for DiskData {
+    fn generic_name() -> &'static str {
+        "Disk"
+    }
+
+    fn table_name_static() -> &'static str {
+        "disk_data"
+    }
+
+    fn insert_sql(&self) -> String {
+        format!("INSERT INTO {} (timestamp_id, total_power_watts, read_usage_mb_s, write_usage_mb_s) VALUES (?1, ?2, ?3, ?4)", Self::table_name_static()).to_string()
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            timestamp_id,
+            &self.total_power_watts,
+            &self.read_usage_mb_s,
+            &self.write_usage_mb_s,
+        ]
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("total_power_watts", "REAL"),
+            ("read_usage_mb_s", "REAL"),
+            ("write_usage_mb_s", "REAL"),
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(DiskData {
+            total_power_watts: row.get("total_power_watts")?,
+            read_usage_mb_s: row.get("read_usage_mb_s")?,
+            write_usage_mb_s: row.get("write_usage_mb_s")?,
+        })
+    }
+}
+
+impl DatabaseEntry for RamData {
+    fn generic_name() -> &'static str {
+        "RAM"
+    }
+
+    fn table_name_static() -> &'static str {
+        "ram_data"
+    }
+
+    fn insert_sql(&self) -> String {
+        format!(
+            "INSERT INTO {} (timestamp_id, total_power_watts, usage_percent) VALUES (?1, ?2, ?3)",
+            Self::table_name_static()
+        )
+        .to_string()
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![timestamp_id, &self.total_power_watts, &self.usage_percent]
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[("total_power_watts", "REAL"), ("usage_percent", "REAL")]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(RamData {
+            total_power_watts: row.get("total_power_watts")?,
+            usage_percent: row.get("usage_percent")?,
+        })
+    }
+}
+
+impl DatabaseEntry for NetworkData {
+    fn generic_name() -> &'static str {
+        "Network"
+    }
+
+    fn table_name_static() -> &'static str {
+        "network_data"
+    }
+
+    fn insert_sql(&self) -> String {
+        format!("INSERT INTO {} (timestamp_id, total_power_watts, download_speed_mb_s, upload_speed_mb_s) VALUES (?1, ?2, ?3, ?4)", Self::table_name_static()).to_string()
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            timestamp_id,
+            &self.total_power_watts,
+            &self.download_speed_mb_s,
+            &self.upload_speed_mb_s,
+        ]
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("total_power_watts", "REAL"),
+            ("download_speed_mb_s", "REAL"),
+            ("upload_speed_mb_s", "REAL"),
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(NetworkData {
+            total_power_watts: row.get("total_power_watts")?,
+            download_speed_mb_s: row.get("download_speed_mb_s")?,
+            upload_speed_mb_s: row.get("upload_speed_mb_s")?,
         })
     }
 }

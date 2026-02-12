@@ -6,6 +6,8 @@ pub mod sensors;
 
 use core::time;
 use std::{
+    cell::RefCell,
+    rc::Rc,
     thread,
     time::{Duration, Instant, SystemTime},
 };
@@ -16,6 +18,9 @@ use database::Database;
 use display_info::DisplayInfo;
 use process::{estimate_app_power_consumption, groups::group_processes_by_app};
 use sensors::{SensorType, create_event_from_sensors, gpu::get_gpu_list};
+use sysinfo::System;
+
+use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
 pub struct CollectorApp {
     database: Database,
@@ -36,27 +41,14 @@ impl CollectorApp {
     pub fn initialize(&mut self) -> Result<(), String> {
         check_permissions()?;
 
-        // Initialize hardware information
-        // let time = Instant::now();
-        // let hw_info = match HardwareInfo::query() {
-        //     Ok(info) => info,
-        //     Err(e) => return Err(format!("Failed to query hardware information: {}", e)),
-        // };
-        // println!("Time taken to query hardware info: {:?}", time.elapsed());
-        // println!("✓ Hardware information loaded");
-        // println!("{:#?}", hw_info);
+        let system = System::new_all();
 
         println!("\n========== INITIALIZING SYSTEM ==========\n");
-
-        // Initialize display information
-        let display_infos = DisplayInfo::all().unwrap();
-        for display_info in display_infos {
-            println!("display_info {display_info:?}");
-        }
+        let s = Rc::new(RefCell::new(system));
 
         // Initialize CPU sensor
         println!("\nInitializing sensors...");
-        let sensor_cpu = sensors::cpu::get_cpu_power_sensor(0);
+        let sensor_cpu = sensors::cpu::get_cpu_power_sensor(s.clone(), 0);
         match sensor_cpu {
             Ok(sensor) => {
                 println!("✓ CPU Power Sensor initialized successfully");
@@ -85,6 +77,11 @@ impl CollectorApp {
             }
         }
 
+        //Initialize RAM, Disk, Network sensors
+        self.sensors.push(SensorType::RAM(RamSensor::new(s.clone())));
+        self.sensors.push(SensorType::Disk(DiskSensor::new()));
+        self.sensors.push(SensorType::Network(NetworkSensor::new()));
+
         // Add total power sensor
         self.sensors.push(SensorType::Total);
         // Add process sensor
@@ -101,6 +98,9 @@ impl CollectorApp {
     }
 
     pub fn run(&mut self) {
+        println!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+        get_info().expect("Failed to gather hardware information");
+
         println!("\n========== PURGING & AVERAGING OLD DATA ==========");
         // averaging data every hour and purge the database until the last X_hours
         averaging_and_purging_data(&mut self.database, 24, 24)
@@ -147,6 +147,15 @@ impl CollectorApp {
             }
         }
     }
+}
+
+fn get_info() -> Result<(), String> {
+    // Initialize display information
+    let display_infos = DisplayInfo::all().unwrap();
+    for display_info in display_infos {
+        println!("display_info {display_info:?}");
+    }
+    Ok(())
 }
 
 fn check_permissions() -> Result<(), String> {

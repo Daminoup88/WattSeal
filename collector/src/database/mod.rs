@@ -2,9 +2,6 @@ mod tables;
 
 pub use common::{
     DATABASE_PATH, Database, DatabaseEntry, DatabaseTable, Event,
-    types::{
-        BatteryData, CPUData, DiskData, GPUData, NetworkData, PeripheralsData, ProcessData, RamData, ScreenData,
-        SensorData, TotalData,
-    },
+    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
 };
 pub use tables::*;

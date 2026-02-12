@@ -1,4 +1,3 @@
-use sysinfo::System;
 use windows::{Win32::Graphics::Dxgi::*, core::PCWSTR};
 
 use super::{Sensor, SensorError, SensorType};

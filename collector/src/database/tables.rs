@@ -2,14 +2,17 @@ use std::time;
 
 use common::{DatabaseTable, ProcessData};
 
-use super::{CPUData, DatabaseEntry, GPUData, TotalData};
-use crate::sensors::{CPUSensor, GPUSensor, SensorType};
+use super::{CPUData, DatabaseEntry, DiskData, GPUData, NetworkData, RamData, SensorData, TotalData};
+use crate::sensors::{CPUSensor, DiskSensor, GPUSensor, NetworkSensor, RamSensor, SensorType};
 
 impl DatabaseTable for SensorType {
     fn table_name(&self) -> &'static str {
         match self {
             SensorType::CPU(s) => s.table_name(),
             SensorType::GPU(s) => s.table_name(),
+            SensorType::RAM(s) => s.table_name(),
+            SensorType::Disk(s) => s.table_name(),
+            SensorType::Network(s) => s.table_name(),
             SensorType::Total => TotalData::table_name_static(),
             SensorType::Process => "process_data",
         }
@@ -19,6 +22,9 @@ impl DatabaseTable for SensorType {
         match self {
             SensorType::CPU(s) => s.columns(),
             SensorType::GPU(s) => s.columns(),
+            SensorType::RAM(s) => s.columns(),
+            SensorType::Disk(s) => s.columns(),
+            SensorType::Network(s) => s.columns(),
             SensorType::Total => {
                 let mut cols = timestamp_columns();
                 for (name, type_) in TotalData::columns_static() {
@@ -73,56 +79,41 @@ impl DatabaseTable for GPUSensor {
     }
 }
 
-// impl DatabaseTable for ScreenSensor {
-//     fn table_name(&self) -> &'static str {
-//         "screen_data"
-//     }
+impl DatabaseTable for RamSensor {
+    fn table_name(&self) -> &'static str {
+        "ram_data"
+    }
+    fn columns(&self) -> Vec<String> {
+        let mut cols = timestamp_columns();
+        for (name, type_) in RamData::columns_static() {
+            cols.push(format!("{} {}", name, type_));
+        }
+        cols
+    }
+}
 
-//     fn columns(&self) -> &'static [&'static str] {
-//         &[
-//             "id                    INTEGER PRIMARY KEY",
-//             "timestamp_id          INTEGER REFERENCES timestamp(id)",
-//             "resolution_width      INTEGER NOT NULL",
-//             "resolution_height     INTEGER NOT NULL",
-//             "refresh_rate_hz       INTEGER NOT NULL",
-//             "technology            TEXT NOT NULL",
-//             "luminosity_nits       INTEGER NOT NULL",
-//         ]
-//     }
-// }
+impl DatabaseTable for DiskSensor {
+    fn table_name(&self) -> &'static str {
+        "disk_data"
+    }
+    fn columns(&self) -> Vec<String> {
+        let mut cols = timestamp_columns();
+        for (name, type_) in DiskData::columns_static() {
+            cols.push(format!("{} {}", name, type_));
+        }
+        cols
+    }
+}
 
-// impl DatabaseTable for BatterySensor {
-//     fn table_name(&self) -> &'static str {
-//         "battery_data"
-//     }
-
-//     fn columns(&self) -> &'static [&'static str] {
-//         &[
-//             "id                    INTEGER PRIMARY KEY",
-//             "timestamp_id          INTEGER REFERENCES timestamp(id)",
-//             "manufacturer          TEXT NOT NULL",
-//             "model                 TEXT NOT NULL",
-//             "serial_number         TEXT NOT NULL",
-//             "design_capacity_mwh   INTEGER NOT NULL",
-//             "full_charge_capacity_mwh INTEGER NOT NULL",
-//             "cycle_count           INTEGER NOT NULL",
-//         ]
-//     }
-// }
-
-// impl DatabaseTable for PeripheralsSensor {
-//     fn table_name(&self) -> &'static str {
-//         "peripherals_data"
-//     }
-
-//     fn columns(&self) -> &'static [&'static str] {
-//         &[
-//             "id                    INTEGER PRIMARY KEY",
-//             "timestamp_id          INTEGER REFERENCES timestamp(id)",
-//             "device_name           TEXT NOT NULL",
-//             "device_type           TEXT NOT NULL",
-//             "manufacturer          TEXT NOT NULL",
-//             "is_connected          INTEGER NOT NULL",
-//         ]
-//     }
-// }
+impl DatabaseTable for NetworkSensor {
+    fn table_name(&self) -> &'static str {
+        "network_data"
+    }
+    fn columns(&self) -> Vec<String> {
+        let mut cols = timestamp_columns();
+        for (name, type_) in NetworkData::columns_static() {
+            cols.push(format!("{} {}", name, type_));
+        }
+        cols
+    }
+}

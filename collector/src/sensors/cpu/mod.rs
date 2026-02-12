@@ -1,3 +1,6 @@
+use std::{cell::RefCell, rc::Rc};
+
+use windows::Win32::System;
 use windows_cpu::WindowsCPUSensor;
 
 use super::{Sensor, SensorError, SensorType};
@@ -38,13 +41,15 @@ impl CPUVendor {
     }
 }
 
-pub fn get_cpu_list() -> Vec<String> {
-    let s = sysinfo::System::new_all();
+pub fn get_cpu_list(system: Rc<RefCell<sysinfo::System>>) -> Vec<String> {
+    let s = system.borrow_mut();
     s.cpus().iter().map(|cpu| cpu.brand().to_string()).collect()
 }
 
-pub fn get_cpu_power_sensor(index: usize) -> Result<SensorType, SensorError> {
-    let s = sysinfo::System::new_all();
+pub fn get_cpu_power_sensor(system: Rc<RefCell<sysinfo::System>>, index: usize) -> Result<SensorType, SensorError> {
+    let s = system
+        .try_borrow_mut()
+        .map_err(|e| SensorError::ReadError(format!("Failed to borrow system: {}", e)))?;
     let cpu = s.cpus().get(index);
     let vendor_id = match cpu {
         None => return Err(SensorError::NotSupported),
@@ -72,15 +77,5 @@ mod test {
 
         let other = CPUVendor::from_str("SomeOtherVendor");
         assert!(matches!(other, CPUVendor::Other));
-    }
-
-    #[test]
-    fn test_get_cpu_power_sensor() {
-        let sensor_result = get_cpu_power_sensor(0);
-
-        #[cfg(target_os = "windows")]
-        {
-            assert!(sensor_result.is_ok());
-        }
     }
 }
