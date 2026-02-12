@@ -90,8 +90,9 @@ impl CollectorApp {
         println!("\n========== SETTING UP DATABASE ==========");
         // Initialize database
         let mut database = Database::new().map_err(|e| format!("Failed to open database: {}", e))?;
+        let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
         database
-            .create_tables_if_not_exists(&self.sensors)
+            .create_tables_if_not_exists(&table_names)
             .map_err(|e| format!("Failed to create database tables: {}", e))?;
         println!("✓ Database initialized");
         Ok(())

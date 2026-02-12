@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, time::SystemTime};
+use std::{fmt::Display, time::SystemTime};
 
 use crate::DatabaseEntry;
 
@@ -92,18 +92,6 @@ pub struct TotalData {
 }
 
 impl SensorData {
-    pub fn get_matching_sensor_data(table_name: &str) -> Option<SensorData> {
-        match table_name {
-            s if s == CPUData::table_name_static() => Some(SensorData::CPU(CPUData::default())),
-            s if s == GPUData::table_name_static() => Some(SensorData::GPU(GPUData::default())),
-            s if s == RamData::table_name_static() => Some(SensorData::Ram(RamData::default())),
-            s if s == DiskData::table_name_static() => Some(SensorData::Disk(DiskData::default())),
-            s if s == NetworkData::table_name_static() => Some(SensorData::Network(NetworkData::default())),
-            s if s == TotalData::table_name_static() => Some(SensorData::Total(TotalData::default())),
-            _ => None,
-        }
-    }
-
     pub fn sensor_type(&self) -> &'static str {
         match self {
             SensorData::CPU(_) => "CPU",

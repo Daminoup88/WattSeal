@@ -1,60 +1,50 @@
 use rusqlite::{Row, ToSql};
 
-use crate::{
-    database,
-    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
-};
+use crate::types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, TotalData};
 
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;
     fn table_name_static() -> &'static str;
-    fn insert_sql(&self) -> String;
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql>;
     fn columns_static() -> &'static [(&'static str, &'static str)];
     fn from_row(row: &Row) -> rusqlite::Result<Self>
     where
         Self: Sized;
-}
 
-impl DatabaseEntry for SensorData {
-    fn generic_name() -> &'static str {
-        "Sensor"
+    fn insert_sql() -> String {
+        let cols = Self::columns_static();
+        let col_names: Vec<&str> = cols.iter().map(|(name, _)| *name).collect();
+        let all_cols = format!("timestamp_id, {}", col_names.join(", "));
+        let params: Vec<String> = (1..=cols.len() + 1).map(|i| format!("?{}", i)).collect();
+        format!(
+            "INSERT INTO {} ({}) VALUES ({})",
+            Self::table_name_static(),
+            all_cols,
+            params.join(", ")
+        )
     }
 
-    fn table_name_static() -> &'static str {
-        "sensor_data"
-    }
-
-    fn insert_sql(&self) -> String {
-        match self {
-            SensorData::CPU(data) => data.insert_sql(),
-            SensorData::GPU(data) => data.insert_sql(),
-            SensorData::Ram(data) => data.insert_sql(),
-            SensorData::Disk(data) => data.insert_sql(),
-            SensorData::Network(data) => data.insert_sql(),
-            SensorData::Total(data) => data.insert_sql(),
-            SensorData::Process(_) => "".to_string(),
+    fn create_table_sql() -> String {
+        let mut col_defs = vec![
+            "id INTEGER PRIMARY KEY".to_string(),
+            "timestamp_id INTEGER NOT NULL REFERENCES timestamp(id) ON DELETE CASCADE".to_string(),
+        ];
+        for (name, type_) in Self::columns_static() {
+            col_defs.push(format!("{} {}", name, type_));
         }
+        format!(
+            "CREATE TABLE IF NOT EXISTS {} ({})",
+            Self::table_name_static(),
+            col_defs.join(", ")
+        )
     }
 
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        match self {
-            SensorData::CPU(data) => data.insert_params(timestamp_id),
-            SensorData::GPU(data) => data.insert_params(timestamp_id),
-            SensorData::Ram(data) => data.insert_params(timestamp_id),
-            SensorData::Disk(data) => data.insert_params(timestamp_id),
-            SensorData::Network(data) => data.insert_params(timestamp_id),
-            SensorData::Total(data) => data.insert_params(timestamp_id),
-            _ => vec![],
-        }
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[]
-    }
-
-    fn from_row(_row: &Row) -> rusqlite::Result<Self> {
-        Err(rusqlite::Error::InvalidQuery)
+    fn avg_columns_sql(prefix: &str) -> String {
+        Self::columns_static()
+            .iter()
+            .map(|(col_name, _)| format!("AVG({}{}) AS {}", prefix, col_name, col_name))
+            .collect::<Vec<String>>()
+            .join(", ")
     }
 }
 
@@ -65,10 +55,6 @@ impl DatabaseEntry for CPUData {
 
     fn table_name_static() -> &'static str {
         "cpu_data"
-    }
-
-    fn insert_sql(&self) -> String {
-        format!("INSERT INTO {} (timestamp_id, total_power_watts, pp0_power_watts, pp1_power_watts, dram_power_watts, usage_percent) VALUES (?1, ?2, ?3, ?4, ?5, ?6)", Self::table_name_static()).to_string()
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
@@ -112,10 +98,6 @@ impl DatabaseEntry for GPUData {
         "gpu_data"
     }
 
-    fn insert_sql(&self) -> String {
-        format!("INSERT INTO {} (timestamp_id, total_power_watts, usage_percent, vram_usage_percent) VALUES (?1, ?2, ?3, ?4)", Self::table_name_static()).to_string()
-    }
-
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
             timestamp_id,
@@ -149,10 +131,6 @@ impl DatabaseEntry for DiskData {
 
     fn table_name_static() -> &'static str {
         "disk_data"
-    }
-
-    fn insert_sql(&self) -> String {
-        format!("INSERT INTO {} (timestamp_id, total_power_watts, read_usage_mb_s, write_usage_mb_s) VALUES (?1, ?2, ?3, ?4)", Self::table_name_static()).to_string()
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
@@ -190,14 +168,6 @@ impl DatabaseEntry for RamData {
         "ram_data"
     }
 
-    fn insert_sql(&self) -> String {
-        format!(
-            "INSERT INTO {} (timestamp_id, total_power_watts, usage_percent) VALUES (?1, ?2, ?3)",
-            Self::table_name_static()
-        )
-        .to_string()
-    }
-
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![timestamp_id, &self.total_power_watts, &self.usage_percent]
     }
@@ -221,10 +191,6 @@ impl DatabaseEntry for NetworkData {
 
     fn table_name_static() -> &'static str {
         "network_data"
-    }
-
-    fn insert_sql(&self) -> String {
-        format!("INSERT INTO {} (timestamp_id, total_power_watts, download_speed_mb_s, upload_speed_mb_s) VALUES (?1, ?2, ?3, ?4)", Self::table_name_static()).to_string()
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
@@ -262,14 +228,6 @@ impl DatabaseEntry for TotalData {
         "total_data"
     }
 
-    fn insert_sql(&self) -> String {
-        format!(
-            "INSERT INTO {} (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2, ?3)",
-            Self::table_name_static()
-        )
-        .to_string()
-    }
-
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![timestamp_id, &self.total_power_watts, &self.period_type]
     }
@@ -293,10 +251,6 @@ impl DatabaseEntry for ProcessData {
 
     fn table_name_static() -> &'static str {
         "process_data"
-    }
-
-    fn insert_sql(&self) -> String {
-        format!("INSERT INTO {} (timestamp_id, app_name, vram_usage, cpu_usage_watts, subprocess_count) VALUES (?1, ?2, ?3, ?4, ?5)", Self::table_name_static()).to_string()
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {

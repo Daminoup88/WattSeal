@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common::{CPUData, DatabaseEntry, SensorData, TotalData};
+use common::{DatabaseEntry, TotalData, generic_name_for_table};
 use iced::{
     Alignment, Element, Length, Padding, Task,
     alignment::{Horizontal, Vertical},
@@ -31,8 +31,8 @@ impl<'a> DashboardPage<'a> {
         let components = components
             .into_iter()
             .map(|table_name| {
-                let sensor_type = SensorData::get_matching_sensor_data(table_name.as_str())
-                    .map(|data| data.sensor_type().to_string())
+                let sensor_type = generic_name_for_table(table_name.as_str())
+                    .map(|s| s.to_string())
                     .unwrap_or(table_name.clone());
                 (table_name.clone(), ComponentState::new(table_name, sensor_type, theme))
             })

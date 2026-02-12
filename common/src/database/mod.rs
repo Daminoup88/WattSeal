@@ -2,11 +2,7 @@ pub mod entries;
 pub mod purge;
 
 use core::time;
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::format,
-    time::SystemTime,
-};
+use std::{collections::HashMap, time::SystemTime};
 
 pub use entries::DatabaseEntry;
 pub use purge::averaging_and_purging_data;
@@ -16,8 +12,26 @@ use crate::types::{CPUData, DiskData, Event, GPUData, NetworkData, ProcessData, 
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 
+macro_rules! dispatch_entry {
+    ($table_name:expr, $method:ident ( $($arg:expr),* )) => {{
+        if $table_name == CPUData::table_name_static() { Some(CPUData::$method($($arg),*)) }
+        else if $table_name == GPUData::table_name_static() { Some(GPUData::$method($($arg),*)) }
+        else if $table_name == RamData::table_name_static() { Some(RamData::$method($($arg),*)) }
+        else if $table_name == DiskData::table_name_static() { Some(DiskData::$method($($arg),*)) }
+        else if $table_name == NetworkData::table_name_static() { Some(NetworkData::$method($($arg),*)) }
+        else if $table_name == TotalData::table_name_static() { Some(TotalData::$method($($arg),*)) }
+        else if $table_name == ProcessData::table_name_static() { Some(ProcessData::$method($($arg),*)) }
+        else { None }
+    }};
+}
+
+/// Returns the display name for a given table name (e.g. "cpu_data" -> "CPU").
+pub fn generic_name_for_table(table_name: &str) -> Option<&'static str> {
+    dispatch_entry!(table_name, generic_name())
+}
+
 pub struct Database {
-    conn: Connection,
+    pub(crate) conn: Connection,
     tables: Option<Vec<String>>,
 }
 
@@ -45,15 +59,8 @@ impl From<std::time::SystemTimeError> for DatabaseError {
 
 impl From<rusqlite::Error> for DatabaseError {
     fn from(err: rusqlite::Error) -> Self {
-        match err {
-            _ => DatabaseError::QueryError(err.to_string()),
-        }
+        DatabaseError::QueryError(err.to_string())
     }
-}
-
-pub trait DatabaseTable {
-    fn table_name(&self) -> &'static str;
-    fn columns(&self) -> Vec<String>;
 }
 
 impl Database {
@@ -72,7 +79,7 @@ impl Database {
         Ok(Database { conn, tables })
     }
 
-    pub fn create_tables_if_not_exists(&mut self, tables: &Vec<impl DatabaseTable>) -> Result<(), DatabaseError> {
+    pub fn create_tables_if_not_exists(&mut self, table_names: &[&str]) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "CREATE TABLE IF NOT EXISTS timestamp (
@@ -91,22 +98,22 @@ impl Database {
             [],
         )?;
 
-        let mut table_names = self.tables.clone().unwrap_or_default();
+        let mut current_tables = self.tables.clone().unwrap_or_default();
         let mut has_changed = false;
-        for table in tables {
-            let name = table.table_name();
-            if !table_names.contains(&name.to_string()) {
-                let create_table_sql = format!("CREATE TABLE IF NOT EXISTS {} ({});", name, table.columns().join(", "));
-                tx.execute(&create_table_sql, [])?;
-                table_names.push(name.to_string());
-                has_changed = true;
+        for &name in table_names {
+            if !current_tables.contains(&name.to_string()) {
+                if let Some(create_sql) = dispatch_entry!(name, create_table_sql()) {
+                    tx.execute(&create_sql, [])?;
+                    current_tables.push(name.to_string());
+                    has_changed = true;
+                }
             }
         }
         if !has_changed {
             return Ok(());
         }
-        Self::insert_hardware_info(&tx, SystemTime::now(), &table_names.join(","))?;
-        self.tables = Some(table_names);
+        Self::insert_hardware_info(&tx, SystemTime::now(), &current_tables.join(","))?;
+        self.tables = Some(current_tables);
         tx.commit()?;
         Ok(())
     }
@@ -140,21 +147,33 @@ impl Database {
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            if sensor_data.sensor_type() == "Processes" {
-                if let SensorData::Process(process_data) = sensor_data {
-                    for process in process_data {
-                        let insert_sql = process.insert_sql();
-                        let params = process.insert_params(&timestamp_id);
-                        tx.execute(&insert_sql, params.as_slice())?;
-                    }
-                }
-            } else {
-                let insert_sql = sensor_data.insert_sql();
-                let params = sensor_data.insert_params(&timestamp_id);
-                tx.execute(&insert_sql, params.as_slice())?;
-            }
+            Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
         }
         tx.commit()?;
+        Ok(())
+    }
+
+    fn insert_sensor_data(tx: &Transaction, timestamp_id: &i64, sensor_data: &SensorData) -> Result<(), DatabaseError> {
+        match sensor_data {
+            SensorData::CPU(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::GPU(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::Ram(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::Disk(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::Network(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::Total(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::Process(processes) => {
+                for process in processes {
+                    Self::insert_entry(tx, timestamp_id, process)?;
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn insert_entry<T: DatabaseEntry>(tx: &Transaction, timestamp_id: &i64, entry: &T) -> Result<(), DatabaseError> {
+        let sql = T::insert_sql();
+        let params = entry.insert_params(timestamp_id);
+        tx.execute(&sql, params.as_slice())?;
         Ok(())
     }
 
@@ -182,22 +201,20 @@ impl Database {
         Ok(records)
     }
 
-    // pub fn select_last_n_seconds_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {}
-
     pub fn select_last_n_seconds_average(
         &mut self,
         n: i64,
         table_name: &str,
         window_seconds: i64,
     ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+        let avg_cols = get_avg_columns(table_name, "d.");
         let query = format!(
             "SELECT t.timestamp, {} FROM timestamp t \
              JOIN {} d ON t.id = d.timestamp_id \
              WHERE t.timestamp >= ?1 \
              GROUP BY (t.timestamp / (?2 * 1000)) \
              ORDER BY t.timestamp ASC",
-            get_avg_columns(table_name, "d."),
-            table_name
+            avg_cols, table_name
         );
         let start_time_millis = (SystemTime::now() - time::Duration::from_secs(n as u64))
             .duration_since(SystemTime::UNIX_EPOCH)?
@@ -211,13 +228,6 @@ impl Database {
         }
         Ok(records)
     }
-
-    // pub fn select_last_n_in_table(
-    //     &mut self,
-    //     n: i64,
-    //     table_name: &str,
-    // ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
-    // }
 
     pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
         let mut records = Vec::<(SystemTime, SensorData)>::new();
@@ -276,14 +286,14 @@ impl Database {
             self.query_sensor_table::<CPUData, P>(query, params)
         } else if table_name == GPUData::table_name_static() {
             self.query_sensor_table::<GPUData, P>(query, params)
-        } else if table_name == TotalData::table_name_static() {
-            self.query_sensor_table::<TotalData, P>(query, params)
-        } else if table_name == DiskData::table_name_static() {
-            self.query_sensor_table::<DiskData, P>(query, params)
         } else if table_name == RamData::table_name_static() {
             self.query_sensor_table::<RamData, P>(query, params)
+        } else if table_name == DiskData::table_name_static() {
+            self.query_sensor_table::<DiskData, P>(query, params)
         } else if table_name == NetworkData::table_name_static() {
             self.query_sensor_table::<NetworkData, P>(query, params)
+        } else if table_name == TotalData::table_name_static() {
+            self.query_sensor_table::<TotalData, P>(query, params)
         } else if table_name == ProcessData::table_name_static() {
             self.query_sensor_table::<ProcessData, P>(query, params)
         } else {
@@ -308,22 +318,5 @@ impl Database {
 }
 
 fn get_avg_columns(table_name: &str, prefix: &str) -> String {
-    match table_name {
-        s if s == CPUData::table_name_static() => CPUData::columns_static()
-            .iter()
-            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
-            .collect::<Vec<String>>()
-            .join(", "),
-        s if s == GPUData::table_name_static() => GPUData::columns_static()
-            .iter()
-            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
-            .collect::<Vec<String>>()
-            .join(", "),
-        s if s == TotalData::table_name_static() => TotalData::columns_static()
-            .iter()
-            .map(|(col_name, _)| format!("AVG({}{}{}) AS {}", prefix, col_name, "", col_name))
-            .collect::<Vec<String>>()
-            .join(", "),
-        _ => "".to_string(),
-    }
+    dispatch_entry!(table_name, avg_columns_sql(prefix)).unwrap_or_default()
 }
