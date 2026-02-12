@@ -121,7 +121,10 @@ impl SensorData {
             SensorData::CPU(_) => CPUData::table_name_static(),
             SensorData::GPU(_) => GPUData::table_name_static(),
             SensorData::Total(_) => TotalData::table_name_static(),
-            _ => "",
+            SensorData::Ram(_) => RamData::table_name_static(),
+            SensorData::Disk(_) => DiskData::table_name_static(),
+            SensorData::Network(_) => NetworkData::table_name_static(),
+            SensorData::Process(_) => ProcessData::table_name_static(),
         }
     }
 
@@ -133,7 +136,7 @@ impl SensorData {
             SensorData::Disk(data) => data.total_power_watts,
             SensorData::Network(data) => data.total_power_watts,
             SensorData::Total(power) => Some(power.total_power_watts),
-            _ => None,
+            SensorData::Process(_) => None,
         }
     }
 
@@ -237,5 +240,27 @@ impl From<GPUData> for SensorData {
 impl From<TotalData> for SensorData {
     fn from(data: TotalData) -> Self {
         SensorData::Total(data)
+    }
+}
+
+impl From<RamData> for SensorData {
+    fn from(data: RamData) -> Self {
+        SensorData::Ram(data)
+    }
+}
+impl From<DiskData> for SensorData {
+    fn from(data: DiskData) -> Self {
+        SensorData::Disk(data)
+    }
+}
+impl From<NetworkData> for SensorData {
+    fn from(data: NetworkData) -> Self {
+        SensorData::Network(data)
+    }
+}
+
+impl From<ProcessData> for SensorData {
+    fn from(data: ProcessData) -> Self {
+        SensorData::Process(vec![data])
     }
 }

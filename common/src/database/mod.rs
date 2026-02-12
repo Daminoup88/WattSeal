@@ -199,7 +199,6 @@ impl Database {
             get_avg_columns(table_name, "d."),
             table_name
         );
-        println!("Executing query: {}", query);
         let start_time_millis = (SystemTime::now() - time::Duration::from_secs(n as u64))
             .duration_since(SystemTime::UNIX_EPOCH)?
             .as_millis() as i64;
@@ -279,6 +278,14 @@ impl Database {
             self.query_sensor_table::<GPUData, P>(query, params)
         } else if table_name == TotalData::table_name_static() {
             self.query_sensor_table::<TotalData, P>(query, params)
+        } else if table_name == DiskData::table_name_static() {
+            self.query_sensor_table::<DiskData, P>(query, params)
+        } else if table_name == RamData::table_name_static() {
+            self.query_sensor_table::<RamData, P>(query, params)
+        } else if table_name == NetworkData::table_name_static() {
+            self.query_sensor_table::<NetworkData, P>(query, params)
+        } else if table_name == ProcessData::table_name_static() {
+            self.query_sensor_table::<ProcessData, P>(query, params)
         } else {
             Ok(Vec::new())
         }
