@@ -267,7 +267,8 @@ impl<'a> ComponentState<'a> {
             Some(self.time_range.clone()),
             |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
         )
-        .class(PickListStyle::TimeRange);
+        .class(PickListStyle::TimeRange)
+        .menu_class(PickListStyle::TimeRange);
 
         let power_style = if power.is_some() {
             TextStyle::Primary
@@ -316,7 +317,8 @@ impl<'a> ComponentState<'a> {
                 let metric_selector = pick_list(metrics, Some(self.metric_type), |metric| {
                     Message::ChangeChartMetricType(self.table_name.clone(), metric)
                 })
-                .class(PickListStyle::TimeRange);
+                .class(PickListStyle::TimeRange)
+                .menu_class(PickListStyle::TimeRange);
                 second_row_right = second_row_right.push(metric_selector);
             }
         }

@@ -1,3 +1,4 @@
+use core::time;
 use std::time::SystemTime;
 
 use chrono::{DateTime, Local};
@@ -58,10 +59,6 @@ impl<'a> App<'a> {
                 let data = self.load_latest_data(1);
                 self.dashboard_page.update(Message::UpdateChartData(data))
             }
-            Message::LoadChartEvents(n) => {
-                let data = self.load_latest_data(n);
-                self.dashboard_page.update(Message::UpdateChartData(data))
-            }
             Message::NavigateTo(page) => {
                 self.current_page = page;
                 self.header.change_page(page);
@@ -76,11 +73,22 @@ impl<'a> App<'a> {
                 let data = self.load_history(&table_name, time_range);
                 self.dashboard_page.update(Message::ReplaceChartData(table_name, data))
             }
+            Message::FetchAllChartsData(time_range) => {
+                let data = self.load_all_charts_history(time_range);
+                self.dashboard_page.update(Message::UpdateChartData(data))
+            }
             msg @ (Message::ChangeChartMetricType(..) | Message::ChangeChartTimeRange(..)) => {
                 self.dashboard_page.update(msg)
             }
             _ => Task::none(),
         }
+    }
+
+    fn load_all_charts_history(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+        normalize_integrated_cpu(from_db(
+            self.database
+                .select_all_data_in_time_range(time_range.start_time().into(), time_range.end_time().into()),
+        ))
     }
 
     fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
@@ -92,8 +100,8 @@ impl<'a> App<'a> {
         let result = match time_range {
             TimeRange::LastMinute => self.database.select_data_in_time_range(
                 table_name,
-                (Local::now() - time_range.duration_seconds()).into(),
-                Local::now().into(),
+                time_range.start_time().into(),
+                time_range.end_time().into(),
             ),
             _ => {
                 let window = time_range.granularity_seconds();

@@ -20,6 +20,7 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
+    types::TimeRange,
 };
 
 pub struct DashboardPage<'a> {
@@ -37,7 +38,10 @@ impl<'a> DashboardPage<'a> {
                 (table_name.clone(), ComponentState::new(table_name, sensor_type, theme))
             })
             .collect();
-        (Self { components }, Task::none())
+        (
+            Self { components },
+            Task::done(Message::FetchAllChartsData(TimeRange::default())),
+        )
     }
 
     pub fn update_theme(&mut self, theme: AppTheme) {

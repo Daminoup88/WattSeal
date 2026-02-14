@@ -30,6 +30,7 @@ use crate::{message::Message, themes::AppTheme};
 
 const PLOT_SECONDS: usize = 60;
 const SNAP_DISTANCE_PX: f32 = 30.0;
+const Y_LABELS_COUNT: usize = 5;
 const VALUE_MIN: f32 = 0.0;
 const VALUE_MAX: f32 = 100.0;
 const X_LABEL_AREA_SIZE: f32 = 15.0;
@@ -130,7 +131,8 @@ impl TooltipContent {
     }
 
     fn value_text(&self) -> String {
-        format!("{:.1}{}", self.value, self.unit)
+        let decimals = if self.value < 1.0 { 2 } else { 1 };
+        format!("{:.*}{}", decimals, self.value, self.unit)
     }
 
     fn timestamp_text(&self) -> String {
@@ -225,6 +227,7 @@ pub struct SensorChart<'a> {
     hovered: RefCell<Option<TooltipData>>,
     x_range: Duration,
     y_range: Range,
+    y_label_area_size: f32,
     x_axis_label: &'a str,
     y_axis_label: &'a str,
     x_unit: &'a str,
@@ -311,6 +314,7 @@ impl<'a> SensorChart<'a> {
             hovered: RefCell::default(),
             x_range: Duration::seconds(PLOT_SECONDS as i64),
             y_range: (VALUE_MIN, VALUE_MAX),
+            y_label_area_size: Y_LABEL_AREA_SIZE,
             dynamic_range: true,
             style: theme.into(),
             x_axis_label: "Time",
@@ -363,6 +367,8 @@ impl<'a> SensorChart<'a> {
     pub fn set_y_axis_label_and_unit(&mut self, label: &'a str, unit: &'a str) {
         self.y_axis_label = label;
         self.y_unit = unit;
+        self.recalculate_y_label_area_size();
+        self.cache.borrow_mut().clear();
     }
 
     pub fn newest_time(&self) -> Option<DateTime<Local>> {
@@ -388,6 +394,25 @@ impl<'a> SensorChart<'a> {
         self.cache.borrow_mut().clear();
     }
 
+    fn recalculate_y_label_area_size(&mut self) {
+        let mut longest_label_length = 0;
+
+        let (min, max) = self.y_range;
+        for i in 0..Y_LABELS_COUNT {
+            let t = i as f32 / (Y_LABELS_COUNT - 1) as f32;
+            let value = min + t * (max - min);
+            let s = self.format_y_label(value);
+            longest_label_length = longest_label_length.max(s.chars().count());
+        }
+
+        if longest_label_length <= 4 {
+            self.y_label_area_size = Y_LABEL_AREA_SIZE;
+            return;
+        }
+        let extra_per_char = 8;
+        self.y_label_area_size = Y_LABEL_AREA_SIZE + ((longest_label_length - 4) * extra_per_char) as f32;
+    }
+
     fn recalculate_range(&mut self) {
         let mut max = f32::MIN;
         for series in self.data.values() {
@@ -403,6 +428,11 @@ impl<'a> SensorChart<'a> {
         if max >= 0.0 {
             self.y_range = (0.0, max);
         }
+
+        if self.y_range.1 == self.y_range.0 {
+            self.y_range = (VALUE_MIN, VALUE_MAX)
+        }
+        self.recalculate_y_label_area_size();
     }
 
     pub fn view(&self, height: f32) -> Element<'_, Message, AppTheme> {
@@ -442,6 +472,11 @@ impl<'a> SensorChart<'a> {
         }
     }
 
+    fn format_y_label(&self, y: f32) -> String {
+        let decimals = if y < 1.0 && y.fract() > 0.0 { 2 } else { 0 };
+        format!("{:.*}{}", decimals, y, self.y_unit)
+    }
+
     fn build_chart_2d<DB: DrawingBackend>(&self, mut builder: ChartBuilder<DB>) {
         use plotters::prelude::*;
 
@@ -453,7 +488,7 @@ impl<'a> SensorChart<'a> {
 
         let mut chart = builder
             .x_label_area_size(X_LABEL_AREA_SIZE)
-            .y_label_area_size(Y_LABEL_AREA_SIZE)
+            .y_label_area_size(self.y_label_area_size)
             .margin(CHART_MARGIN)
             .margin_left(CHART_MARGIN_LEFT)
             .margin_right(CHART_MARGIN_RIGHT)
@@ -462,12 +497,13 @@ impl<'a> SensorChart<'a> {
 
         chart
             .configure_mesh()
+            .max_light_lines(1)
             .bold_line_style(style.grid_bold)
             .light_line_style(style.grid_light)
             .axis_style(ShapeStyle::from(style.axis).stroke_width(1))
-            .y_labels(5)
+            .y_labels(Y_LABELS_COUNT)
             .y_label_style(label_style.clone())
-            .y_label_formatter(&|y: &f32| format!("{}{}", y, self.y_unit))
+            .y_label_formatter(&|y| self.format_y_label(*y))
             .x_label_style(label_style.clone())
             .x_labels(if x_seconds <= 120 { x_seconds as usize } else { 7 })
             .x_label_formatter(&|x: &DateTime<Local>| self.format_x_label(x, x_seconds, &newest_time))
@@ -634,7 +670,7 @@ impl<'a> SensorChart<'a> {
 
     fn hovered_point_at(&self, cursor: Point, bounds: Size, snap_distance: f32) -> Option<TooltipData> {
         let chart_bounds = Size::new(
-            bounds.width - Y_LABEL_AREA_SIZE - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT,
+            bounds.width - self.y_label_area_size - CHART_MARGIN_LEFT - CHART_MARGIN_RIGHT,
             bounds.height - X_LABEL_AREA_SIZE - 2.0 * CHART_MARGIN,
         );
 
@@ -643,7 +679,7 @@ impl<'a> SensorChart<'a> {
         }
 
         let chart_cursor = Point::new(
-            cursor.x - Y_LABEL_AREA_SIZE - CHART_MARGIN_LEFT,
+            cursor.x - self.y_label_area_size - CHART_MARGIN_LEFT,
             cursor.y - CHART_MARGIN,
         );
 

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use chrono::Duration;
+use chrono::{DateTime, Duration, Local};
 
 #[derive(Default, Clone, PartialEq, Debug)]
 pub enum TimeRange {
@@ -32,7 +32,15 @@ impl TimeRange {
     }
 
     pub fn duration_seconds(&self) -> Duration {
-        chrono::Duration::seconds(self.clone() as i64)
+        Duration::seconds(self.clone() as i64)
+    }
+
+    pub fn start_time(&self) -> DateTime<Local> {
+        Local::now() - self.duration_seconds()
+    }
+
+    pub fn end_time(&self) -> DateTime<Local> {
+        Local::now()
     }
 }
 
