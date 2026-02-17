@@ -1,6 +1,9 @@
 use rusqlite::{Row, ToSql};
 
-use crate::types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+use crate::{
+    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
+    utils::load_icon_and_name,
+};
 
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;
@@ -288,7 +291,7 @@ impl DatabaseEntry for ProcessData {
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(ProcessData {
+        let proc = ProcessData {
             app_name: row.get("app_name")?,
             process_exe_path: row.get("process_exe_path")?,
             process_usage_watt: row.get("process_usage_watt")?,
@@ -297,8 +300,20 @@ impl DatabaseEntry for ProcessData {
             read_bytes_per_sec: row.get("read_bytes_per_sec")?,
             written_bytes_per_sec: row.get("written_bytes_per_sec")?,
             subprocess_count: row.get("subprocess_count")?,
+            icon: None,
+        };
+        let (icon, friendly_name) = if let Some(exe_path) = &proc.process_exe_path {
+            load_icon_and_name(exe_path)
+        } else {
+            (None, None)
+        };
+        Ok(ProcessData {
+            icon,
+            app_name: friendly_name.unwrap_or(proc.app_name),
+            ..proc
         })
     }
+
     fn zero() -> SensorData {
         SensorData::Process(Vec::new())
     }

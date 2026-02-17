@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 chrono = "0.4.43"
 rusqlite = { version = "0.38.0", features = ["bundled", "chrono"] }
+
+[target."cfg(windows)".dependencies]
+pelite = "0.10.0"

@@ -1,11 +1,11 @@
-use std::{collections::HashMap, time::SystemTime};
+use std::{collections::HashMap, os::windows::process, time::SystemTime};
 
 use chrono::{DateTime, Local};
-use common::{Database, DatabaseError, GPUData, SensorData, generic_name_for_table};
+use common::{Database, DatabaseError, GPUData, ProcessData, SensorData, generic_name_for_table};
 use iced::{
     Element, Subscription, Task,
     time::{Duration, every},
-    widget::{Column, Container, pick_list},
+    widget::{Column, Container, canvas::path, pick_list},
 };
 
 use crate::{

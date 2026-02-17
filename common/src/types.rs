@@ -76,6 +76,7 @@ pub struct ProcessData {
     pub read_bytes_per_sec: f64,
     pub written_bytes_per_sec: f64,
     pub subprocess_count: u32,
+    pub icon: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]
@@ -436,6 +437,7 @@ impl Default for ProcessData {
             read_bytes_per_sec: 0.0,
             written_bytes_per_sec: 0.0,
             subprocess_count: 0,
+            icon: None,
         }
     }
 }
