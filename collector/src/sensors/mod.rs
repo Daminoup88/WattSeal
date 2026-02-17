@@ -5,7 +5,11 @@ pub mod network;
 pub mod ram;
 // pub mod process;
 
-use std::time::{Instant, SystemTime};
+use std::{
+    cell::RefCell,
+    rc::Rc,
+    time::{Instant, SystemTime},
+};
 
 pub use common::{Event, ProcessData, SensorData, TotalData};
 pub use cpu::CPUSensor;
@@ -15,7 +19,7 @@ pub use network::NetworkSensor;
 pub use ram::RamSensor;
 use sysinfo::System;
 
-pub use crate::process::{estimate_app_power_consumption, groups::group_processes_by_app};
+pub use crate::process::get_processes;
 
 pub enum SensorType {
     CPU(CPUSensor),
@@ -51,11 +55,13 @@ pub enum SensorError {
     ReadError(String),
 }
 
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event {
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<System>>) -> Event {
     let time = SystemTime::now();
     let mut data: Vec<SensorData> = Vec::new();
 
-    let mut top10_process_data: Vec<ProcessData> = Vec::new();
+    let (mut cpu_power, mut cpu_usage, mut nb_cpus) = (0.0, 0.0, 0);
+    let (mut gpu_power, mut gpu_usage, mut nb_gpus) = (0.0, 0.0, 0);
+
     let mut total_power = 0.0;
     for sensor in sensors {
         if let SensorType::Total = sensor {
@@ -70,8 +76,16 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event {
                 if let Some(power) = d.total_power_watts() {
                     total_power += power;
 
-                    if let SensorType::CPU(_) = sensor {
-                        top10_process_data = get_processes(10, power);
+                    if let SensorData::CPU(cpu) = &d {
+                        cpu_power += power;
+                        cpu_usage += cpu.usage_percent.unwrap_or(0.0);
+                        nb_cpus += 1;
+                    }
+                    
+                    if let SensorData::GPU(gpu) = &d {
+                        gpu_power += power;
+                        gpu_usage += gpu.usage_percent.unwrap_or(0.0);
+                        nb_gpus += 1;
                     }
                 }
                 data.push(d);
@@ -83,13 +97,19 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event {
         total_power_watts: total_power,
         period_type: "second".to_string(),
     }));
+
+    cpu_usage /= nb_cpus.max(1) as f64;
+    gpu_usage /= nb_gpus.max(1) as f64;
+    let top10_process_data: Vec<ProcessData> = get_processes(
+        system.clone(),
+        cpu_power,
+        cpu_usage,
+        gpu_power,
+        gpu_usage,
+        total_power,
+        10,
+    );
     data.push(SensorData::Process(top10_process_data));
 
     return Event::new(time, data);
-}
-
-pub fn get_processes(number_processes: u16, cpu_power: f64) -> Vec<ProcessData> {
-    let processes = estimate_app_power_consumption();
-    let list_of_apps = group_processes_by_app(processes, cpu_power);
-    return list_of_apps.into_iter().take(number_processes as usize).collect();
 }

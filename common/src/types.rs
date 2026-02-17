@@ -69,8 +69,12 @@ pub struct NetworkData {
 #[derive(Debug, Clone)]
 pub struct ProcessData {
     pub app_name: String,
-    pub vram_usage: f64,
-    pub cpu_usage_watts: f64,
+    pub process_exe_path: Option<String>,
+    pub process_usage_watt: f64,
+    pub process_cpu_usage: f64,
+    pub process_mem_usage: f64,
+    pub read_bytes_per_sec: f64,
+    pub written_bytes_per_sec: f64,
     pub subprocess_count: u32,
 }
 
@@ -301,15 +305,11 @@ impl Display for SensorData {
                 writeln!(f, "Top Processes by CPU Usage:")?;
                 writeln!(
                     f,
-                    "{:<30} {:>10} {:>15} {:>10}",
-                    "Application", "CPU (W)", "VRAM (MB)", "Subprocesses"
+                    "{:<30} {:>10} {:>10} {:>10} {:>15} {:>15} {:>20}",
+                    "App Name", "CPU %", "Mem %", "Power W", "Read MB/s", "Write MB/s", "Subprocesses"
                 )?;
                 for process in processes {
-                    writeln!(
-                        f,
-                        "{:<30} {:>10.2} {:>15.2} {:>10}",
-                        process.app_name, process.cpu_usage_watts, process.vram_usage, process.subprocess_count
-                    )?;
+                    write!(f, "{}", process)?;
                 }
                 Ok(())
             }
@@ -321,8 +321,14 @@ impl Display for ProcessData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(
             f,
-            "App: {} | VRAM: {:.2}MB | Power(CPU): {:.3}W | Nb: {}",
-            self.app_name, self.vram_usage, self.cpu_usage_watts, self.subprocess_count
+            "{:<30} {:>10.2} {:>10.2} {:>10.3} {:>15.2} {:>15.2} {:>20}",
+            self.app_name,
+            self.process_cpu_usage,
+            self.process_mem_usage,
+            self.process_usage_watt,
+            self.read_bytes_per_sec / 1_000_000.0,    // Convert to MB/s
+            self.written_bytes_per_sec / 1_000_000.0, // Convert to MB/s
+            self.subprocess_count
         )?;
         Ok(())
     }
@@ -423,8 +429,12 @@ impl Default for ProcessData {
     fn default() -> Self {
         ProcessData {
             app_name: String::new(),
-            vram_usage: 0.0,
-            cpu_usage_watts: 0.0,
+            process_exe_path: None,
+            process_usage_watt: 0.0,
+            process_cpu_usage: 0.0,
+            process_mem_usage: 0.0,
+            read_bytes_per_sec: 0.0,
+            written_bytes_per_sec: 0.0,
             subprocess_count: 0,
         }
     }

@@ -264,17 +264,25 @@ impl DatabaseEntry for ProcessData {
         vec![
             timestamp_id,
             &self.app_name,
-            &self.vram_usage,
-            &self.cpu_usage_watts,
-            &(self.subprocess_count),
+            &self.process_exe_path,
+            &self.process_usage_watt,
+            &self.process_cpu_usage,
+            &self.process_mem_usage,
+            &self.read_bytes_per_sec,
+            &self.written_bytes_per_sec,
+            &self.subprocess_count,
         ]
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
             ("app_name", "TEXT NOT NULL"),
-            ("vram_usage", "REAL"),
-            ("cpu_usage_watts", "REAL"),
+            ("process_exe_path", "TEXT"),
+            ("process_usage_watt", "REAL"),
+            ("process_cpu_usage", "REAL"),
+            ("process_mem_usage", "REAL"),
+            ("read_bytes_per_sec", "REAL"),
+            ("written_bytes_per_sec", "REAL"),
             ("subprocess_count", "INTEGER"),
         ]
     }
@@ -282,9 +290,13 @@ impl DatabaseEntry for ProcessData {
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(ProcessData {
             app_name: row.get("app_name")?,
-            vram_usage: row.get("vram_usage")?,
-            cpu_usage_watts: row.get("cpu_usage_watts")?,
-            subprocess_count: row.get::<_, i64>("subprocess_count")? as u32,
+            process_exe_path: row.get("process_exe_path")?,
+            process_usage_watt: row.get("process_usage_watt")?,
+            process_cpu_usage: row.get("process_cpu_usage")?,
+            process_mem_usage: row.get("process_mem_usage")?,
+            read_bytes_per_sec: row.get("read_bytes_per_sec")?,
+            written_bytes_per_sec: row.get("written_bytes_per_sec")?,
+            subprocess_count: row.get("subprocess_count")?,
         })
     }
     fn zero() -> SensorData {

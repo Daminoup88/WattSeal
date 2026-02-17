@@ -16,7 +16,7 @@ use adlx::gpu;
 use common::database::purge::averaging_and_purging_data;
 use database::Database;
 use display_info::DisplayInfo;
-use process::{estimate_app_power_consumption, groups::group_processes_by_app};
+use process::get_processes;
 use sensors::{SensorType, create_event_from_sensors, gpu::get_gpu_list};
 use sysinfo::System;
 
@@ -26,29 +26,29 @@ pub struct CollectorApp {
     database: Database,
     sensors: Vec<SensorType>,
     iteration: u64,
+    system: Rc<RefCell<System>>,
 }
 
 impl CollectorApp {
     pub fn new() -> Result<Self, String> {
         let database = Database::new().map_err(|e| format!("Failed to create database: {}", e))?;
+        let s = System::new_all();
         Ok(CollectorApp {
             database,
             sensors: Vec::new(),
             iteration: 0,
+            system: Rc::new(RefCell::new(s)),
         })
     }
 
     pub fn initialize(&mut self) -> Result<(), String> {
         check_permissions()?;
 
-        let system = System::new_all();
-
         println!("\n========== INITIALIZING SYSTEM ==========\n");
-        let s = Rc::new(RefCell::new(system));
 
         // Initialize CPU sensor
         println!("\nInitializing sensors...");
-        let sensor_cpu = sensors::cpu::get_cpu_power_sensor(s.clone(), 0);
+        let sensor_cpu = sensors::cpu::get_cpu_power_sensor(self.system.clone(), 0);
         match sensor_cpu {
             Ok(sensor) => {
                 println!("✓ CPU Power Sensor initialized successfully");
@@ -78,7 +78,7 @@ impl CollectorApp {
         }
 
         //Initialize RAM, Disk, Network sensors
-        self.sensors.push(SensorType::RAM(RamSensor::new(s.clone())));
+        self.sensors.push(SensorType::RAM(RamSensor::new(self.system.clone())));
         self.sensors.push(SensorType::Disk(DiskSensor::new()));
         self.sensors.push(SensorType::Network(NetworkSensor::new()));
 
@@ -117,7 +117,7 @@ impl CollectorApp {
             self.iteration += 1;
             println!("\n--- Iteration {} ---", self.iteration);
 
-            let event = create_event_from_sensors(&self.sensors);
+            let event = create_event_from_sensors(&self.sensors, self.system.clone());
 
             match self.database.insert_event(&event) {
                 Ok(_) => println!("✓ Event data saved to database"),
