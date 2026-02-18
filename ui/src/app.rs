@@ -34,7 +34,7 @@ impl<'a> App<'a> {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::EcoEnergy;
         let current_page = Page::Dashboard;
-        let database = Database::new().unwrap();
+        let database = Database::new().expect("Failed to create database");
         let components = database
             .get_tables()
             .into_iter()

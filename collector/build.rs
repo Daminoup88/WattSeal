@@ -22,6 +22,6 @@ fn main() {
     "#,
         );
 
-        res.compile().unwrap();
+        res.compile().ok();
     }
 }

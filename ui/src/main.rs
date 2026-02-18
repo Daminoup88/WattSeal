@@ -1,3 +1,3 @@
 fn main() {
-    ui::run().unwrap();
+    ui::run().ok();
 }

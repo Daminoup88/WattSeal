@@ -98,13 +98,13 @@ impl CollectorApp {
 
     pub fn run(&mut self) {
         println!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
-        get_info().expect("Failed to gather hardware information");
+        get_info().ok();
 
         println!("\n========== PURGING & AVERAGING OLD DATA ==========");
         // averaging data every hour and purge the database until the last X_hours
         averaging_and_purging_data(&mut self.database, 24, 24)
             .map_err(|e| format!("Failed averaging/purging data: {}", e))
-            .unwrap();
+            .ok();
 
         println!("\n========== POWER CONSUMPTION MONITORING ==========");
         println!("Logging data to database every second. Press Ctrl+C to stop.\n");
@@ -136,7 +136,11 @@ impl CollectorApp {
             let elapsed_time = start_time.elapsed();
             if elapsed_time < Duration::from_millis(1000) {
                 let now = SystemTime::now();
-                let time_before_next_second = now.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() % 1000;
+                let time_before_next_second = now
+                    .duration_since(SystemTime::UNIX_EPOCH)
+                    .unwrap_or(Duration::from_secs(0))
+                    .as_millis()
+                    % 1000;
                 thread::sleep(Duration::from_millis(1000 - time_before_next_second as u64));
             } else {
                 println!(
@@ -150,7 +154,7 @@ impl CollectorApp {
 
 fn get_info() -> Result<(), String> {
     // Initialize display information
-    let display_infos = DisplayInfo::all().unwrap();
+    let display_infos = DisplayInfo::all().map_err(|e| format!("Failed to get display information: {}", e))?;
     for display_info in display_infos {
         println!("display_info {display_info:?}");
     }
@@ -175,7 +179,7 @@ fn check_permissions() -> Result<(), String> {
         if !is_root() {
             Err(format!(
                 "This program requires root privileges on Linux. Please run with: sudo {}",
-                std::env::current_exe().unwrap().display()
+                std::env::current_exe().unwrap_or_else(|_| "<program>".into()).display()
             ))
         } else {
             Ok(())

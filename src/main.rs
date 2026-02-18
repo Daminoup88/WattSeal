@@ -18,15 +18,18 @@ use winit::{
     window::WindowId,
 };
 
-fn spawn_ui(ui_child: &Mutex<Option<Child>>) {
-    let mut guard = ui_child.lock().unwrap();
+fn spawn_ui(ui_child: &Mutex<Option<Child>>) -> Result<(), String> {
+    let mut guard = ui_child
+        .lock()
+        .map_err(|e| format!("Failed to lock UI child mutex: {}", e))?;
     let already_running = guard.as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
     if already_running {
-        return;
+        return Ok(());
     }
     if let Ok(exe) = std::env::current_exe() {
         *guard = Command::new(exe).arg("--ui").spawn().ok();
     }
+    Ok(())
 }
 
 fn main() {
@@ -41,7 +44,13 @@ fn main() {
 
     thread::spawn(move || {
         println!("Starting collector...");
-        let mut app = CollectorApp::new().expect("Failed to create CollectorApp");
+        let mut app = match CollectorApp::new() {
+            Ok(app) => app,
+            Err(e) => {
+                eprintln!("Failed to create CollectorApp: {}", e);
+                return;
+            }
+        };
         if let Err(e) = app.initialize() {
             eprintln!("Failed to initialize collector: {}", e);
             return;
@@ -54,7 +63,13 @@ fn main() {
     let _ = rx.recv();
 
     // Create event loop for tray icon
-    let event_loop = EventLoop::new().unwrap();
+    let event_loop = match EventLoop::new() {
+        Ok(loop_handle) => loop_handle,
+        Err(e) => {
+            eprintln!("Failed to create event loop: {}", e);
+            return;
+        }
+    };
 
     // Build tray menu
     let tray_menu = Menu::new();
@@ -85,10 +100,12 @@ fn main() {
     let ui_child_menu = Arc::clone(&ui_child);
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         if event.id == open_ui_id {
-            spawn_ui(&ui_child_menu);
+            spawn_ui(&ui_child_menu).ok();
         } else if event.id == quit_id {
-            if let Some(c) = ui_child_menu.lock().unwrap().as_mut() {
-                let _ = c.kill();
+            if let Ok(mut child_guard) = ui_child_menu.lock() {
+                if let Some(c) = child_guard.as_mut() {
+                    let _ = c.kill();
+                }
             }
             std::process::exit(0);
         }
@@ -97,20 +114,22 @@ fn main() {
     let ui_child_tray = Arc::clone(&ui_child);
     TrayIconEvent::set_event_handler(Some(move |event| {
         if let TrayIconEvent::DoubleClick { .. } = event {
-            spawn_ui(&ui_child_tray);
+            spawn_ui(&ui_child_tray).ok();
         }
     }));
 
-    let icon = tray_icon::Icon::from_rgba(vec![0, 255, 0, 0], 1, 1).expect("Failed to create icon");
+    let icon = tray_icon::Icon::from_rgba(vec![0, 255, 0, 0], 1, 1).ok();
 
-    let _tray_icon = TrayIconBuilder::new()
-        .with_menu(Box::new(tray_menu))
-        .with_tooltip("WattAware")
-        .with_icon(icon)
-        .build()
-        .expect("Failed to create tray icon");
+    if let Some(icon) = icon {
+        TrayIconBuilder::new()
+            .with_menu(Box::new(tray_menu))
+            .with_tooltip("WattAware")
+            .with_icon(icon)
+            .build()
+            .ok();
+    };
 
-    spawn_ui(&ui_child);
+    spawn_ui(&ui_child).ok();
 
     println!("Collector running. Use the tray icon to open the UI.");
 
@@ -122,5 +141,5 @@ fn main() {
         }
         fn window_event(&mut self, _event_loop: &ActiveEventLoop, _id: WindowId, _event: WindowEvent) {}
     }
-    event_loop.run_app(&mut TrayApp).unwrap();
+    event_loop.run_app(&mut TrayApp).ok();
 }

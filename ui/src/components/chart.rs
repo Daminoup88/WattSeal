@@ -307,6 +307,12 @@ fn to_plotters_color(color: iced::Color) -> RGBColor {
 }
 
 impl<'a> SensorChart<'a> {
+    fn clear_cache(&self) {
+        if let Ok(cache) = self.cache.try_borrow_mut() {
+            cache.clear();
+        }
+    }
+
     pub fn new(theme: AppTheme) -> Self {
         Self {
             cache: RefCell::default(),
@@ -356,7 +362,7 @@ impl<'a> SensorChart<'a> {
         if self.dynamic_range {
             self.recalculate_range();
         }
-        self.cache.borrow_mut().clear();
+        self.clear_cache();
     }
 
     pub fn set_x_axis_label_and_unit(&mut self, label: &'a str, unit: &'a str) {
@@ -368,7 +374,7 @@ impl<'a> SensorChart<'a> {
         self.y_axis_label = label;
         self.y_unit = unit;
         self.recalculate_y_label_area_size();
-        self.cache.borrow_mut().clear();
+        self.clear_cache();
     }
 
     pub fn newest_time(&self) -> Option<DateTime<Local>> {
@@ -381,17 +387,17 @@ impl<'a> SensorChart<'a> {
 
     pub fn clear_all(&mut self) {
         self.data.clear();
-        self.cache.borrow_mut().clear();
+        self.clear_cache();
     }
 
     pub fn update_style(&mut self, theme: AppTheme) {
         self.style = theme.into();
-        self.cache.borrow_mut().clear();
+        self.clear_cache();
     }
 
     pub fn set_x_range(&mut self, duration: Duration) {
         self.x_range = duration;
-        self.cache.borrow_mut().clear();
+        self.clear_cache();
     }
 
     fn recalculate_y_label_area_size(&mut self) {
@@ -486,14 +492,20 @@ impl<'a> SensorChart<'a> {
 
         let x_seconds = self.x_range.num_seconds();
 
-        let mut chart = builder
+        let mut chart = match builder
             .x_label_area_size(X_LABEL_AREA_SIZE)
             .y_label_area_size(self.y_label_area_size)
             .margin(CHART_MARGIN)
             .margin_left(CHART_MARGIN_LEFT)
             .margin_right(CHART_MARGIN_RIGHT)
             .build_cartesian_2d(oldest_time..newest_time, self.y_range.0..self.y_range.1)
-            .expect("failed to build chart");
+        {
+            Ok(chart) => chart,
+            Err(e) => {
+                eprintln!("failed to build chart: {}", e);
+                return;
+            }
+        };
 
         chart
             .configure_mesh()
@@ -508,7 +520,7 @@ impl<'a> SensorChart<'a> {
             .x_labels(if x_seconds <= 120 { x_seconds as usize } else { 7 })
             .x_label_formatter(&|x: &DateTime<Local>| self.format_x_label(x, x_seconds, &newest_time))
             .draw()
-            .expect("failed to draw chart mesh");
+            .ok();
 
         for (i, (label, series)) in self.data.iter().enumerate() {
             let color = series
@@ -546,10 +558,10 @@ impl<'a> SensorChart<'a> {
                 LineType::Step => chart.draw_series(LineSeries::new(data, color.stroke_width(2))),
             };
 
-            annotation
-                .expect("failed to draw series")
-                .label(format!("{}   ", label))
-                .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
+            if let Some(anno) = annotation.ok() {
+                anno.label(format!("{}   ", label))
+                    .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
+            }
         }
 
         chart
@@ -558,9 +570,11 @@ impl<'a> SensorChart<'a> {
             .background_style(&style.legend_background)
             .label_font(("sans-serif", 12).into_font().color(&style.text))
             .draw()
-            .expect("failed to draw legend");
+            .ok();
 
-        if let Some(tooltip) = self.hovered.borrow().as_ref() {
+        if let Ok(hovered) = self.hovered.try_borrow()
+            && let Some(tooltip) = hovered.as_ref()
+        {
             let series_color = tooltip
                 .content
                 .color_index
@@ -578,7 +592,7 @@ impl<'a> SensorChart<'a> {
                             + Circle::new((0, 0), size, st.clone())
                     },
                 ))
-                .expect("failed to draw hover marker");
+                .ok();
 
             let backend_area = chart.plotting_area().strip_coord_spec();
             self.draw_tooltip_on_backend(&backend_area, tooltip, style);
@@ -789,10 +803,13 @@ impl<'a> SensorChart<'a> {
     }
 
     fn clear_hover(&self) -> bool {
-        let mut current = self.hovered.borrow_mut();
+        let mut current = match self.hovered.try_borrow_mut() {
+            Ok(current) => current,
+            Err(_) => return false,
+        };
         if current.is_some() {
             *current = None;
-            self.cache.borrow_mut().clear();
+            self.clear_cache();
             true
         } else {
             false
@@ -800,10 +817,13 @@ impl<'a> SensorChart<'a> {
     }
 
     fn update_hover(&self, new: Option<TooltipData>) -> bool {
-        let mut current = self.hovered.borrow_mut();
+        let mut current = match self.hovered.try_borrow_mut() {
+            Ok(current) => current,
+            Err(_) => return false,
+        };
         if *current != new {
             *current = new;
-            self.cache.borrow_mut().clear();
+            self.clear_cache();
             true
         } else {
             false
@@ -843,7 +863,11 @@ impl<'a> Chart<Message> for SensorChart<'a> {
 
     #[inline]
     fn draw<R: Renderer, F: Fn(&mut Frame)>(&self, renderer: &R, bounds: Size, draw_fn: F) -> Geometry {
-        renderer.draw_cache(&self.cache.borrow(), bounds, draw_fn)
+        if let Ok(cache) = self.cache.try_borrow() {
+            renderer.draw_cache(&cache, bounds, draw_fn)
+        } else {
+            renderer.draw_cache(&Cache::new(), bounds, draw_fn)
+        }
     }
 
     fn build_chart<DB: DrawingBackend>(&self, _state: &Self::State, chart: ChartBuilder<DB>) {

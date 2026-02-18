@@ -20,7 +20,13 @@ pub fn get_processes(
     number_processes: usize,
     proc_gpu_usage: HashMap<u32, f64>,
 ) -> Vec<ProcessData> {
-    let mut sys = system.borrow_mut();
+    let mut sys = match system.try_borrow_mut() {
+        Ok(sys) => sys,
+        Err(e) => {
+            eprintln!("Failed to borrow system for process collection: {}", e);
+            return Vec::new();
+        }
+    };
     let nb_cores = sys.cpus().len();
     sys.refresh_processes_specifics(
         sysinfo::ProcessesToUpdate::All,
@@ -44,7 +50,11 @@ pub fn get_processes(
         total_power,
         proc_gpu_usage,
     );
-    processes.sort_by(|a, b| b.process_usage_watt.partial_cmp(&a.process_usage_watt).unwrap());
+    processes.sort_by(|a, b| {
+        b.process_usage_watt
+            .partial_cmp(&a.process_usage_watt)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     let top_apps = processes.into_iter().take(number_processes).collect();
 

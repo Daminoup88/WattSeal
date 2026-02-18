@@ -80,8 +80,18 @@ impl WindowsCPUSensor {
         match &self.measurement_source {
             MeasurementSource::MSR(msr_reader) => {
                 let current_energy = msr_reader.read_energy()?;
-                let power_values = msr_reader.calculate_power(&current_energy, &self.last_energy_measurement.borrow());
-                *self.last_energy_measurement.borrow_mut() = current_energy;
+                let power_values = {
+                    let last_energy = self.last_energy_measurement.try_borrow().map_err(|e| {
+                        SensorError::ReadError(format!("Failed to borrow last energy measurement: {}", e))
+                    })?;
+                    msr_reader.calculate_power(&current_energy, &last_energy)
+                };
+
+                let mut last_energy_mut = self
+                    .last_energy_measurement
+                    .try_borrow_mut()
+                    .map_err(|e| SensorError::ReadError(format!("Failed to update last energy measurement: {}", e)))?;
+                *last_energy_mut = current_energy;
 
                 if power_values.pkg.is_none() {
                     return Err(SensorError::ReadError("Failed to calculate power".to_string()));

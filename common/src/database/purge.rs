@@ -1,5 +1,5 @@
 use core::time;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use rusqlite::{OptionalExtension, params};
 
@@ -15,10 +15,10 @@ pub fn averaging_and_purging_data(
 ) -> Result<(), String> {
     averaging_data(database, average_until_time)
         .map_err(|e| format!("Failed to average data: {}", e))
-        .unwrap();
+        .ok();
     purge_old_events(database, purge_until_time)
         .map_err(|e| format!("Failed to purge data: {}", e))
-        .unwrap();
+        .ok();
     Ok(())
 }
 
@@ -135,7 +135,7 @@ fn purge_old_events(database: &mut Database, duration_in_hours: i64) -> Result<(
 fn get_timestamp_oclock() -> i64 {
     let timestamp_now = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)
-        .unwrap()
+        .unwrap_or(Duration::from_secs(0))
         .as_millis() as i64;
     let ms_after_oclock = timestamp_now % (3600 * 1000);
 
