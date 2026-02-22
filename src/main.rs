@@ -120,13 +120,20 @@ fn main() {
 
     let icon = tray_icon::Icon::from_rgba(vec![0, 255, 0, 0], 1, 1).ok();
 
-    if let Some(icon) = icon {
+    let _tray_icon = if let Some(icon) = icon {
         TrayIconBuilder::new()
             .with_menu(Box::new(tray_menu))
             .with_tooltip("WattAware")
             .with_icon(icon)
             .build()
-            .ok();
+            .map_err(|e| {
+                eprintln!("Failed to create tray icon: {}", e);
+                e
+            })
+            .ok()
+    } else {
+        eprintln!("Failed to create tray icon: invalid icon data");
+        None
     };
 
     spawn_ui(&ui_child).ok();
