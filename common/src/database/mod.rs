@@ -134,7 +134,7 @@ impl Database {
         let timestamp_id = tx.last_insert_rowid();
         tx.execute(
             "INSERT INTO hardware_info (timestamp_id, detected_materials) VALUES (?1, ?2)",
-            params![timestamp_id, detected_materials], 
+            params![timestamp_id, detected_materials],
         )?;
         Ok(())
     }

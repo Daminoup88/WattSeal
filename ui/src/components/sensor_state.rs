@@ -3,9 +3,9 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 use chrono::{DateTime, Local, Timelike};
 use common::{DatabaseEntry, MetricType, ProcessData, SecondaryValues, SensorData, TotalData, utils::bytes_to_mb};
 use iced::{
-    Alignment, Element, Length, Padding, Task,
+    Alignment, ContentFit, Element, Length, Padding, Task,
     widget::{
-        Column, Container, PickList, Row, Scrollable, Space, Text, pick_list,
+        Column, Container, PickList, Row, Scrollable, Space, Text, image, pick_list,
         scrollable::{Direction, Scrollbar},
     },
 };
@@ -32,7 +32,8 @@ use crate::{
 
 const SNAPSHOT_AREA_HEIGHT: f32 = 34.0;
 const PROCESS_APP_WIDTH: f32 = 180.0;
-const PROCESS_INDEX_WIDTH: f32 = 20.0;
+const PROCESS_ICON_COLUMN_WIDTH: f32 = 24.0;
+const PROCESS_ICON_SIZE: f32 = 16.0;
 const PROCESS_POWER_WIDTH: f32 = 55.0;
 const PROCESS_CPU_WIDTH: f32 = 48.0;
 const PROCESS_GPU_WIDTH: f32 = 48.0;
@@ -537,13 +538,7 @@ impl SensorState {
         let header_style = TextStyle::Muted;
         let header_row = Row::new()
             .spacing(SPACING_MEDIUM)
-            .push(text_widget(
-                "#",
-                header_font_size,
-                header_style,
-                Length::Fixed(20.0),
-                false,
-            ))
+            .push(Space::new().width(Length::Fixed(PROCESS_ICON_COLUMN_WIDTH)))
             .push(text_widget(
                 "Application",
                 header_font_size,
@@ -596,19 +591,13 @@ impl SensorState {
 
         let mut table = Column::new().spacing(SPACING_SMALL).push(header_row);
         let table_font_size = FONT_SIZE_BODY;
-        for (i, p) in state.top_processes.iter().enumerate() {
+        for p in &state.top_processes {
             let gpu = p.process_gpu_usage.map_or("N/A".to_string(), |v| format!("{:.1}%", v));
             table = table.push(
                 Row::new()
                     .spacing(SPACING_MEDIUM)
                     .align_y(Alignment::Center)
-                    .push(text_widget(
-                        format!("{}", i + 1),
-                        table_font_size,
-                        TextStyle::Muted,
-                        Length::Fixed(20.0),
-                        false,
-                    ))
+                    .push(process_icon_cell(&p.icon))
                     .push(text_widget(
                         format!("{} ({})", p.app_name, p.subprocess_count),
                         table_font_size,
@@ -714,6 +703,24 @@ impl SensorState {
             SensorCategory::Processes(state) => self.process_card(state, title),
         }
     }
+}
+
+fn process_icon_cell(icon_bytes: &Option<Vec<u8>>) -> Element<'static, Message, AppTheme> {
+    let icon: Element<'static, Message, AppTheme> = if let Some(bytes) = icon_bytes {
+        image(image::Handle::from_bytes(bytes.clone()))
+            .width(Length::Fixed(PROCESS_ICON_SIZE))
+            .height(Length::Fixed(PROCESS_ICON_SIZE))
+            .content_fit(ContentFit::Contain)
+            .into()
+    } else {
+        Space::new().into()
+    };
+
+    Container::new(icon)
+        .width(Length::Fixed(PROCESS_ICON_COLUMN_WIDTH))
+        .align_x(Alignment::Center)
+        .align_y(Alignment::Center)
+        .into()
 }
 
 fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
