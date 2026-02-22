@@ -1,7 +1,9 @@
 use rusqlite::{Row, ToSql};
 
 use crate::{
-    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData, GeneralData},
+    types::{
+        AllTimeData, CPUData, DiskData, GPUData, GeneralData, NetworkData, ProcessData, RamData, SensorData, TotalData,
+    },
     utils::load_icon_and_name,
 };
 
@@ -322,8 +324,36 @@ impl DatabaseEntry for ProcessData {
     }
 }
 
+impl DatabaseEntry for AllTimeData {
+    fn generic_name() -> &'static str {
+        "AllTime"
+    }
+
+    fn table_name_static() -> &'static str {
+        "all_time_data"
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![timestamp_id, &self.total_power_watts, &self.duration_seconds]
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[("total_power_watts", "REAL"), ("duration_seconds", "INTEGER")]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(AllTimeData {
+            total_power_watts: row.get("total_power_watts")?,
+            duration_seconds: row.get("duration_seconds")?,
+        })
+    }
+}
+
 mod tests {
-    use super::{CPUData, DatabaseEntry, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+    use super::{
+        AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData,
+        TotalData,
+    };
 
     #[test]
     fn zero_defaults_are_zero_filled() {
@@ -393,6 +423,15 @@ mod tests {
                 assert!(vec.is_empty());
             }
             _ => panic!("ProcessData::zero() returned wrong SensorData variant"),
+        }
+
+        // AllTime
+        match AllTimeData::zero() {
+            SensorData::AllTime(all_time) => {
+                assert_eq!(all_time.total_power_watts, 0.0);
+                assert_eq!(all_time.duration_seconds, 0);
+            }
+            _ => panic!("AllTimeData::zero() returned wrong SensorData variant"),
         }
     }
 }

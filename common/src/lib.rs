@@ -6,5 +6,6 @@ pub mod utils;
 
 pub use database::{DATABASE_PATH, Database, DatabaseEntry, DatabaseError, generic_name_for_table};
 pub use types::{
-    CPUData, Event, GPUData, LabeledValue, MetricType, ProcessData, SecondaryValues, SensorData, TotalData, GeneralData,
+    AllTimeData, CPUData, Event, GPUData, GeneralData, LabeledValue, MetricType, ProcessData, SecondaryValues,
+    SensorData, TotalData,
 };

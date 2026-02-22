@@ -72,11 +72,11 @@ impl Sensor for CPUSensor {
             .system
             .try_borrow()
             .map_err(|e| SensorError::ReadError(format!("Failed to borrow system: {}", e)))?;
-        let cpu_name = sys
-            .cpus()
-            .first()
-            .map(|cpu| cpu.brand().to_string());
-        Ok(format!("Cpu: {}",cpu_name.unwrap_or_else(|| "Unknown CPU".to_string())))
+        let cpu_name = sys.cpus().first().map(|cpu| cpu.brand().to_string());
+        Ok(format!(
+            "Cpu: {}",
+            cpu_name.unwrap_or_else(|| "Unknown CPU".to_string())
+        ))
     }
 }
 

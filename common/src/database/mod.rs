@@ -8,9 +8,9 @@ pub use entries::DatabaseEntry;
 pub use purge::averaging_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
-use crate::types::{
+use crate::{types::{
     CPUData, DiskData, Event, GPUData, GeneralData, NetworkData, ProcessData, RamData, SensorData, TotalData,
-};
+}, AllTimeData};
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 
@@ -22,6 +22,7 @@ macro_rules! dispatch_entry {
         else if $table_name == DiskData::table_name_static() { Some(DiskData::$method($($arg),*)) }
         else if $table_name == NetworkData::table_name_static() { Some(NetworkData::$method($($arg),*)) }
         else if $table_name == TotalData::table_name_static() { Some(TotalData::$method($($arg),*)) }
+        else if $table_name == AllTimeData::table_name_static() { Some(AllTimeData::$method($($arg),*)) }
         else if $table_name == ProcessData::table_name_static() { Some(ProcessData::$method($($arg),*)) }
         else { None }
     }};
@@ -162,6 +163,7 @@ impl Database {
             SensorData::Disk(data) => Self::insert_entry(tx, timestamp_id, data),
             SensorData::Network(data) => Self::insert_entry(tx, timestamp_id, data),
             SensorData::Total(data) => Self::insert_entry(tx, timestamp_id, data),
+            SensorData::AllTime(data) => Self::insert_entry(tx, timestamp_id, data),
             SensorData::Process(processes) => {
                 for process in processes {
                     Self::insert_entry(tx, timestamp_id, process)?;
@@ -285,6 +287,18 @@ impl Database {
         Ok(records)
     }
 
+    // Fetch the last record of the all_time_data table if it exists
+    pub fn get_all_time_data(&mut self) -> Result<AllTimeData, DatabaseError> {
+        let query = "SELECT t.timestamp, d.* FROM timestamp t JOIN all_time_data d ON t.id = d.timestamp_id ORDER BY t.timestamp DESC LIMIT 1";
+        let mut stmt = self.conn.prepare(query)?;
+        let result = stmt.query_row([], |row| {
+            let data = AllTimeData::from_row(row)?;
+            Ok(data)
+        })?;
+
+        Ok(result)
+    }
+
     pub fn execute_sensor_query<P>(
         &self,
         table_name: &str,
@@ -305,6 +319,8 @@ impl Database {
         } else if table_name == NetworkData::table_name_static() {
             self.query_sensor_table::<NetworkData, P>(query, params)
         } else if table_name == TotalData::table_name_static() {
+            self.query_sensor_table::<TotalData, P>(query, params)
+        } else if table_name == AllTimeData::table_name_static() {
             self.query_sensor_table::<TotalData, P>(query, params)
         } else if table_name == ProcessData::table_name_static() {
             self.query_sensor_table::<ProcessData, P>(query, params)

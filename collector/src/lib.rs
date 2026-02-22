@@ -84,23 +84,26 @@ impl CollectorApp {
         self.sensors.push(SensorType::Total);
         // Add process sensor
         self.sensors.push(SensorType::Process);
+        // Add all-time data sensor
+        self.sensors.push(SensorType::AllTime);
 
         println!("\n========== SETTING UP DATABASE ==========");
         // Initialize database
         let mut database = Database::new().map_err(|e| format!("Failed to open database: {}", e))?;
         let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
+
         database
             .create_tables_if_not_exists(&table_names)
             .map_err(|e| format!("Failed to create database tables: {}", e))?;
         println!("✓ Database initialized");
 
         println!("\n========== GETTING ALL TIME DATA ==========");
-        // if let Ok(all_time) = database.get_all_time_data() {
-        //     self.all_time_data = all_time;
-        //     println!("✓ All-time data loaded: {:#?}", self.all_time_data);
-        // } else {
-        //     println!("✗ No existing all-time data found, starting fresh.");
-        // }
+        if let Ok(all_time) = database.get_all_time_data() {
+            self.all_time_data = all_time;
+            println!("✓ All-time data loaded from database");
+        } else {
+            println!("✗ No existing all-time data found, starting fresh");
+        }
 
         Ok(())
     }
@@ -140,7 +143,6 @@ impl CollectorApp {
             }
 
             self.iteration += 1;
-            println!("{:#?}", self.all_time_data);
 
             // ADJUST SLEEP DURATION TO MAINTAIN 1 SECOND INTERVALS
             let elapsed_time = start_time.elapsed();
