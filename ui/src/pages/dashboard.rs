@@ -8,7 +8,7 @@ use iced::{
 };
 
 use crate::{
-    components::component_state::ComponentState,
+    components::sensor_state::SensorState,
     message::Message,
     styles::{
         container::ContainerStyle,
@@ -25,21 +25,21 @@ use crate::{
 pub struct DashboardPage;
 
 impl DashboardPage {
-    pub fn view<'a>(&'a self, components: &'a HashMap<String, ComponentState>) -> Element<'a, Message, AppTheme> {
+    pub fn view<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(components));
+            .push(self.view_power_summary(sensors));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.chart_or_placeholder(components, None, TotalData::table_name_static(), 300.0, false))
-            .push(self.view_component_cards(components));
+            .push(self.chart_or_placeholder(sensors, None, TotalData::table_name_static(), 300.0, false))
+            .push(self.view_component_cards(sensors));
 
         content
             .push(
@@ -51,13 +51,10 @@ impl DashboardPage {
             .into()
     }
 
-    fn view_power_summary<'a>(
-        &'a self,
-        components: &'a HashMap<String, ComponentState>,
-    ) -> Element<'a, Message, AppTheme> {
+    fn view_power_summary<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
-            components
+            sensors
                 .get(TotalData::table_name_static())
                 .and_then(|c| c.get_latest_reading())
                 .and_then(|data| data.total_power_watts())
@@ -96,13 +93,10 @@ impl DashboardPage {
             .into()
     }
 
-    fn view_component_cards<'a>(
-        &'a self,
-        components_map: &'a HashMap<String, ComponentState>,
-    ) -> Element<'a, Message, AppTheme> {
+    fn view_component_cards<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
         let mut column = Column::new().spacing(SPACING_LARGE).width(Length::Fill);
 
-        let mut components: Vec<(&String, &ComponentState)> = components_map
+        let mut sensors: Vec<(&String, &SensorState)> = sensors
             .iter()
             .filter(|(table_name, _)| *table_name != TotalData::table_name_static())
             .collect();
@@ -124,13 +118,13 @@ impl DashboardPage {
             }
         }
 
-        components.sort_by_key(|(name, _)| (priority(name.as_str()), *name));
+        sensors.sort_by_key(|(name, _)| (priority(name.as_str()), *name));
 
         let mut row = Row::new().spacing(SPACING_LARGE).width(Length::Fill);
         let mut items_in_row = 0usize;
 
-        for (i, (_, component)) in components.into_iter().enumerate() {
-            let card = component.chart_card(None, 200.0, true);
+        for (i, (_, sensor)) in sensors.into_iter().enumerate() {
+            let card = sensor.chart_card(None, 200.0, true);
 
             row = row.push(card);
             items_in_row += 1;
@@ -155,13 +149,13 @@ impl DashboardPage {
 
     fn chart_or_placeholder<'a>(
         &'a self,
-        components: &'a HashMap<String, ComponentState>,
+        sensors: &'a HashMap<String, SensorState>,
         title: Option<&'static str>,
         table_name: &str,
         height: f32,
         show_usage: bool,
     ) -> Element<'a, Message, AppTheme> {
-        components
+        sensors
             .get(table_name)
             .map(|c| c.chart_card(title, height, show_usage))
             .unwrap_or_else(|| {

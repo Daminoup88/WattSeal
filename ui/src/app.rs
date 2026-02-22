@@ -9,7 +9,7 @@ use iced::{
 };
 
 use crate::{
-    components::{component_state::ComponentState, header::Header},
+    components::{header::Header, sensor_state::SensorState},
     message::Message,
     pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
     themes::AppTheme,
@@ -20,7 +20,7 @@ const FPS: u64 = 1;
 
 pub struct App {
     current_page: Page,
-    components: HashMap<String, ComponentState>,
+    sensors: HashMap<String, SensorState>,
     dashboard_page: DashboardPage,
     info_page: InfoPage,
     optimization_page: OptimizationPage,
@@ -35,14 +35,14 @@ impl App {
         let theme = AppTheme::EcoEnergy;
         let current_page = Page::Dashboard;
         let database = Database::new().expect("Failed to create database");
-        let components = database
+        let sensors = database
             .get_tables()
             .into_iter()
             .map(|table_name| {
-                let sensor_type = generic_name_for_table(table_name.as_str())
+                let display_name = generic_name_for_table(table_name.as_str())
                     .map(|s| s.to_string())
                     .unwrap_or(table_name.clone());
-                (table_name.clone(), ComponentState::new(table_name, sensor_type, theme))
+                (table_name.clone(), SensorState::new(table_name, display_name, theme))
             })
             .collect();
         let dashboard_page = DashboardPage;
@@ -51,7 +51,7 @@ impl App {
         (
             Self {
                 current_page,
-                components,
+                sensors,
                 dashboard_page,
                 header: Header::new(Page::all(), current_page),
                 info_page: InfoPage::new(),
@@ -68,9 +68,9 @@ impl App {
         match message {
             Message::Tick => {
                 let data = self.load_latest_data(1);
-                for (timestamp, sensor) in data.iter() {
-                    if let Some(component) = self.components.get_mut(sensor.table_name()) {
-                        component.push_data(*timestamp, sensor);
+                for (timestamp, sensor_data) in data.iter() {
+                    if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
+                        sensor.push_data(*timestamp, sensor_data);
                     }
                 }
                 Task::none()
@@ -82,50 +82,50 @@ impl App {
             }
             Message::ChangeTheme(theme) => {
                 self.theme = theme;
-                for component in self.components.values_mut() {
-                    component.update_theme(theme);
+                for sensor in self.sensors.values_mut() {
+                    sensor.update_theme(theme);
                 }
                 Task::none()
             }
             Message::ChangeChartMetricType(table_name, metric_type) => {
-                if let Some(component) = self.components.get_mut(&table_name) {
-                    component.set_metric_type(metric_type);
+                if let Some(sensor) = self.sensors.get_mut(&table_name) {
+                    sensor.set_metric_type(metric_type);
                 }
                 Task::none()
             }
             Message::ChangeChartTimeRange(table_name, time_range) => {
-                if let Some(component) = self.components.get_mut(&table_name) {
-                    return component.update_time_range(time_range);
+                if let Some(sensor) = self.sensors.get_mut(&table_name) {
+                    return sensor.update_time_range(time_range);
                 }
                 Task::none()
             }
             Message::FetchChartData(table_name, time_range) => {
                 let data = self.load_history(&table_name, time_range);
-                if let Some(component) = self.components.get_mut(&table_name) {
-                    component.load_history_batch(&data);
+                if let Some(sensor) = self.sensors.get_mut(&table_name) {
+                    sensor.load_history_batch(&data);
                 }
                 Task::none()
             }
             Message::FetchAllChartsData(time_range) => {
                 let data = self.load_all_charts_history(time_range);
-                for (timestamp, sensor) in data.iter() {
-                    if let Some(component) = self.components.get_mut(sensor.table_name()) {
-                        component.push_data(*timestamp, sensor);
+                for (timestamp, sensor_data) in data.iter() {
+                    if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
+                        sensor.push_data(*timestamp, sensor_data);
                     }
                 }
                 Task::none()
             }
             Message::UpdateChartData(data) => {
-                for (timestamp, sensor) in data.iter() {
-                    if let Some(component) = self.components.get_mut(sensor.table_name()) {
-                        component.push_data(*timestamp, sensor);
+                for (timestamp, sensor_data) in data.iter() {
+                    if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
+                        sensor.push_data(*timestamp, sensor_data);
                     }
                 }
                 Task::none()
             }
             Message::ReplaceChartData(table_name, data) => {
-                if let Some(component) = self.components.get_mut(&table_name) {
-                    component.load_history_batch(&data);
+                if let Some(sensor) = self.sensors.get_mut(&table_name) {
+                    sensor.load_history_batch(&data);
                 }
                 Task::none()
             }
@@ -163,7 +163,7 @@ impl App {
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let page_content = match self.current_page {
-            Page::Dashboard => self.dashboard_page.view(&self.components),
+            Page::Dashboard => self.dashboard_page.view(&self.sensors),
             Page::Info => self.info_page.view(),
             Page::Optimization => self.optimization_page.view(),
             Page::Settings => self.settings_page.view(),

@@ -52,3 +52,7 @@ fn windows_icon_and_name(path: &Path) -> (Option<Vec<u8>>, Option<String>) {
     }
     (None, None)
 }
+
+pub fn bytes_to_mb(bytes: f64) -> f64 {
+    bytes / (2 << 20) as f64
+}
