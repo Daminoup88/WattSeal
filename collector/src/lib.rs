@@ -11,10 +11,8 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-use adlx::gpu;
 use common::database::purge::averaging_and_purging_data;
 use database::Database;
-use display_info::DisplayInfo;
 use sensors::{AllTimeData, SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
 use sysinfo::System;
 
@@ -107,13 +105,6 @@ impl CollectorApp {
         Ok(())
     }
 
-    pub fn get_hardware_info(&self) {
-        let start = Instant::now();
-        let info = get_hardware_info(&self.sensors);
-        println!("Hardware info time: {:.2?} ms", start.elapsed().as_millis());
-        println!("{:#?}", info);
-    }
-
     pub fn run(&mut self) {
         println!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
         self.get_hardware_info();
@@ -150,10 +141,6 @@ impl CollectorApp {
 
             self.iteration += 1;
             println!("{:#?}", self.all_time_data);
-            // self.database
-            //     .update_all_time_data(&self.all_time_data)
-            //     .map_err(|e| format!("Failed to update all-time data: {}", e))
-            //     .unwrap();
 
             // ADJUST SLEEP DURATION TO MAINTAIN 1 SECOND INTERVALS
             let elapsed_time = start_time.elapsed();
@@ -172,6 +159,17 @@ impl CollectorApp {
                 );
             }
         }
+    }
+
+    pub fn get_hardware_info(&mut self) {
+        let info = get_hardware_info(&self.sensors);
+
+        match self.database.insert_hardware_info(&info) {
+            Ok(_) => println!("✓ Hardware info saved to database"),
+            Err(e) => eprintln!("✗ Failed to save hardware info to database: {:?}", e),
+        }
+
+        println!("{:#?}", info);
     }
 }
 

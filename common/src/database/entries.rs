@@ -1,7 +1,7 @@
 use rusqlite::{Row, ToSql};
 
 use crate::{
-    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
+    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData, GeneralData},
     utils::load_icon_and_name,
 };
 

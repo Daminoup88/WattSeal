@@ -111,7 +111,8 @@ pub enum InitialInfo {
 
 #[derive(Debug, Clone)]
 pub struct GeneralData {
-    pub detected_hardware: Vec<String>,
+    pub tables: String,
+    pub detected_hardware: String,
     pub hardware_info_serialized: String,
 }
 

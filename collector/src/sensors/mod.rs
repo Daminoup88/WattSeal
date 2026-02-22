@@ -15,7 +15,7 @@ use std::{
 use adlx::system;
 use battery::{Battery, Manager};
 pub use common::{
-    Event, ProcessData, SensorData, TotalData,
+    Event, SensorData, TotalData, ProcessData, GeneralData,
     types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
 pub use cpu::CPUSensor;
@@ -26,6 +26,8 @@ pub use network::NetworkSensor;
 pub use process::get_processes;
 pub use ram::RamSensor;
 use sysinfo::{Components, CpuRefreshKind, Disks, Networks, System};
+use serde::{Deserialize, Serialize};
+use serde_json;
 
 pub enum SensorType {
     CPU(CPUSensor),
@@ -89,6 +91,34 @@ pub trait Sensor {
 pub enum SensorError {
     NotSupported,
     ReadError(String),
+}
+
+#[derive(Debug, Clone)]
+pub struct AllTimeData {
+    pub total_power_watts: f64,
+    pub duration_seconds: u64,
+}
+
+impl AllTimeData {
+    pub fn new() -> Self {
+        AllTimeData {
+            total_power_watts: 0.0,
+            duration_seconds: 0,
+        }
+    }
+
+    pub fn update(&mut self, power_watts: f64) {
+        self.total_power_watts += power_watts;
+        self.duration_seconds += 1;
+    }
+
+    pub fn average_power(&self) -> f64 {
+        if self.duration_seconds > 0 {
+            self.total_power_watts / self.duration_seconds as f64
+        } else {
+            0.0
+        }
+    }
 }
 
 pub fn create_event_from_sensors(
@@ -172,21 +202,26 @@ pub fn create_event_from_sensors(
     return Event::new(time, data);
 }
 
-pub fn get_hardware_info(sensors: &Vec<SensorType>) -> (Vec<String>, HardwareInfo) {
+pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
+    let mut tables: Vec<String> = Vec::new();
     let mut detected_materials: Vec<String> = Vec::new();
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
+    
     for sensor in sensors {
-        if let Ok(info) = sensor.read_initial_info() {
-            sensors_info.push(info);
-        } else {
-            eprintln!("✗ Failed to read initial info for sensor: {:?}", sensor.table_name());
-        }
+
+        tables.push(sensor.table_name().to_string());
 
         if let Ok(name) = sensor.read_name() {
             detected_materials.push(name);
         } else {
             eprintln!("✗ No name available for sensor: {:?}", sensor.table_name());
+        }
+
+        if let Ok(info) = sensor.read_initial_info() {
+            sensors_info.push(info);
+        } else {
+            eprintln!("✗ Failed to read initial info for sensor: {:?}", sensor.table_name());
         }
     }
 
@@ -258,9 +293,15 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> (Vec<String>, HardwareInf
     };
     detected_materials.push(format!("Battery(s): [{}]", battery_names.join(", ")));
     sensors_info.push(InitialInfo::Battery(battery_info));
-    let hardware_info = sensors_info.into();
+    let hardware_info: HardwareInfo = sensors_info.into();
 
-    return (detected_materials, hardware_info);
+    let data = GeneralData {
+        tables: tables.join(","),
+        detected_hardware: serialize_data_to_json(&detected_materials),
+        hardware_info_serialized: serialize_data_to_json(&hardware_info),
+    };
+
+    return data;
 }
 
 fn disk_kind_label(kind: &sysinfo::Disk) -> &'static str {
@@ -275,30 +316,12 @@ fn disk_kind_label(kind: &sysinfo::Disk) -> &'static str {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct AllTimeData {
-    pub total_power_watts: f64,
-    pub duration_seconds: u64,
-}
-
-impl AllTimeData {
-    pub fn new() -> Self {
-        AllTimeData {
-            total_power_watts: 0.0,
-            duration_seconds: 0,
-        }
-    }
-
-    pub fn update(&mut self, power_watts: f64) {
-        self.total_power_watts += power_watts;
-        self.duration_seconds += 1;
-    }
-
-    pub fn average_power(&self) -> f64 {
-        if self.duration_seconds > 0 {
-            self.total_power_watts / self.duration_seconds as f64
-        } else {
-            0.0
+fn serialize_data_to_json<T: Serialize>(data: &T) -> String {
+    match serde_json::to_string_pretty(data) {
+        Ok(json_string) => json_string,
+        Err(e) => {
+            eprintln!("Failed to serialize to JSON: {}", e);
+            "{}".to_string()
         }
     }
 }

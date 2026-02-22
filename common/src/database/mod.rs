@@ -8,7 +8,9 @@ pub use entries::DatabaseEntry;
 pub use purge::averaging_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
-use crate::types::{CPUData, DiskData, Event, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+use crate::types::{
+    CPUData, DiskData, Event, GPUData, GeneralData, NetworkData, ProcessData, RamData, SensorData, TotalData,
+};
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
 
@@ -69,7 +71,7 @@ impl Database {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "OFF")?;
 
-        let tables = match conn.prepare("SELECT detected_materials FROM hardware_info ORDER BY id DESC LIMIT 1") {
+        let tables = match conn.prepare("SELECT tables FROM hardware_info ORDER BY id DESC LIMIT 1") {
             Err(_) => None,
             Ok(mut stmt) => match stmt.query_row([], |row| row.get::<_, String>(0)).optional() {
                 Ok(Some(materials)) => Some(materials.split(',').map(|s| s.trim().to_string()).collect()),
@@ -92,8 +94,10 @@ impl Database {
         tx.execute(
             "CREATE TABLE IF NOT EXISTS hardware_info (
                     id                 INTEGER PRIMARY KEY,
-                    timestamp_id       INTEGER REFERENCES timestamp(id) ON DELETE CASCADE,
-                    detected_materials TEXT
+                    timestamp_id       INTEGER REFERENCES timestamp(id),
+                    tables             TEXT,
+                    detected_hardware  TEXT,
+                    hardware_data      TEXT
             )",
             [],
         )?;
@@ -112,7 +116,6 @@ impl Database {
         if !has_changed {
             return Ok(());
         }
-        Self::insert_hardware_info(&tx, SystemTime::now(), &current_tables.join(","))?;
         self.tables = Some(current_tables);
         tx.commit()?;
         Ok(())
@@ -120,23 +123,6 @@ impl Database {
 
     pub fn get_tables(&self) -> Vec<String> {
         self.tables.clone().unwrap_or_default()
-    }
-
-    pub fn insert_hardware_info(
-        tx: &Transaction,
-        timestamp: SystemTime,
-        detected_materials: &str,
-    ) -> Result<(), DatabaseError> {
-        tx.execute(
-            "INSERT INTO timestamp (timestamp) VALUES (?1)",
-            params![timestamp.duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
-        )?;
-        let timestamp_id = tx.last_insert_rowid();
-        tx.execute(
-            "INSERT INTO hardware_info (timestamp_id, detected_materials) VALUES (?1, ?2)",
-            params![timestamp_id, detected_materials], 
-        )?;
-        Ok(())
     }
 
     pub fn insert_event(&mut self, event: &Event) -> Result<(), DatabaseError> {
@@ -149,6 +135,21 @@ impl Database {
         for sensor_data in event.data() {
             Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
         }
+        tx.commit()?;
+        Ok(())
+    }
+
+    pub fn insert_hardware_info(&mut self, data: &GeneralData) -> Result<(), DatabaseError> {
+        let tx = self.conn.transaction()?;
+        tx.execute(
+            "INSERT INTO timestamp (timestamp) VALUES (?1)",
+            params![SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
+        )?;
+        let timestamp_id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT INTO hardware_info (timestamp_id, tables, detected_hardware, hardware_data) VALUES (?1, ?2, ?3, ?4)",
+            params![timestamp_id, data.tables, data.detected_hardware, data.hardware_info_serialized],
+        )?;
         tx.commit()?;
         Ok(())
     }
