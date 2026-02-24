@@ -44,10 +44,14 @@ pub trait DatabaseEntry {
         for (name, type_) in Self::columns_static() {
             col_defs.push(format!("{} {}", name, type_));
         }
+        let table_name = Self::table_name_static();
         format!(
-            "CREATE TABLE IF NOT EXISTS {} ({})",
-            Self::table_name_static(),
-            col_defs.join(", ")
+            "CREATE TABLE IF NOT EXISTS {} ({});\
+             CREATE INDEX IF NOT EXISTS idx_{}_timestamp_id ON {}(timestamp_id)",
+            table_name,
+            col_defs.join(", "),
+            table_name,
+            table_name,
         )
     }
 
@@ -342,8 +346,7 @@ impl DatabaseEntry for AllTimeData {
     }
 
     fn create_table_sql() -> String {
-        "CREATE TABLE IF NOT EXISTS all_time_data (id INTEGER PRIMARY KEY, total_power_watts REAL, duration_seconds INTEGER)"
-            .to_string()
+        "CREATE TABLE IF NOT EXISTS all_time_data (id INTEGER PRIMARY KEY, total_power_watts REAL, duration_seconds INTEGER)".to_string()
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {

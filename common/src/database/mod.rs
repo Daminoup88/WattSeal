@@ -87,7 +87,8 @@ impl Database {
         tx.execute(
             "CREATE TABLE IF NOT EXISTS timestamp (
                   id            INTEGER PRIMARY KEY,
-                  timestamp     INTEGER NOT NULL
+                  timestamp     INTEGER NOT NULL,
+                  period_type   INTEGER NOT NULL
                   )",
             [],
         )?;
@@ -117,7 +118,7 @@ impl Database {
         for &name in table_names {
             if !current_tables.contains(&name.to_string()) {
                 if let Some(create_sql) = dispatch_entry!(name, create_table_sql()) {
-                    tx.execute(&create_sql, [])?;
+                    tx.execute_batch(&create_sql)?;
                     current_tables.push(name.to_string());
                     has_changed = true;
                 }
@@ -137,8 +138,11 @@ impl Database {
     pub fn insert_event(&mut self, event: &Event) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
-            "INSERT INTO timestamp (timestamp) VALUES (?1)",
-            params![event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
+            "INSERT INTO timestamp (timestamp, period_type) VALUES (?1, ?2)",
+            params![
+                event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64,
+                1 as i64
+            ],
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
@@ -151,8 +155,11 @@ impl Database {
     pub fn insert_hardware_info(&mut self, data: &GeneralData) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
-            "INSERT INTO timestamp (timestamp) VALUES (?1)",
-            params![SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64],
+            "INSERT INTO timestamp (timestamp, period_type) VALUES (?1, ?2)",
+            params![
+                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64,
+                1000 as i64
+            ],
         )?;
         let timestamp_id = tx.last_insert_rowid();
         tx.execute(
