@@ -25,8 +25,6 @@ pub use gpu::{GPUSensor, get_gpu_list};
 pub use network::NetworkSensor;
 pub use process::get_processes;
 pub use ram::RamSensor;
-use serde::{Deserialize, Serialize};
-use serde_json;
 use sysinfo::{Components, CpuRefreshKind, Disks, Networks, System};
 
 pub enum SensorType {
@@ -267,8 +265,7 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
 
     let data = GeneralData {
         tables: tables.join(","),
-        detected_hardware: serialize_data_to_json(&detected_materials),
-        hardware_info_serialized: serialize_data_to_json(&hardware_info),
+        hardware_info_serialized: hardware_info.serialized(),
     };
 
     return data;
@@ -282,16 +279,6 @@ fn disk_kind_label(kind: &sysinfo::Disk) -> &'static str {
             sysinfo::DiskKind::HDD => "HDD",
             sysinfo::DiskKind::SSD => "SSD",
             _ => "Unknown",
-        }
-    }
-}
-
-fn serialize_data_to_json<T: Serialize>(data: &T) -> String {
-    match serde_json::to_string_pretty(data) {
-        Ok(json_string) => json_string,
-        Err(e) => {
-            eprintln!("Failed to serialize to JSON: {}", e);
-            "{}".to_string()
         }
     }
 }

@@ -95,6 +95,9 @@ impl CollectorApp {
             .map_err(|e| format!("Failed to create database tables: {}", e))?;
         println!("✓ Database initialized");
 
+        println!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+        self.set_hardware_info();
+
         println!("\n========== GETTING ALL TIME DATA ==========");
         if let Ok(all_time) = database.get_all_time_data() {
             self.all_time_data = all_time;
@@ -107,9 +110,6 @@ impl CollectorApp {
     }
 
     pub fn run(&mut self) {
-        println!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
-        self.get_hardware_info();
-
         println!("\n========== PURGING & AVERAGING OLD DATA ==========");
         // averaging data every hour and purge the database until the last X_hours
         averaging_and_purging_data(&mut self.database, 24, 24)
@@ -171,7 +171,7 @@ impl CollectorApp {
         }
     }
 
-    pub fn get_hardware_info(&mut self) {
+    pub fn set_hardware_info(&mut self) {
         let info = get_hardware_info(&self.sensors);
 
         match self.database.insert_hardware_info(&info) {

@@ -10,7 +10,10 @@ use rusqlite::{Connection, OptionalExtension, Row, Transaction, params};
 
 use crate::{
     AllTimeData,
-    types::{CPUData, DiskData, Event, GPUData, GeneralData, NetworkData, ProcessData, RamData, SensorData, TotalData},
+    types::{
+        CPUData, DiskData, Event, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData, RamData, SensorData,
+        TotalData,
+    },
 };
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
@@ -96,9 +99,7 @@ impl Database {
         tx.execute(
             "CREATE TABLE IF NOT EXISTS hardware_info (
                     id                 INTEGER PRIMARY KEY,
-                    timestamp_id       INTEGER REFERENCES timestamp(id),
                     tables             TEXT,
-                    detected_hardware  TEXT,
                     hardware_data      TEXT
             )",
             [],
@@ -152,20 +153,25 @@ impl Database {
         Ok(())
     }
 
+    /// Insert hardware info if line with id=1 doesn't exist, otherwise update it
     pub fn insert_hardware_info(&mut self, data: &GeneralData) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
-        tx.execute(
-            "INSERT INTO timestamp (timestamp, period_type) VALUES (?1, ?2)",
-            params![
-                SystemTime::now().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64,
-                1000 as i64
-            ],
-        )?;
-        let timestamp_id = tx.last_insert_rowid();
-        tx.execute(
-            "INSERT INTO hardware_info (timestamp_id, tables, detected_hardware, hardware_data) VALUES (?1, ?2, ?3, ?4)",
-            params![timestamp_id, data.tables, data.detected_hardware, data.hardware_info_serialized],
-        )?;
+        let existing: Option<String> = tx
+            .query_row("SELECT hardware_data FROM hardware_info WHERE id = 1", [], |row| {
+                row.get(0)
+            })
+            .optional()?;
+        if let Some(_) = existing {
+            tx.execute(
+                "UPDATE hardware_info SET tables = ?1, hardware_data = ?2 WHERE id = 1",
+                params![data.tables, data.hardware_info_serialized],
+            )?;
+        } else {
+            tx.execute(
+                "INSERT INTO hardware_info (id, tables, hardware_data) VALUES (1, ?1, ?2)",
+                params![data.tables, data.hardware_info_serialized],
+            )?;
+        }
         tx.commit()?;
         Ok(())
     }

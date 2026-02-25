@@ -140,11 +140,10 @@ pub enum InitialInfo {
 #[derive(Debug, Clone)]
 pub struct GeneralData {
     pub tables: String,
-    pub detected_hardware: String,
     pub hardware_info_serialized: String,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct HardwareInfo {
     pub system: SystemInfo,
     pub cpu: CpuInfo,
@@ -153,6 +152,18 @@ pub struct HardwareInfo {
     pub disks: Vec<DiskInfo>,
     pub displays: Vec<ScreenInfo>,
     pub battery: BatteryInfo,
+}
+
+impl HardwareInfo {
+    pub fn serialized(&self) -> String {
+        match serde_json::to_string(self) {
+            Ok(json_string) => json_string,
+            Err(e) => {
+                eprintln!("Failed to serialize to JSON: {}", e);
+                "{}".to_string()
+            }
+        }
+    }
 }
 
 impl From<Vec<InitialInfo>> for HardwareInfo {

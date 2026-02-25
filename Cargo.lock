@@ -716,8 +716,6 @@ dependencies = [
  "display-info",
  "is-admin",
  "nvml-wrapper",
- "serde",
- "serde_json",
  "sysinfo",
  "win-kernel-driver",
  "win_ring0",
@@ -749,6 +747,7 @@ dependencies = [
  "pelite",
  "rusqlite",
  "serde",
+ "serde_json",
 ]
 
 [[package]]
