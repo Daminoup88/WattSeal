@@ -149,6 +149,10 @@ impl DashboardPage {
             }
         }
 
+        if items_in_row % 2 == 1 {
+            row = row.push(Row::new().spacing(SPACING_LARGE).width(Length::Fill));
+        }
+
         if items_in_row > 0 {
             column = column.push(row);
         }

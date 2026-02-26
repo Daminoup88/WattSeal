@@ -1,8 +1,7 @@
-use chrono::format;
 use common::HardwareInfo;
 use iced::{
     Color, Element, Length, Padding,
-    widget::{Column, Container, Row, Scrollable},
+    widget::{Container, Scrollable, grid},
 };
 
 use crate::{
@@ -16,7 +15,7 @@ use crate::{
     themes::AppTheme,
 };
 
-const CARDS_PER_ROW: usize = 3;
+const CARD_MAX_WIDTH: f32 = 350.0;
 
 pub struct InfoPage;
 
@@ -179,24 +178,12 @@ impl InfoPage {
             }
         }
 
-        let max_fields = specs.iter().map(|card| card.fields.len()).max().unwrap_or(0);
+        let cards = specs
+            .into_iter()
+            .map(|card| hardware_card(card.icon_svg, card.accent, &card.title, &card.subtitle, card.fields))
+            .collect::<Vec<_>>();
 
-        let mut cards: Vec<Element<'_, Message, AppTheme>> = Vec::new();
-        for card in specs {
-            let InfoCard {
-                icon_svg: icon,
-                accent,
-                title,
-                subtitle,
-                mut fields,
-            } = card;
-            while fields.len() < max_fields {
-                fields.push(InfoField::new("", ""));
-            }
-            cards.push(hardware_card(icon, accent, &title, &subtitle, fields));
-        }
-
-        let grid = card_grid(cards);
+        let grid = grid(cards).fluid(CARD_MAX_WIDTH).spacing(SPACING_LARGE);
 
         Scrollable::new(
             Container::new(grid)
@@ -208,40 +195,6 @@ impl InfoPage {
         .class(ScrollableStyle::Standard)
         .into()
     }
-}
-
-fn card_grid<'a>(cards: Vec<Element<'a, Message, AppTheme>>) -> Column<'a, Message, AppTheme> {
-    let mut column = Column::new()
-        .spacing(SPACING_LARGE)
-        .width(Length::Fill)
-        .height(Length::Fill);
-    let mut row = Row::new()
-        .spacing(SPACING_LARGE)
-        .width(Length::Fill)
-        .height(Length::Fill);
-    let mut col = 0;
-
-    for card in cards {
-        row = row.push(card);
-        col += 1;
-        if col == CARDS_PER_ROW {
-            column = column.push(row);
-            row = Row::new()
-                .spacing(SPACING_LARGE)
-                .width(Length::Fill)
-                .height(Length::Fill);
-            col = 0;
-        }
-    }
-
-    if col > 0 {
-        for _ in col..CARDS_PER_ROW {
-            row = row.push(Column::new().width(Length::Fill).height(Length::Fill));
-        }
-        column = column.push(row);
-    }
-
-    column
 }
 
 fn format_bytes_gb(bytes: u64) -> String {

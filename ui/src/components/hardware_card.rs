@@ -1,7 +1,6 @@
 use iced::{
     Alignment, Color, Element, Length,
-    advanced::graphics::core::window::icon,
-    widget::{Column, Container, Row, Svg, Text, svg},
+    widget::{Column, Container, Row, Scrollable, Svg, Text, svg},
 };
 
 use crate::{
@@ -87,16 +86,29 @@ pub fn hardware_card<'a>(
 
     let mut content = Column::new().spacing(SPACING_LARGE).push(header);
 
-    for field in fields {
-        content = content.push(
-            Column::new()
-                .spacing(2)
-                .push(Text::new(field.label).size(FONT_SIZE_SMALL).class(TextStyle::Muted))
-                .push(Text::new(field.value).size(FONT_SIZE_SUBTITLE).font(FONT_BOLD)),
-        );
+    let mut fields_content = Column::new().spacing(SPACING_LARGE);
+
+    for chunk in fields.chunks(2) {
+        let mut row = Row::new().spacing(SPACING_LARGE);
+        for field in chunk {
+            row = row.push(
+                Column::new()
+                    .spacing(2)
+                    .width(Length::FillPortion(1))
+                    .push(
+                        Text::new(field.label.clone())
+                            .size(FONT_SIZE_SMALL)
+                            .class(TextStyle::Muted),
+                    )
+                    .push(Text::new(field.value.clone()).size(FONT_SIZE_SUBTITLE).font(FONT_BOLD)),
+            );
+        }
+        fields_content = fields_content.push(row);
     }
 
-    Container::new(content)
+    content = content.push(fields_content);
+
+    Container::new(Scrollable::new(content).width(Length::Fill).height(Length::Fill))
         .padding(PADDING_LARGE)
         .width(Length::Fill)
         .class(ContainerStyle::ComponentCard)
