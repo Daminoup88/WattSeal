@@ -28,20 +28,13 @@ impl Event {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct AllTimeData {
     pub total_energy_wh: f64,
     pub duration_seconds: i64,
 }
 
 impl AllTimeData {
-    pub fn new() -> Self {
-        AllTimeData {
-            total_energy_wh: 0.0,
-            duration_seconds: 0,
-        }
-    }
-
     pub fn update(&mut self, power_watts: f64) {
         self.total_energy_wh += power_watts;
         self.duration_seconds += 1;
@@ -603,15 +596,6 @@ impl Default for TotalData {
         TotalData {
             total_power_watts: 0.0,
             period_type: "second".to_string(),
-        }
-    }
-}
-
-impl Default for AllTimeData {
-    fn default() -> Self {
-        AllTimeData {
-            total_energy_wh: 0.0,
-            duration_seconds: 0,
         }
     }
 }

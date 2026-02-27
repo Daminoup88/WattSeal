@@ -2,7 +2,8 @@ use std::{collections::HashMap, os::windows::process, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo, ProcessData, SensorData, generic_name_for_table,
+    AllTimeData, Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo, ProcessData, SensorData,
+    generic_name_for_table,
 };
 use iced::{
     Element, Subscription, Task,
@@ -31,13 +32,14 @@ pub struct App {
     header: Header,
     theme: AppTheme,
     database: Database,
+    all_time_data: AllTimeData,
 }
 
 impl App {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::EcoEnergy;
         let current_page = Page::Dashboard;
-        let database = Database::new().expect("Failed to create database");
+        let mut database = Database::new().expect("Failed to create database");
         let sensors = database
             .get_tables()
             .into_iter()
@@ -50,6 +52,7 @@ impl App {
             .collect();
         let hardware_info = database.get_hardware_info().unwrap_or_default();
         let dashboard_page = DashboardPage;
+        let all_time_data = database.get_all_time_data().unwrap_or_default();
         let task = Task::done(Message::FetchAllChartsData(TimeRange::default()));
 
         (
@@ -64,6 +67,7 @@ impl App {
                 theme,
                 database,
                 hardware_info,
+                all_time_data,
             },
             task,
         )
@@ -78,6 +82,7 @@ impl App {
                         sensor.push_data(*timestamp, sensor_data);
                     }
                 }
+                self.refresh_all_time_data();
                 Task::none()
             }
             Message::NavigateTo(page) => {
@@ -173,7 +178,7 @@ impl App {
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let page_content = match self.current_page {
-            Page::Dashboard => self.dashboard_page.view(&self.sensors),
+            Page::Dashboard => self.dashboard_page.view(&self.sensors, &self.all_time_data),
             Page::Info => self.info_page.view(&self.hardware_info, self.theme),
             Page::Optimization => self.optimization_page.view(),
             Page::Settings => self.settings_page.view(),
@@ -195,6 +200,12 @@ impl App {
 
     pub fn theme(&self) -> AppTheme {
         self.theme
+    }
+
+    fn refresh_all_time_data(&mut self) {
+        if let Ok(all_time_data) = self.database.get_all_time_data() {
+            self.all_time_data = all_time_data;
+        }
     }
 }
 

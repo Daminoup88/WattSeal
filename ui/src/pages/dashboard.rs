@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use common::{DatabaseEntry, ProcessData, SensorData, TotalData};
+use common::{AllTimeData, DatabaseEntry, ProcessData, TotalData};
 use iced::{
     Alignment, Element, Length, Padding,
     alignment::{Horizontal, Vertical},
-    widget::{Column, Container, Row, Scrollable, Text},
+    widget::{Column, Container, Row, Scrollable, Text, grid, rule},
 };
 
 use crate::{
@@ -14,24 +14,31 @@ use crate::{
         container::ContainerStyle,
         scrollable::ScrollableStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HUGE, FONT_SIZE_SUBTITLE, FONT_SIZE_TITLE, PADDING_LARGE,
-            SPACING_LARGE, SPACING_MEDIUM, SPACING_XLARGE,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_LARGE, FONT_SIZE_SUBTITLE, FONT_SIZE_TITLE, PADDING_LARGE,
+            PADDING_MEDIUM, SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL, SPACING_XLARGE,
         },
         text::TextStyle,
     },
     themes::AppTheme,
 };
 
+const MAX_COMPONENT_CARD_WIDTH: f32 = 600.0;
+const CARBON_INTENSITY_G_PER_KWH: f64 = 475.0;
+
 pub struct DashboardPage;
 
 impl DashboardPage {
-    pub fn view<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
+    pub fn view<'a>(
+        &'a self,
+        sensors: &'a HashMap<String, SensorState>,
+        all_time_data: &'a AllTimeData,
+    ) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(sensors));
+            .push(self.view_power_summary(sensors, all_time_data));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
@@ -52,7 +59,11 @@ impl DashboardPage {
             .into()
     }
 
-    fn view_power_summary<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
+    fn view_power_summary<'a>(
+        &'a self,
+        sensors: &'a HashMap<String, SensorState>,
+        all_time_data: &'a AllTimeData,
+    ) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
             sensors
@@ -61,35 +72,61 @@ impl DashboardPage {
                 .and_then(|data| data.total_power_watts())
                 .unwrap_or(0.0)
         );
-        let power_unit = "W";
 
-        let title = Text::new("Total Power Consumption")
-            .size(FONT_SIZE_SUBTITLE)
-            .font(FONT_BOLD)
-            .class(TextStyle::Subtitle);
-
-        let power_display = Row::new()
-            .align_y(Alignment::End)
-            .spacing(4)
-            .push(
-                Text::new(power_value)
-                    .size(FONT_SIZE_HUGE)
-                    .font(FONT_BOLD)
-                    .class(TextStyle::Primary),
-            )
-            .push(Text::new(power_unit).size(FONT_SIZE_TITLE).class(TextStyle::Muted));
-
-        let content = Column::new()
-            .spacing(SPACING_MEDIUM)
+        let main = Column::new()
+            .width(Length::FillPortion(1))
+            .spacing(SPACING_SMALL)
             .align_x(Alignment::Center)
-            .push(title)
-            .push(power_display);
+            .push(
+                Text::new("Current power consumption")
+                    .size(FONT_SIZE_SUBTITLE)
+                    .font(FONT_BOLD)
+                    .class(TextStyle::Subtitle),
+            )
+            .push(
+                Row::new()
+                    .align_y(Alignment::End)
+                    .spacing(4)
+                    .push(
+                        Text::new(power_value)
+                            .size(FONT_SIZE_LARGE)
+                            .font(FONT_BOLD)
+                            .class(TextStyle::Primary),
+                    )
+                    .push(Text::new("W").size(FONT_SIZE_TITLE).class(TextStyle::Muted)),
+            );
+
+        let total_energy_wh = all_time_data.total_energy_wh;
+        let carbon_grams = wh_to_co2_grams(total_energy_wh);
+
+        let side = Column::new()
+            .width(Length::FillPortion(1))
+            .spacing(SPACING_SMALL)
+            .align_x(Alignment::Center)
+            .push(metric_tile(
+                "All Time",
+                format_wh(total_energy_wh),
+                "Wh",
+                TextStyle::Secondary,
+            ))
+            .push(metric_tile(
+                "Emissions",
+                format_grams(carbon_grams),
+                "g CO₂",
+                TextStyle::Tertiary,
+            ));
+
+        let content = Row::new()
+            .width(Length::Fill)
+            .align_y(Alignment::Center)
+            .push(main)
+            .push(rule::vertical(1))
+            .push(side);
 
         Container::new(content)
             .width(Length::Fill)
-            .padding(Padding::from(PADDING_LARGE))
-            .align_x(Horizontal::Center)
-            .align_y(Vertical::Center)
+            .height(Length::Shrink)
+            .padding(Padding::from(PADDING_MEDIUM))
             .class(ContainerStyle::PowerCard)
             .into()
     }
@@ -177,4 +214,52 @@ impl DashboardPage {
             .map(|c| c.sensor_visual_card(title, height, show_usage))
             .unwrap_or_else(|| no_data_placeholder())
     }
+}
+
+fn metric_tile<'a>(
+    label: &'a str,
+    value: String,
+    unit: &'a str,
+    value_style: TextStyle,
+) -> Element<'a, Message, AppTheme> {
+    let value_row = Row::new()
+        .spacing(4)
+        .align_y(Alignment::End)
+        .push(
+            Text::new(value)
+                .size(FONT_SIZE_SUBTITLE)
+                .font(FONT_BOLD)
+                .class(value_style),
+        )
+        .push(Text::new(unit).size(FONT_SIZE_BODY).class(TextStyle::Muted));
+
+    Container::new(
+        Column::new()
+            .padding(Padding::from(PADDING_MEDIUM))
+            .spacing(2)
+            .align_x(Alignment::Center)
+            .push(
+                Text::new(label)
+                    .size(FONT_SIZE_BODY)
+                    .font(FONT_BOLD)
+                    .class(TextStyle::Subtitle),
+            )
+            .push(value_row),
+    )
+    .width(Length::Fill)
+    .align_x(Horizontal::Center)
+    .align_y(Vertical::Center)
+    .into()
+}
+
+fn wh_to_co2_grams(energy_wh: f64) -> f64 {
+    (energy_wh / 1000.0) * CARBON_INTENSITY_G_PER_KWH
+}
+
+fn format_wh(energy_wh: f64) -> String {
+    format!("{:.1}", energy_wh.max(0.0))
+}
+
+fn format_grams(co2_grams: f64) -> String {
+    format!("{:.1}", co2_grams.max(0.0))
 }
