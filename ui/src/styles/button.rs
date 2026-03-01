@@ -16,6 +16,7 @@ pub enum ButtonStyle {
     Toggle(bool),
     Nav,
     NavActive,
+    InfoHelp,
 }
 
 impl Catalog for AppTheme {
@@ -88,6 +89,18 @@ impl ButtonStyle {
                     color: ext.primary,
                     width: BORDER_WIDTH,
                     radius: BORDER_RADIUS_SMALL.into(),
+                },
+                shadow: Shadow::default(),
+                ..Default::default()
+            },
+
+            Self::InfoHelp => button::Style {
+                background: Some(Background::Color(with_alpha(ext.primary, 0.15))),
+                text_color: ext.primary,
+                border: Border {
+                    color: with_alpha(ext.primary, 0.3),
+                    width: BORDER_WIDTH,
+                    radius: 12.0.into(),
                 },
                 shadow: Shadow::default(),
                 ..Default::default()

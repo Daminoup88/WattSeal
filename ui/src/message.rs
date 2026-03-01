@@ -23,4 +23,6 @@ pub enum Message {
     FetchAllChartsData(TimeRange),
     Redraw,
     LoadChartEvents(i64),
+    OpenInfoModal(String),
+    CloseInfoModal,
 }

@@ -1,4 +1,4 @@
-use common::HardwareInfo;
+use common::{CPUData, DatabaseEntry, DiskData, GPUData, HardwareInfo, RamData};
 use iced::{
     Color, Element, Length, Padding,
     widget::{Column, Container, Row, Scrollable, Space},
@@ -48,6 +48,7 @@ impl InfoPage {
                 cores(language),
                 cores_and_threads(language, hw.cpu.physical_cores, hw.cpu.logical_cores),
             )),
+            Some(CPUData::table_name_static().to_string()),
         ));
 
         if hw.gpus.is_empty() {
@@ -58,6 +59,7 @@ impl InfoPage {
                 graphics_information(language).to_string(),
                 InfoField::new(model(language), na(language)),
                 None,
+                Some(GPUData::table_name_static().to_string()),
             ));
         } else {
             for (i, gpu) in hw.gpus.iter().enumerate() {
@@ -69,6 +71,7 @@ impl InfoPage {
                     subtitle,
                     InfoField::new(model(language), gpu.as_str()),
                     None,
+                    Some(GPUData::table_name_static().to_string()),
                 ));
             }
         }
@@ -86,6 +89,7 @@ impl InfoPage {
                 swap(language),
                 format_bytes_gb(hw.memory.total_swap_bytes, language),
             )),
+            Some(RamData::table_name_static().to_string()),
         ));
 
         specs.push(InfoCard::new(
@@ -95,6 +99,7 @@ impl InfoPage {
             os_information(language).to_string(),
             InfoField::new(operating_system(language), &hw.system.os),
             Some(InfoField::new(hostname(language), &hw.system.hostname)),
+            Some("system".to_string()),
         ));
 
         if hw.disks.is_empty() {
@@ -105,6 +110,7 @@ impl InfoPage {
                 disk_information(language).to_string(),
                 InfoField::new(disk(language), na(language)),
                 Some(InfoField::new(space(language), na(language))),
+                Some(DiskData::table_name_static().to_string()),
             ));
         } else {
             for (i, disk) in hw.disks.iter().enumerate() {
@@ -126,6 +132,7 @@ impl InfoPage {
                             format_bytes_gb(disk.total_bytes, language)
                         ),
                     )),
+                    Some(DiskData::table_name_static().to_string()),
                 ));
             }
         }
@@ -145,6 +152,7 @@ impl InfoPage {
                 battery_status(language).to_string(),
                 InfoField::new(name(language), hw.battery.name.as_deref().unwrap_or(na(language))),
                 Some(InfoField::new(translations::capacity(language), capacity)),
+                Some("battery".to_string()),
             ));
         } else {
             specs.push(InfoCard::new(
@@ -154,6 +162,7 @@ impl InfoPage {
                 battery_status(language).to_string(),
                 InfoField::new(name(language), na(language)),
                 Some(InfoField::new(capacity(language), na(language))),
+                Some("battery".to_string()),
             ));
         }
 
@@ -165,6 +174,7 @@ impl InfoPage {
                 screen_information(language).to_string(),
                 InfoField::new(model(language), na(language)),
                 Some(InfoField::new(mode(language), na(language))),
+                Some("display".to_string()),
             ));
         } else {
             let mut displays = hw.displays.iter().collect::<Vec<_>>();
@@ -186,6 +196,7 @@ impl InfoPage {
                         mode(language),
                         format_display_mode(&d.resolution, d.refresh_rate_hz),
                     )),
+                    Some("display".to_string()),
                 ));
             }
         }
@@ -193,6 +204,7 @@ impl InfoPage {
         let cards = specs
             .into_iter()
             .map(|card| {
+                let on_info = card.info_key.map(|key| Message::OpenInfoModal(key));
                 hardware_card(
                     card.icon_svg,
                     card.accent,
@@ -200,6 +212,7 @@ impl InfoPage {
                     &card.subtitle,
                     card.field,
                     card.optional_field,
+                    on_info,
                 )
             })
             .collect::<Vec<_>>();

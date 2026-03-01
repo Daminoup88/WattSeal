@@ -1,4 +1,6 @@
-use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricType, NetworkData, RamData, SensorData, TotalData};
+use common::{
+    CPUData, DatabaseEntry, DiskData, GPUData, MetricType, NetworkData, ProcessData, RamData, SensorData, TotalData,
+};
 
 use crate::types::{AppLanguage, TimeRange};
 
@@ -64,7 +66,7 @@ pub fn settings_language(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn settings_close(language: AppLanguage) -> &'static str {
+pub fn modal_close(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close",
         AppLanguage::French => "Fermer",
@@ -261,6 +263,13 @@ pub fn battery_status(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Battery Status",
         AppLanguage::French => "État de la batterie",
+    }
+}
+
+pub fn process(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Processes",
+        AppLanguage::French => "Processus",
     }
 }
 
@@ -525,27 +534,6 @@ pub fn translate_label(language: AppLanguage, english_label: &str) -> &'static s
     }
 }
 
-// pub fn sensor_name<'a>(language: AppLanguage, table_name: &'a str) -> &'a str {
-//     if table_name == CPUData::table_name_static() {
-//         cpu(language)
-//     } else if table_name == GPUData::table_name_static() {
-//         gpu(language)
-//     } else if table_name == RamData::table_name_static() {
-//         ram(language)
-//     } else if table_name == DiskData::table_name_static() {
-//         disk(language)
-//     } else if table_name == NetworkData::table_name_static() {
-//         network(language)
-//     } else if table_name == TotalData::table_name_static() {
-//         all_time(language)
-//     } else {
-//         match language {
-//             AppLanguage::English => "Unknown",
-//             AppLanguage::French => "Inconnu",
-//         }
-//     }
-// }
-
 pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str {
     match (language, english_name) {
         (_, "CPU") => "CPU",
@@ -558,12 +546,6 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
     }
 }
 
-// pub fn chart_legend(language: AppLanguage, component: &str, metric_label: &str) -> String {
-//     let component = sensor_name(language, component);
-//     let _ = translate_label(language, metric_label);
-//     component.to_string()
-// }
-
 pub fn chart_legend(language: AppLanguage, metric_label: &str) -> String {
     let metric = translate_label(language, metric_label);
     metric.to_string()
@@ -573,6 +555,297 @@ pub fn optimization_content(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Optimization Page Content",
         AppLanguage::French => "Contenu de la page d'optimisation",
+    }
+}
+
+// Info modal
+
+pub fn info_modal_current_power(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Current power",
+        AppLanguage::French => "Puissance actuelle",
+    }
+}
+
+pub fn info_modal_all_time_power(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "All-time energy",
+        AppLanguage::French => "Énergie totale",
+    }
+}
+
+pub fn info_modal_top_consumer(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Highest consumer",
+        AppLanguage::French => "Plus gros consommateur",
+    }
+}
+
+pub fn info_modal_top_process(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Top process",
+        AppLanguage::French => "Processus principal",
+    }
+}
+
+pub fn info_modal_coming_soon(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Coming soon",
+        AppLanguage::French => "Bientôt disponible",
+    }
+}
+
+pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
+    if key == CPUData::table_name_static() {
+        return cpu(language).to_string();
+    } else if key == GPUData::table_name_static() {
+        return gpu(language).to_string();
+    } else if key == RamData::table_name_static() {
+        return ram(language).to_string();
+    } else if key == DiskData::table_name_static() {
+        return disk(language).to_string();
+    } else if key == NetworkData::table_name_static() {
+        return network(language).to_string();
+    } else if key == TotalData::table_name_static() {
+        return all_time(language).to_string();
+    } else if key == ProcessData::table_name_static() {
+        return process(language).to_string();
+    } else {
+        return match key {
+            "system" => system(language).to_string(),
+            "battery" => battery(language).to_string(),
+            "display" => display(language).to_string(),
+            _ => match language {
+                AppLanguage::English => "Info".to_string(),
+                AppLanguage::French => "Info".to_string(),
+            },
+        };
+    }
+}
+
+pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str {
+    if key == CPUData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "The CPU (Central Processing Unit) is the brain of your computer. \
+                 It executes all instructions and computations.\n\n\
+                 Main power consumers:\n\
+                 \u{2022} Higher clock speeds increase power draw\n\
+                 \u{2022} More active cores = more consumption\n\
+                 \u{2022} Intensive tasks (compilation, encoding) spike usage\n\
+                 \u{2022} Higher voltages (overclocking) raise consumption"
+            }
+            AppLanguage::French => {
+                "Le CPU (processeur central) est le cerveau de votre ordinateur. \
+                 Il exécute toutes les instructions et calculs.\n\n\
+                 Principaux consommateurs d'énergie :\n\
+                 \u{2022} Des fréquences plus élevées augmentent la consommation\n\
+                 \u{2022} Plus de cœurs actifs = plus de consommation\n\
+                 \u{2022} Les tâches intensives (compilation, encodage) augmentent la charge\n\
+                 \u{2022} Des tensions plus élevées (overclocking) augmentent la consommation"
+            }
+        };
+    } else if key == GPUData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "The GPU (Graphics Processing Unit) handles graphics rendering and \
+                 parallel computations.\n\n\
+                 Main power consumers:\n\
+                 \u{2022} 3D rendering and gaming\n\
+                 \u{2022} Video encoding / decoding\n\
+                 \u{2022} AI and machine learning workloads\n\
+                 \u{2022} High VRAM usage and memory bandwidth"
+            }
+            AppLanguage::French => {
+                "Le GPU (processeur graphique) gère le rendu graphique et les calculs \
+                 parallèles.\n\n\
+                 Principaux consommateurs d'énergie :\n\
+                 \u{2022} Rendu 3D et jeux vidéo\n\
+                 \u{2022} Encodage / décodage vidéo\n\
+                 \u{2022} Charges IA et apprentissage automatique\n\
+                 \u{2022} Utilisation élevée de la VRAM"
+            }
+        };
+    } else if key == RamData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "RAM (Random Access Memory) provides fast temporary storage for running \
+                 programs and active data.\n\n\
+                 Main power consumers:\n\
+                 \u{2022} Higher memory frequencies (MHz)\n\
+                 \u{2022} More active memory modules\n\
+                 \u{2022} Frequent read/write operations\n\
+                 \u{2022} Always draws power while the system is on"
+            }
+            AppLanguage::French => {
+                "La RAM (mémoire vive) fournit un stockage temporaire rapide pour les \
+                 programmes en cours et les données actives.\n\n\
+                 Principaux consommateurs d'énergie :\n\
+                 \u{2022} Fréquences mémoire plus élevées (MHz)\n\
+                 \u{2022} Plus de modules mémoire actifs\n\
+                 \u{2022} Opérations de lecture/écriture fréquentes\n\
+                 \u{2022} Consomme toujours de l'énergie tant que le système est allumé"
+            }
+        };
+    } else if key == DiskData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "Storage drives (SSD / HDD) provide permanent data storage for your \
+                 files and system.\n\n\
+                 Main power consumers:\n\
+                 \u{2022} Sustained read/write operations\n\
+                 \u{2022} Spinning platters (HDD)\n\
+                 \u{2022} NAND write operations (SSD)\n\
+                 \u{2022} Drive seeking and indexing"
+            }
+            AppLanguage::French => {
+                "Les disques de stockage (SSD / HDD) fournissent un stockage permanent \
+                 pour vos fichiers et votre système.\n\n\
+                 Principaux consommateurs d'énergie :\n\
+                 \u{2022} Opérations de lecture/écriture soutenues\n\
+                 \u{2022} Plateaux en rotation (HDD)\n\
+                 \u{2022} Opérations d'écriture NAND (SSD)\n\
+                 \u{2022} Recherche et indexation sur le disque"
+            }
+        };
+    } else if key == NetworkData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "Network interfaces handle data transmission between your computer \
+                 and other devices or the internet.\n\n\
+                 Main power consumers:\n\
+                 \u{2022} High data throughput\n\
+                 \u{2022} Wi-Fi radio transmission\n\
+                 \u{2022} Active network connections\n\
+                 \u{2022} Bluetooth and wireless peripherals"
+            }
+            AppLanguage::French => {
+                "Les interfaces réseau gèrent la transmission de données entre votre \
+                 ordinateur et d'autres appareils ou internet.\n\n\
+                 Principaux consommateurs d'énergie :\n\
+                 \u{2022} Débit de données élevé\n\
+                 \u{2022} Transmission radio Wi-Fi\n\
+                 \u{2022} Connexions réseau actives\n\
+                 \u{2022} Bluetooth et périphériques sans fil"
+            }
+        };
+    } else if key == ProcessData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "Shows which applications consume the most power on your system.\n\n\
+                 Power is estimated based on CPU, GPU, and disk usage of each process. \
+                 Background processes and services also contribute to total consumption."
+            }
+            AppLanguage::French => {
+                "Montre quelles applications consomment le plus d'énergie sur votre \
+                 système.\n\n\
+                 La puissance est estimée à partir de l'utilisation CPU, GPU et disque \
+                 de chaque processus. Les processus en arrière-plan et les services \
+                 contribuent aussi à la consommation totale."
+            }
+        };
+    } else if key == TotalData::table_name_static() {
+        return match language {
+            AppLanguage::English => {
+                "Shows the total power consumption of your entire system.\n\n\
+                 This is the sum of all hardware components (CPU, GPU, RAM, Disk, \
+                 Network). Understanding which component consumes the most helps \
+                 optimize energy usage."
+            }
+            AppLanguage::French => {
+                "Affiche la consommation totale de votre système.\n\n\
+                 C'est la somme de tous les composants (CPU, GPU, RAM, Disque, \
+                 Réseau). Comprendre quel composant consomme le plus aide à \
+                 optimiser la consommation d'énergie."
+            }
+        };
+    } else {
+        return match key {
+            "system" => match language {
+                AppLanguage::English => {
+                    "Your operating system manages all hardware resources and running \
+                     software.\n\n\
+                     Impact on power:\n\
+                     \u{2022} Background services and scheduled tasks\n\
+                     \u{2022} System indexing and updates\n\
+                     \u{2022} Power plan settings affect all components"
+                }
+                AppLanguage::French => {
+                    "Votre système d'exploitation gère toutes les ressources matérielles \
+                     et les logiciels en cours.\n\n\
+                     Impact sur la consommation :\n\
+                     \u{2022} Services en arrière-plan et tâches planifiées\n\
+                     \u{2022} Indexation et mises à jour du système\n\
+                     \u{2022} Les paramètres du plan d'alimentation affectent tous les \
+                     composants"
+                }
+            },
+            "battery" => match language {
+                AppLanguage::English => {
+                    "The battery stores energy for portable use and affects how power is \
+                     managed.\n\n\
+                     Key facts:\n\
+                     \u{2022} Cycle count reflects battery health and aging\n\
+                     \u{2022} Design capacity decreases over time\n\
+                     \u{2022} Running on battery often triggers power-saving modes\n\
+                     \u{2022} Fast charging generates more heat and uses more energy"
+                }
+                AppLanguage::French => {
+                    "La batterie stocke l'énergie pour une utilisation portable et \
+                     influence la gestion de l'alimentation.\n\n\
+                     Points clés :\n\
+                     \u{2022} Le nombre de cycles reflète l'état et le vieillissement de \
+                     la batterie\n\
+                     \u{2022} La capacité diminue avec le temps\n\
+                     \u{2022} L'utilisation sur batterie active souvent des modes \
+                     d'économie\n\
+                     \u{2022} La charge rapide génère plus de chaleur et consomme plus"
+                }
+            },
+            "display" => match language {
+                AppLanguage::English => {
+                    "Displays are a major power consumer, especially at high brightness.\n\n\
+                     Main power consumers:\n\
+                     \u{2022} Screen brightness (biggest factor)\n\
+                     \u{2022} Higher refresh rates (Hz)\n\
+                     \u{2022} Higher resolutions\n\
+                     \u{2022} HDR and wide color gamut"
+                }
+                AppLanguage::French => {
+                    "Les écrans sont un gros consommateur d'énergie, surtout à haute \
+                     luminosité.\n\n\
+                     Principaux consommateurs d'énergie :\n\
+                     \u{2022} Luminosité de l'écran (facteur principal)\n\
+                     \u{2022} Taux de rafraîchissement élevés (Hz)\n\
+                     \u{2022} Résolutions plus élevées\n\
+                     \u{2022} HDR et gamme de couleurs étendue"
+                }
+            },
+            "storage" => match language {
+                AppLanguage::English => {
+                    "Storage drives (SSD / HDD) provide permanent data storage for your \
+                     files and system.\n\n\
+                     Main power consumers:\n\
+                     \u{2022} Sustained read/write operations\n\
+                     \u{2022} Spinning platters (HDD)\n\
+                     \u{2022} NAND write operations (SSD)\n\
+                     \u{2022} Drive seeking and indexing"
+                }
+                AppLanguage::French => {
+                    "Les disques de stockage (SSD / HDD) fournissent un stockage \
+                     permanent pour vos fichiers et votre système.\n\n\
+                     Principaux consommateurs d'énergie :\n\
+                     \u{2022} Opérations de lecture/écriture soutenues\n\
+                     \u{2022} Plateaux en rotation (HDD)\n\
+                     \u{2022} Opérations d'écriture NAND (SSD)\n\
+                     \u{2022} Recherche et indexation sur le disque"
+                }
+            },
+            _ => match language {
+                AppLanguage::English => "No additional information available for this component.",
+                AppLanguage::French => "Aucune information supplémentaire disponible pour ce composant.",
+            },
+        };
     }
 }
 

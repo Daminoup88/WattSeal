@@ -2,22 +2,35 @@ use std::{collections::HashMap, os::windows::process, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo, ProcessData, SensorData,
+    AllTimeData, Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo, ProcessData, SensorData, TotalData,
     generic_name_for_table,
 };
 use iced::{
-    Alignment, Element, Length, Subscription, Task,
+    Alignment, Element, Length, Padding, Subscription, Task,
     time::{Duration, every},
-    widget::{Column, Container, Space, center, mouse_area, opaque, stack},
+    widget::{
+        Button, Column, Container, Row, Scrollable, Space, Text, button, center, image, mouse_area, opaque, stack,
+    },
 };
 
 use crate::{
     components::{header::Header, helpers::modal, sensor_state::SensorState},
     message::Message,
     pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
-    styles::container::ContainerStyle,
+    styles::{
+        button::ButtonStyle,
+        container::ContainerStyle,
+        style_constants::{
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE,
+            PADDING_XLARGE, SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL,
+        },
+        text::TextStyle,
+    },
     themes::AppTheme,
-    translations::window_title,
+    translations::{
+        self, info_modal_all_time_power, info_modal_coming_soon, info_modal_current_power, info_modal_description,
+        info_modal_title, info_modal_top_consumer, info_modal_top_process, modal_close, na, window_title,
+    },
     types::{AppLanguage, TimeRange},
 };
 
@@ -32,6 +45,7 @@ pub struct App {
     optimization_page: OptimizationPage,
     settings_page: SettingsPage,
     settings_open: bool,
+    info_modal_open: Option<String>,
     language: AppLanguage,
     header: Header,
     theme: AppTheme,
@@ -73,6 +87,7 @@ impl App {
                 optimization_page: OptimizationPage::new(),
                 settings_page: SettingsPage::new(),
                 settings_open: false,
+                info_modal_open: None,
                 language,
                 theme,
                 database,
@@ -120,6 +135,14 @@ impl App {
             }
             Message::CloseSettings => {
                 self.settings_open = false;
+                Task::none()
+            }
+            Message::OpenInfoModal(target) => {
+                self.info_modal_open = Some(target);
+                Task::none()
+            }
+            Message::CloseInfoModal => {
+                self.info_modal_open = None;
                 Task::none()
             }
             Message::ChangeChartMetricType(table_name, metric_type) => {
@@ -221,9 +244,146 @@ impl App {
                 self.settings_page.view(self.theme, self.language),
                 Message::CloseSettings,
             )
+        } else if let Some(ref target) = self.info_modal_open {
+            modal(content, self.info_modal_view(target), Message::CloseInfoModal)
         } else {
-            content
+            stack![content].into()
         }
+    }
+
+    fn info_modal_view(&self, target: &str) -> Element<'_, Message, AppTheme> {
+        let language = self.language;
+
+        let title = Text::new(info_modal_title(language, target))
+            .size(FONT_SIZE_HEADER)
+            .font(FONT_BOLD)
+            .width(Length::Fill);
+
+        let close_button: Button<'_, Message, AppTheme> = button(Text::new(modal_close(language)).size(FONT_SIZE_BODY))
+            .class(ButtonStyle::Standard)
+            .on_press(Message::CloseInfoModal);
+
+        let top_row = Row::new()
+            .spacing(SPACING_LARGE)
+            .align_y(Alignment::Center)
+            .push(title)
+            .push(close_button);
+
+        let description = Text::new(info_modal_description(language, target)).size(FONT_SIZE_BODY);
+
+        let mut content = Column::new()
+            .spacing(SPACING_LARGE)
+            .align_x(Alignment::Start)
+            .push(top_row)
+            .push(description);
+
+        if let Some(sensor) = self.sensors.get(target) {
+            let power = sensor.get_latest_reading().and_then(|d| d.total_power_watts());
+
+            let power_text = power
+                .map(|p| format!("{:.1} W", p))
+                .unwrap_or_else(|| na(language).to_string());
+
+            let power_row = Row::new()
+                .spacing(SPACING_MEDIUM)
+                .align_y(Alignment::Center)
+                .push(
+                    Text::new(info_modal_current_power(language))
+                        .size(FONT_SIZE_BODY)
+                        .class(TextStyle::Muted),
+                )
+                .push(
+                    Text::new(power_text)
+                        .size(FONT_SIZE_SUBTITLE)
+                        .font(FONT_BOLD)
+                        .class(TextStyle::Primary),
+                );
+
+            content = content.push(power_row);
+        }
+
+        let all_time_row = Row::new()
+            .spacing(SPACING_MEDIUM)
+            .align_y(Alignment::Center)
+            .push(
+                Text::new(info_modal_all_time_power(language))
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted),
+            )
+            .push(
+                Text::new(info_modal_coming_soon(language))
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted)
+                    .font(FONT_BOLD),
+            );
+        content = content.push(all_time_row);
+
+        if target == TotalData::table_name_static() {
+            if let Some((name, power)) = self.find_top_consumer() {
+                let consumer_row = Row::new()
+                    .spacing(SPACING_MEDIUM)
+                    .align_y(Alignment::Center)
+                    .push(
+                        Text::new(info_modal_top_consumer(language))
+                            .size(FONT_SIZE_BODY)
+                            .class(TextStyle::Muted),
+                    )
+                    .push(
+                        Text::new(format!("{} ({:.1} W)", name, power))
+                            .size(FONT_SIZE_SUBTITLE)
+                            .font(FONT_BOLD)
+                            .class(TextStyle::Secondary),
+                    );
+                content = content.push(consumer_row);
+            }
+        }
+
+        if target == ProcessData::table_name_static() {
+            if let Some(proc_sensor) = self.sensors.get(ProcessData::table_name_static()) {
+                if let Some(top_proc) = proc_sensor.get_top_process() {
+                    let mut proc_row = Row::new().spacing(SPACING_MEDIUM).align_y(Alignment::Center).push(
+                        Text::new(info_modal_top_process(language))
+                            .size(FONT_SIZE_BODY)
+                            .class(TextStyle::Muted),
+                    );
+
+                    if let Some(icon_handle) = proc_sensor.get_process_icon(top_proc) {
+                        proc_row = proc_row.push(
+                            image(icon_handle)
+                                .width(Length::Fixed(16.0))
+                                .height(Length::Fixed(16.0)),
+                        );
+                    }
+
+                    proc_row = proc_row.push(
+                        Text::new(format!("{} ({:.1} W)", top_proc.app_name, top_proc.process_power_watts))
+                            .size(FONT_SIZE_SUBTITLE)
+                            .font(FONT_BOLD)
+                            .class(TextStyle::Primary),
+                    );
+
+                    content = content.push(proc_row);
+                }
+            }
+        }
+
+        Container::new(Scrollable::new(content).width(Length::Fill).height(Length::Shrink))
+            .width(Length::Fixed(560.0))
+            .max_height(500.0)
+            .padding(PADDING_XLARGE)
+            .class(ContainerStyle::ModalCard)
+            .into()
+    }
+
+    fn find_top_consumer(&self) -> Option<(String, f64)> {
+        self.sensors
+            .iter()
+            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
+            .filter_map(|(_, sensor)| {
+                let power = sensor.get_latest_reading().and_then(|d| d.total_power_watts())?;
+                Some((sensor.name().to_string(), power))
+            })
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
     }
 
     pub fn subscription(&self) -> Subscription<Message> {

@@ -9,7 +9,7 @@ use common::{DatabaseEntry, MetricType, ProcessData, SecondaryValues, SensorData
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
     widget::{
-        Column, Container, PickList, Row, Scrollable, Space, Text, image, pick_list,
+        Button, Column, Container, PickList, Row, Scrollable, Space, Text, button, image, pick_list,
         scrollable::{Direction, Scrollbar},
     },
 };
@@ -21,6 +21,7 @@ use crate::{
     },
     message::Message,
     styles::{
+        button::ButtonStyle,
         container::ContainerStyle,
         picklist::PickListStyle,
         scrollable::ScrollableStyle,
@@ -378,8 +379,28 @@ impl SensorState {
         &self.display_name
     }
 
+    pub fn table_name(&self) -> &str {
+        &self.table_name
+    }
+
     pub fn get_latest_reading(&self) -> Option<&SensorData> {
         self.latest_reading.as_ref()
+    }
+
+    pub fn get_top_process(&self) -> Option<&ProcessData> {
+        if let SensorCategory::Processes(state) = &self.sensor_category {
+            state.top_processes.first()
+        } else {
+            None
+        }
+    }
+
+    pub fn get_process_icon(&self, process: &ProcessData) -> Option<image::Handle> {
+        if let SensorCategory::Processes(state) = &self.sensor_category {
+            state.icon_handle_for(process)
+        } else {
+            None
+        }
     }
 
     fn apply_time_range(&mut self, time_range: TimeRange) -> Task<Message> {
@@ -547,6 +568,11 @@ impl SensorState {
             .font(FONT_BOLD)
             .width(Length::Fill);
 
+        let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
+            .class(ButtonStyle::InfoHelp)
+            .on_press(Message::OpenInfoModal(self.table_name.clone()))
+            .padding(Padding::from([2, 8]));
+
         let mut controls = Row::new()
             .spacing(SPACING_MEDIUM)
             .align_y(Alignment::Center)
@@ -554,6 +580,7 @@ impl SensorState {
         if let Some(extra) = extra_control {
             controls = controls.push(extra);
         }
+        controls = controls.push(info_button);
 
         Row::new()
             .spacing(SPACING_XLARGE)

@@ -15,7 +15,7 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    translations::{self, settings_close, settings_general, settings_language, settings_theme, settings_title},
+    translations::{self, modal_close, settings_general, settings_language, settings_theme, settings_title},
     types::AppLanguage,
 };
 
@@ -64,10 +64,9 @@ impl SettingsPage {
                     .padding(PADDING_MEDIUM),
             );
 
-        let close_button: Button<'_, Message, AppTheme> =
-            button(Text::new(settings_close(language)).size(FONT_SIZE_BODY))
-                .class(ButtonStyle::Standard)
-                .on_press(Message::CloseSettings);
+        let close_button: Button<'_, Message, AppTheme> = button(Text::new(modal_close(language)).size(FONT_SIZE_BODY))
+            .class(ButtonStyle::Standard)
+            .on_press(Message::CloseSettings);
 
         let top_row = Row::new()
             .spacing(SPACING_LARGE)

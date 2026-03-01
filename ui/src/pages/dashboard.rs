@@ -4,13 +4,14 @@ use common::{AllTimeData, DatabaseEntry, ProcessData, TotalData};
 use iced::{
     Alignment, Element, Length, Padding,
     alignment::{Horizontal, Vertical},
-    widget::{Column, Container, Row, Scrollable, Text, grid, rule},
+    widget::{Button, Column, Container, Row, Scrollable, Text, button, grid, rule},
 };
 
 use crate::{
     components::{helpers::no_data_placeholder, sensor_state::SensorState},
     message::Message,
     styles::{
+        button::ButtonStyle,
         container::ContainerStyle,
         scrollable::ScrollableStyle,
         style_constants::{

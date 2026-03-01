@@ -1,14 +1,16 @@
 use iced::{
-    Alignment, Color, Element, Length,
-    widget::{Column, Container, Row, Scrollable, Svg, Text, svg},
+    Alignment, Color, Element, Length, Padding,
+    widget::{Button, Column, Container, Row, Scrollable, Svg, Text, button, svg},
 };
 
 use crate::{
     message::Message,
     styles::{
+        button::ButtonStyle,
         container::ContainerStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE, SPACING_MEDIUM,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE,
+            SPACING_MEDIUM,
         },
         svg::SvgStyle,
         text::TextStyle,
@@ -23,6 +25,7 @@ pub struct InfoCard {
     pub subtitle: String,
     pub field: InfoField,
     pub optional_field: Option<InfoField>,
+    pub info_key: Option<String>,
 }
 
 impl InfoCard {
@@ -33,6 +36,7 @@ impl InfoCard {
         subtitle: impl Into<String>,
         field: InfoField,
         optional_field: Option<InfoField>,
+        info_key: Option<String>,
     ) -> Self {
         Self {
             icon_svg,
@@ -41,6 +45,7 @@ impl InfoCard {
             subtitle: subtitle.into(),
             field,
             optional_field,
+            info_key,
         }
     }
 }
@@ -66,6 +71,7 @@ pub fn hardware_card<'a>(
     subtitle: &str,
     field: InfoField,
     optional_field: Option<InfoField>,
+    on_info: Option<Message>,
 ) -> Element<'a, Message, AppTheme> {
     let icon = Svg::new(svg::Handle::from_memory(icon_svg))
         .width(22)
@@ -74,19 +80,28 @@ pub fn hardware_card<'a>(
 
     let icon_badge = Container::new(icon).padding(8).class(ContainerStyle::IconBadge(accent));
 
-    let header = Row::new()
+    let title_col = Column::new()
+        .push(Text::new(title.to_owned()).size(FONT_SIZE_SUBTITLE).font(FONT_BOLD))
+        .push(
+            Text::new(subtitle.to_owned())
+                .size(FONT_SIZE_SMALL)
+                .class(TextStyle::Muted),
+        );
+
+    let mut header = Row::new()
         .spacing(SPACING_MEDIUM)
         .align_y(Alignment::Center)
         .push(icon_badge)
-        .push(
-            Column::new()
-                .push(Text::new(title.to_owned()).size(FONT_SIZE_SUBTITLE).font(FONT_BOLD))
-                .push(
-                    Text::new(subtitle.to_owned())
-                        .size(FONT_SIZE_SMALL)
-                        .class(TextStyle::Muted),
-                ),
-        );
+        .push(title_col.width(Length::Fill));
+
+    if let Some(msg) = on_info {
+        let info_btn: Button<'a, Message, AppTheme> =
+            button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
+                .class(ButtonStyle::InfoHelp)
+                .on_press(msg)
+                .padding(Padding::from([2, 8]));
+        header = header.push(info_btn);
+    }
 
     let mut content = Column::new().spacing(SPACING_LARGE).push(header);
 
