@@ -26,7 +26,12 @@ use plotters::{
 use plotters_backend::DrawingBackend;
 use plotters_iced2::{Chart, ChartWidget, DrawingArea, Renderer, plotters_backend};
 
-use crate::{message::Message, themes::AppTheme};
+use crate::{
+    message::Message,
+    themes::AppTheme,
+    translations::{self, tooltip_time, tooltip_value},
+    types::AppLanguage,
+};
 
 const PLOT_SECONDS: usize = 60;
 const SNAP_DISTANCE_PX: f32 = 30.0;
@@ -234,6 +239,7 @@ pub struct SensorChart {
     y_unit: &'static str,
     dynamic_range: bool,
     style: ChartStyle,
+    language: AppLanguage,
 }
 
 #[derive(Default, Clone, Copy, Debug)]
@@ -252,6 +258,7 @@ struct TimeSeries {
     points: Rc<RefCell<VecDeque<(DateTime<Local>, f32)>>>,
     line_type: LineType,
     color_index: Option<usize>,
+    display_label: String,
 }
 
 impl TimeSeries {
@@ -313,7 +320,7 @@ impl SensorChart {
         }
     }
 
-    pub fn new(theme: AppTheme) -> Self {
+    pub fn new(theme: AppTheme, language: AppLanguage) -> Self {
         Self {
             cache: RefCell::default(),
             data: ChartData::default(),
@@ -327,16 +334,18 @@ impl SensorChart {
             y_axis_label: "Value",
             x_unit: "",
             y_unit: "",
+            language,
         }
     }
 
-    pub fn add_series(&mut self, label: &str, line_type: LineType, color_idx: Option<usize>) {
+    pub fn add_series(&mut self, key: &str, display_label: &str, line_type: LineType, color_idx: Option<usize>) {
         self.data.insert(
-            label.to_string(),
+            key.to_string(),
             TimeSeries {
                 points: Rc::new(RefCell::new(VecDeque::new())),
                 line_type,
                 color_index: color_idx,
+                display_label: display_label.to_string(),
             },
         );
     }
@@ -393,6 +402,18 @@ impl SensorChart {
     pub fn update_style(&mut self, theme: AppTheme) {
         self.style = theme.into();
         self.clear_cache();
+    }
+
+    pub fn update_language(&mut self, language: AppLanguage) {
+        self.language = language;
+        self.clear_cache();
+    }
+
+    pub fn update_display_label(&mut self, key: &str, display_label: &str) {
+        if let Some(series) = self.data.get_mut(key) {
+            series.display_label = display_label.to_string();
+            self.clear_cache();
+        }
     }
 
     pub fn set_x_range(&mut self, duration: Duration) {
@@ -522,7 +543,7 @@ impl SensorChart {
             .draw()
             .ok();
 
-        for (i, (label, series)) in self.data.iter().enumerate() {
+        for (i, (_key, series)) in self.data.iter().enumerate() {
             let color = series
                 .color_index
                 .map(|idx| style.series_color(idx))
@@ -559,7 +580,7 @@ impl SensorChart {
             };
 
             if let Some(anno) = annotation.ok() {
-                anno.label(format!("{}   ", label))
+                anno.label(format!("{}   ", series.display_label))
                     .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
             }
         }
@@ -654,7 +675,7 @@ impl SensorChart {
         text_y += TOOLTIP_LINE_HEIGHT as i32;
 
         area.draw(&Text::new(
-            format!("Value: {}", content.value_text()),
+            tooltip_value(self.language, &content.value_text()),
             (text_x, text_y),
             text_style.clone(),
         ))
@@ -662,7 +683,7 @@ impl SensorChart {
         text_y += TOOLTIP_LINE_HEIGHT as i32;
 
         area.draw(&Text::new(
-            format!("Time: {}", content.timestamp_text()),
+            tooltip_time(self.language, &content.timestamp_text()),
             (text_x, text_y),
             text_style.clone(),
         ))
@@ -727,7 +748,7 @@ impl SensorChart {
             TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
         };
 
-        for (idx, (label, s)) in self.data.iter().enumerate() {
+        for (idx, (_key, s)) in self.data.iter().enumerate() {
             if s.newest_time().is_none() {
                 continue;
             }
@@ -763,8 +784,15 @@ impl SensorChart {
                             let cursor_time_ms = (chart_cursor.x / chart_bounds.width) * total_ms;
                             let cursor_time = oldest + Duration::milliseconds(cursor_time_ms as i64);
 
-                            let tooltip =
-                                create_tooltip(label, value, cursor_time, idx, chart_cursor.x, py, s.color_index);
+                            let tooltip = create_tooltip(
+                                &s.display_label,
+                                value,
+                                cursor_time,
+                                idx,
+                                chart_cursor.x,
+                                py,
+                                s.color_index,
+                            );
                             update_best_tooltip(tooltip, y_dist * y_dist);
                         }
                     }
@@ -776,7 +804,7 @@ impl SensorChart {
                         let dist_sq = (px - chart_cursor.x).powi(2) + (py - chart_cursor.y).powi(2);
 
                         if dist_sq <= snap_sq {
-                            let tooltip = create_tooltip(label, value, time, idx, px, py, s.color_index);
+                            let tooltip = create_tooltip(&s.display_label, value, time, idx, px, py, s.color_index);
                             update_best_tooltip(tooltip, dist_sq);
                         }
                     }

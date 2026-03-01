@@ -31,7 +31,11 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    types::TimeRange,
+    translations::{
+        self, TranslatedMetricType, TranslatedTimeRange, application, chart_legend, cpu, disk_read, disk_write, gpu,
+        na, power, power_label, ram, sensor_name, tooltip_time, tooltip_value, translate_label,
+    },
+    types::{AppLanguage, TimeRange},
 };
 
 const SNAPSHOT_AREA_HEIGHT: f32 = 34.0;
@@ -55,10 +59,10 @@ struct PowerChartState {
 }
 
 impl PowerChartState {
-    fn new(theme: AppTheme) -> Self {
+    fn new(theme: AppTheme, language: AppLanguage) -> Self {
         Self {
             power_history: Rc::new(RefCell::new(VecDeque::new())),
-            chart: SensorChart::new(theme),
+            chart: SensorChart::new(theme, language),
             line_type: LineType::default(),
         }
     }
@@ -88,17 +92,18 @@ struct ComponentState {
 }
 
 impl ComponentState {
-    fn new(theme: AppTheme, display_name: &str) -> Self {
-        let mut power_graph = PowerChartState::new(theme);
+    fn new(theme: AppTheme, display_name: &str, language: AppLanguage) -> Self {
+        let mut power_graph = PowerChartState::new(theme, language);
         let metric_type = MetricType::default();
         power_graph
             .chart
             .set_y_axis_label_and_unit(metric_type.label(), metric_type.unit());
-        let legend = metric_type.legend(display_name);
+        let key = metric_type.legend(display_name);
+        let display = chart_legend(language, metric_type.label());
         power_graph
             .chart
-            .add_series(&legend, power_graph.line_type, Some(metric_type as usize));
-        power_graph.chart.set_data(&legend, power_graph.power_history.clone());
+            .add_series(&key, &display, power_graph.line_type, Some(metric_type as usize));
+        power_graph.chart.set_data(&key, power_graph.power_history.clone());
         Self {
             power_graph,
             secondary_histories: Vec::new(),
@@ -149,6 +154,7 @@ impl ComponentState {
         &mut self,
         metric_type: MetricType,
         display_name: &str,
+        language: AppLanguage,
         secondary_values: Option<SecondaryValues>,
     ) {
         self.metric_type = metric_type;
@@ -158,26 +164,32 @@ impl ComponentState {
             .set_y_axis_label_and_unit(metric_type.label(), metric_type.unit());
         match metric_type {
             MetricType::Power => {
-                let legend = metric_type.legend(display_name);
+                let key = metric_type.legend(display_name);
+                let display = chart_legend(language, metric_type.label());
+                self.power_graph.chart.add_series(
+                    &key,
+                    &display,
+                    self.power_graph.line_type,
+                    Some(metric_type as usize),
+                );
                 self.power_graph
                     .chart
-                    .add_series(&legend, self.power_graph.line_type, Some(metric_type as usize));
-                self.power_graph
-                    .chart
-                    .set_data(&legend, self.power_graph.power_history.clone());
+                    .set_data(&key, self.power_graph.power_history.clone());
             }
             _ => {
                 if let Some(secondary_values) = secondary_values {
                     for (i, labeled_value) in secondary_values.values.into_iter().enumerate() {
-                        let legend = format!("{} {}", display_name, labeled_value.label);
+                        let key = format!("{} {}", display_name, labeled_value.label);
+                        let display = chart_legend(language, labeled_value.label);
                         self.power_graph.chart.add_series(
-                            &legend,
+                            &key,
+                            &display,
                             self.power_graph.line_type,
                             Some(i.saturating_add(1)),
                         );
                         self.power_graph
                             .chart
-                            .set_data(&legend, self.secondary_histories[i].clone());
+                            .set_data(&key, self.secondary_histories[i].clone());
                     }
                 }
             }
@@ -192,7 +204,11 @@ impl ComponentState {
         metrics
     }
 
-    fn snapshot_row(&self, latest: Option<&SensorData>) -> Option<Row<'static, Message, AppTheme>> {
+    fn snapshot_row(
+        &self,
+        latest: Option<&SensorData>,
+        language: AppLanguage,
+    ) -> Option<Row<'static, Message, AppTheme>> {
         let secondary_values = latest?.secondary_values()?;
         let mut col = Column::new().spacing(SPACING_SMALL);
         for (i, labeled_value) in secondary_values.values.into_iter().enumerate() {
@@ -202,12 +218,13 @@ impl ComponentState {
                     1 => TextStyle::Tertiary,
                     _ => TextStyle::Subtitle,
                 };
+                let translated = translate_label(language, labeled_value.label);
                 col = col.push(
                     Row::new()
                         .spacing(SPACING_MEDIUM)
                         .align_y(Alignment::Center)
                         .push(
-                            Text::new(format!("{}:", labeled_value.label))
+                            Text::new(format!("{}:", translated))
                                 .size(FONT_SIZE_BODY)
                                 .class(TextStyle::Muted),
                         )
@@ -230,17 +247,18 @@ struct TotalState {
 }
 
 impl TotalState {
-    fn new(theme: AppTheme, display_name: &str) -> Self {
-        let mut power_graph = PowerChartState::new(theme);
+    fn new(theme: AppTheme, display_name: &str, language: AppLanguage) -> Self {
+        let mut power_graph = PowerChartState::new(theme, language);
         let metric_type = MetricType::default();
         power_graph
             .chart
             .set_y_axis_label_and_unit(metric_type.label(), metric_type.unit());
-        let legend = metric_type.legend(display_name);
+        let key = metric_type.legend(display_name);
+        let display = chart_legend(language, metric_type.label());
         power_graph
             .chart
-            .add_series(&legend, power_graph.line_type, Some(metric_type as usize));
-        power_graph.chart.set_data(&legend, power_graph.power_history.clone());
+            .add_series(&key, &display, power_graph.line_type, Some(metric_type as usize));
+        power_graph.chart.set_data(&key, power_graph.power_history.clone());
         Self {
             power_graph,
             tooltip_history: Rc::new(RefCell::new(VecDeque::new())),
@@ -312,16 +330,17 @@ pub struct SensorState {
     sensor_category: SensorCategory,
     latest_reading: Option<SensorData>,
     time_range: TimeRange,
+    language: AppLanguage,
 }
 
 impl SensorState {
-    pub fn new(table_name: String, display_name: String, theme: AppTheme) -> Self {
+    pub fn new(table_name: String, display_name: String, theme: AppTheme, language: AppLanguage) -> Self {
         let sensor_category = if table_name == TotalData::table_name_static() {
-            SensorCategory::Total(TotalState::new(theme, &display_name))
+            SensorCategory::Total(TotalState::new(theme, &display_name, language))
         } else if table_name == ProcessData::table_name_static() {
             SensorCategory::Processes(ProcessesState::new())
         } else {
-            SensorCategory::Component(ComponentState::new(theme, &display_name))
+            SensorCategory::Component(ComponentState::new(theme, &display_name, language))
         };
 
         let mut state = Self {
@@ -330,6 +349,7 @@ impl SensorState {
             sensor_category,
             latest_reading: None,
             time_range: TimeRange::default(),
+            language,
         };
         let _ = state.apply_time_range(TimeRange::default());
         state
@@ -384,7 +404,7 @@ impl SensorState {
     pub fn set_metric_type(&mut self, metric_type: MetricType) {
         if let SensorCategory::Component(state) = &mut self.sensor_category {
             let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-            state.update_metric_type(metric_type, &self.display_name, secondary_values);
+            state.update_metric_type(metric_type, &self.display_name, self.language, secondary_values);
         }
     }
 
@@ -447,6 +467,24 @@ impl SensorState {
         }
     }
 
+    pub fn update_language(&mut self, language: AppLanguage) {
+        self.language = language;
+        match &mut self.sensor_category {
+            SensorCategory::Component(state) => {
+                state.power_graph.chart.update_language(language);
+                let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
+                state.update_metric_type(state.metric_type, &self.display_name, language, secondary_values);
+            }
+            SensorCategory::Total(state) => {
+                state.power_graph.chart.update_language(language);
+                let key = MetricType::default().legend(&self.display_name);
+                let display = chart_legend(language, MetricType::default().label());
+                state.power_graph.chart.update_display_label(&key, &display);
+            }
+            SensorCategory::Processes(_) => {}
+        }
+    }
+
     pub fn refresh_chart(&mut self) {
         match &mut self.sensor_category {
             SensorCategory::Component(s) => s.power_graph.chart.refresh_cache(),
@@ -463,14 +501,15 @@ impl SensorState {
         }
     }
 
-    fn time_range_selector(&self) -> PickList<'_, TimeRange, Vec<TimeRange>, TimeRange, Message, AppTheme> {
+    fn time_range_selector(&self) -> Element<'_, Message, AppTheme> {
         pick_list(
-            vec![TimeRange::LastMinute, TimeRange::LastHour, TimeRange::Last24Hours],
-            Some(self.time_range.clone()),
-            |tr| Message::ChangeChartTimeRange(self.table_name.clone(), tr),
+            TranslatedTimeRange::options(self.language),
+            Some(TranslatedTimeRange::new(self.time_range.clone(), self.language)),
+            |tr: TranslatedTimeRange| Message::ChangeChartTimeRange(self.table_name.clone(), tr.range),
         )
         .class(PickListStyle::TimeRange)
         .menu_class(PickListStyle::TimeRange)
+        .into()
     }
 
     fn chart_card_header<'b>(
@@ -478,7 +517,8 @@ impl SensorState {
         title: Option<&'b str>,
         extra_control: Option<Element<'b, Message, AppTheme>>,
     ) -> Row<'b, Message, AppTheme> {
-        let title_widget = Text::new(title.unwrap_or(&self.display_name))
+        let default_name = sensor_name(self.language, &self.display_name);
+        let title_widget = Text::new(title.unwrap_or(default_name))
             .size(FONT_SIZE_SUBTITLE)
             .font(FONT_BOLD)
             .width(Length::Fill);
@@ -511,7 +551,7 @@ impl SensorState {
 
         let power_text = power_value
             .map(|p| format!("{:.1} W", p))
-            .unwrap_or_else(|| "N/A".to_string());
+            .unwrap_or_else(|| na(self.language).to_string());
         let power_style = if power_value.is_some() {
             TextStyle::Primary
         } else {
@@ -521,7 +561,11 @@ impl SensorState {
         let power_row = Row::new()
             .spacing(SPACING_MEDIUM)
             .align_y(Alignment::Center)
-            .push(Text::new("Power:").size(FONT_SIZE_BODY).class(TextStyle::Muted))
+            .push(
+                Text::new(power_label(self.language))
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted),
+            )
             .push(
                 Text::new(power_text)
                     .size(FONT_SIZE_BODY)
@@ -569,49 +613,49 @@ impl SensorState {
             .spacing(SPACING_MEDIUM)
             .push(Space::new().width(Length::Fixed(PROCESS_ICON_COLUMN_WIDTH)))
             .push(text_widget(
-                "Application",
+                application(self.language),
                 header_font_size,
                 header_style,
                 Length::Fill,
                 false,
             ))
             .push(text_widget(
-                "Power",
+                power(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_POWER_WIDTH),
                 false,
             ))
             .push(text_widget(
-                "CPU",
+                cpu(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_CPU_WIDTH),
                 false,
             ))
             .push(text_widget(
-                "GPU",
+                gpu(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_GPU_WIDTH),
                 false,
             ))
             .push(text_widget(
-                "RAM",
+                ram(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_RAM_WIDTH),
                 false,
             ))
             .push(text_widget(
-                "Disk read",
+                disk_read(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_DISK_READ_WIDTH),
                 false,
             ))
             .push(text_widget(
-                "Disk write",
+                disk_write(self.language),
                 header_font_size,
                 header_style,
                 Length::Fixed(PROCESS_DISK_WRITE_WIDTH),
@@ -621,7 +665,9 @@ impl SensorState {
         let mut table = Column::new().spacing(SPACING_SMALL).push(header_row);
         let table_font_size = FONT_SIZE_BODY;
         for p in &state.top_processes {
-            let gpu = p.process_gpu_usage.map_or("N/A".to_string(), |v| format!("{:.1}%", v));
+            let gpu = p
+                .process_gpu_usage
+                .map_or(na(self.language).to_string(), |v| format!("{:.1}%", v));
             table = table.push(
                 Row::new()
                     .spacing(SPACING_MEDIUM)
@@ -706,13 +752,18 @@ impl SensorState {
 
         match &self.sensor_category {
             SensorCategory::Component(state) => {
-                let snapshot = state.snapshot_row(self.latest_reading.as_ref());
+                let snapshot = state.snapshot_row(self.latest_reading.as_ref(), self.language);
                 let metric_selector = if show_secondary {
                     let metrics = state.available_metrics(self.latest_reading.as_ref());
                     if metrics.len() > 1 {
+                        let translated: Vec<TranslatedMetricType> = metrics
+                            .into_iter()
+                            .map(|m| TranslatedMetricType::new(m, self.language))
+                            .collect();
+                        let selected = TranslatedMetricType::new(state.metric_type, self.language);
                         Some(
-                            pick_list(metrics, Some(state.metric_type), |m| {
-                                Message::ChangeChartMetricType(self.table_name.clone(), m)
+                            pick_list(translated, Some(selected), |tm: TranslatedMetricType| {
+                                Message::ChangeChartMetricType(self.table_name.clone(), tm.metric)
                             })
                             .class(PickListStyle::TimeRange)
                             .menu_class(PickListStyle::TimeRange)

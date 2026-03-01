@@ -20,6 +20,8 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
+    translations::{self, all_time, current_power_consumption, emissions},
+    types::AppLanguage,
 };
 
 const MAX_COMPONENT_CARD_WIDTH: f32 = 600.0;
@@ -32,21 +34,22 @@ impl DashboardPage {
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
         all_time_data: &'a AllTimeData,
+        language: AppLanguage,
     ) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(sensors, all_time_data));
+            .push(self.view_power_summary(sensors, all_time_data, language));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.chart_or_placeholder(sensors, None, TotalData::table_name_static(), 300.0, false))
-            .push(self.view_process_summary(sensors))
+            .push(self.chart_or_placeholder(sensors, None, TotalData::table_name_static(), 300.0, false, language))
+            .push(self.view_process_summary(sensors, language))
             .push(self.view_component_cards(sensors));
 
         content
@@ -63,6 +66,7 @@ impl DashboardPage {
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
         all_time_data: &'a AllTimeData,
+        language: AppLanguage,
     ) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
@@ -78,7 +82,7 @@ impl DashboardPage {
             .spacing(SPACING_SMALL)
             .align_x(Alignment::Center)
             .push(
-                Text::new("Current power consumption")
+                Text::new(current_power_consumption(language))
                     .size(FONT_SIZE_SUBTITLE)
                     .font(FONT_BOLD)
                     .class(TextStyle::Subtitle),
@@ -104,13 +108,13 @@ impl DashboardPage {
             .spacing(SPACING_SMALL)
             .align_x(Alignment::Center)
             .push(metric_tile(
-                "All Time",
+                all_time(language),
                 format_wh(total_energy_wh),
                 "Wh",
                 TextStyle::Secondary,
             ))
             .push(metric_tile(
-                "Emissions",
+                emissions(language),
                 format_grams(carbon_grams),
                 "g CO₂",
                 TextStyle::Tertiary,
@@ -131,13 +135,17 @@ impl DashboardPage {
             .into()
     }
 
-    fn view_process_summary<'a>(&'a self, sensors: &'a HashMap<String, SensorState>) -> Element<'a, Message, AppTheme> {
+    fn view_process_summary<'a>(
+        &'a self,
+        sensors: &'a HashMap<String, SensorState>,
+        language: AppLanguage,
+    ) -> Element<'a, Message, AppTheme> {
         let process_data = sensors.get(ProcessData::table_name_static());
 
         if let Some(process_card) = process_data.and_then(|p| Some(p.sensor_visual_card(None, 300.0, false))) {
             process_card
         } else {
-            no_data_placeholder()
+            no_data_placeholder(language)
         }
     }
 
@@ -208,11 +216,12 @@ impl DashboardPage {
         table_name: &str,
         height: f32,
         show_usage: bool,
+        language: AppLanguage,
     ) -> Element<'a, Message, AppTheme> {
         sensors
             .get(table_name)
             .map(|c| c.sensor_visual_card(title, height, show_usage))
-            .unwrap_or_else(|| no_data_placeholder())
+            .unwrap_or_else(|| no_data_placeholder(language))
     }
 }
 

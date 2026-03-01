@@ -17,6 +17,7 @@ use crate::{
     pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
     styles::container::ContainerStyle,
     themes::AppTheme,
+    translations::window_title,
     types::{AppLanguage, TimeRange},
 };
 
@@ -42,6 +43,7 @@ impl App {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::EcoEnergy;
         let current_page = Page::Dashboard;
+        let language = AppLanguage::default();
         let mut database = Database::new().expect("Failed to create database");
         let sensors = database
             .get_tables()
@@ -50,7 +52,10 @@ impl App {
                 let display_name = generic_name_for_table(table_name.as_str())
                     .map(|s| s.to_string())
                     .unwrap_or(table_name.clone());
-                (table_name.clone(), SensorState::new(table_name, display_name, theme))
+                (
+                    table_name.clone(),
+                    SensorState::new(table_name, display_name, theme, language),
+                )
             })
             .collect();
         let hardware_info = database.get_hardware_info().unwrap_or_default();
@@ -68,7 +73,7 @@ impl App {
                 optimization_page: OptimizationPage::new(),
                 settings_page: SettingsPage::new(),
                 settings_open: false,
-                language: AppLanguage::default(),
+                language,
                 theme,
                 database,
                 hardware_info,
@@ -104,6 +109,9 @@ impl App {
             }
             Message::ChangeLanguage(language) => {
                 self.language = language;
+                for sensor in self.sensors.values_mut() {
+                    sensor.update_language(language);
+                }
                 Task::none()
             }
             Message::OpenSettings => {
@@ -195,12 +203,17 @@ impl App {
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let page_content = match self.current_page {
-            Page::Dashboard => self.dashboard_page.view(&self.sensors, &self.all_time_data),
-            Page::Info => self.info_page.view(&self.hardware_info, self.theme),
-            Page::Optimization => self.optimization_page.view(),
+            Page::Dashboard => self
+                .dashboard_page
+                .view(&self.sensors, &self.all_time_data, self.language),
+            Page::Info => self.info_page.view(&self.hardware_info, self.theme, self.language),
+            Page::Optimization => self.optimization_page.view(self.language),
         };
 
-        let content: Element<'_, Message, AppTheme> = Column::new().push(self.header.view()).push(page_content).into();
+        let content: Element<'_, Message, AppTheme> = Column::new()
+            .push(self.header.view(self.language))
+            .push(page_content)
+            .into();
 
         if self.settings_open {
             modal(
@@ -215,6 +228,10 @@ impl App {
 
     pub fn subscription(&self) -> Subscription<Message> {
         every(Duration::from_millis(1000 / FPS)).map(|_| Message::Tick)
+    }
+
+    pub fn title(&self) -> String {
+        window_title(self.language).to_string()
     }
 
     pub fn theme(&self) -> AppTheme {

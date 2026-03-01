@@ -14,6 +14,8 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
+    translations::{self, no_data_available},
+    types::AppLanguage,
 };
 
 pub fn text_widget<'a>(
@@ -30,8 +32,8 @@ pub fn text_widget<'a>(
     text.into()
 }
 
-pub fn no_data_placeholder<'a>() -> Element<'a, Message, AppTheme> {
-    Text::new("No data available")
+pub fn no_data_placeholder<'a>(language: AppLanguage) -> Element<'a, Message, AppTheme> {
+    Text::new(no_data_available(language))
         .size(FONT_SIZE_BODY)
         .class(TextStyle::Muted)
         .into()

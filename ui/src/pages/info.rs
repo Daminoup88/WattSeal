@@ -13,6 +13,15 @@ use crate::{
         style_constants::{PADDING_LARGE, SPACING_LARGE},
     },
     themes::AppTheme,
+    translations::{
+        self, all_time, battery, battery_status, capacity, capacity_wh_cycles, capacity_wh_only, cores,
+        cores_and_threads, cpu, current_power_consumption, disk, disk_information, disk_n, disk_read, disk_write,
+        display, emissions, gpu, graphics_information, graphics_processor_n, hostname, memory, mode, model, na,
+        na_with_cycles, name, operating_system, os_information, primary_display, processor_information, ram,
+        ram_information, screen_information, secondary_display, space, storage, swap, system, total_memory,
+        translate_label,
+    },
+    types::AppLanguage,
 };
 
 const CARD_HEIGHT: f32 = 180.0;
@@ -24,7 +33,7 @@ impl InfoPage {
         Self
     }
 
-    pub fn view(&self, hw: &HardwareInfo, theme: AppTheme) -> Element<'_, Message, AppTheme> {
+    pub fn view(&self, hw: &HardwareInfo, theme: AppTheme, language: AppLanguage) -> Element<'_, Message, AppTheme> {
         let pal = theme.palette();
 
         let mut specs: Vec<InfoCard> = Vec::new();
@@ -32,12 +41,12 @@ impl InfoPage {
         specs.push(InfoCard::new(
             icons::CPU,
             pal.primary,
-            "CPU".to_string(),
-            "Processor Information".to_string(),
-            InfoField::new("Model", &hw.cpu.name),
+            cpu(language).to_string(),
+            processor_information(language).to_string(),
+            InfoField::new(model(language), &hw.cpu.name),
             Some(InfoField::new(
-                "Cores",
-                format!("{} cores / {} threads", hw.cpu.physical_cores, hw.cpu.logical_cores),
+                cores(language),
+                cores_and_threads(language, hw.cpu.physical_cores, hw.cpu.logical_cores),
             )),
         ));
 
@@ -45,20 +54,20 @@ impl InfoPage {
             specs.push(InfoCard::new(
                 icons::GPU,
                 pal.danger,
-                "GPU".to_string(),
-                "Graphics Information".to_string(),
-                InfoField::new("Model", "N/A"),
+                gpu(language).to_string(),
+                graphics_information(language).to_string(),
+                InfoField::new(model(language), na(language)),
                 None,
             ));
         } else {
             for (i, gpu) in hw.gpus.iter().enumerate() {
-                let subtitle = format!("Graphics Processor {}", i + 1);
+                let subtitle = graphics_processor_n(language, i + 1);
                 specs.push(InfoCard::new(
                     icons::GPU,
                     pal.danger,
-                    "GPU".to_string(),
+                    translations::gpu(language).to_string(),
                     subtitle,
-                    InfoField::new("Model", gpu.as_str()),
+                    InfoField::new(model(language), gpu.as_str()),
                     None,
                 ));
             }
@@ -67,45 +76,54 @@ impl InfoPage {
         specs.push(InfoCard::new(
             icons::RAM,
             pal.warning,
-            "Memory".to_string(),
-            "RAM Information".to_string(),
-            InfoField::new("Total Memory", format_bytes_gb(hw.memory.total_ram_bytes)),
-            Some(InfoField::new("Swap", format_bytes_gb(hw.memory.total_swap_bytes))),
+            memory(language).to_string(),
+            ram_information(language).to_string(),
+            InfoField::new(
+                total_memory(language),
+                format_bytes_gb(hw.memory.total_ram_bytes, language),
+            ),
+            Some(InfoField::new(
+                swap(language),
+                format_bytes_gb(hw.memory.total_swap_bytes, language),
+            )),
         ));
 
         specs.push(InfoCard::new(
             icons::SYSTEM,
             pal.success,
-            "System".to_string(),
-            "OS Information".to_string(),
-            InfoField::new("Operating System", &hw.system.os),
-            Some(InfoField::new("Hostname", &hw.system.hostname)),
+            system(language).to_string(),
+            os_information(language).to_string(),
+            InfoField::new(operating_system(language), &hw.system.os),
+            Some(InfoField::new(hostname(language), &hw.system.hostname)),
         ));
 
         if hw.disks.is_empty() {
             specs.push(InfoCard::new(
                 icons::STORAGE,
                 pal.primary,
-                "Storage".to_string(),
-                "Disk Information".to_string(),
-                InfoField::new("Disk", "N/A"),
-                Some(InfoField::new("Space", "N/A")),
+                storage(language).to_string(),
+                disk_information(language).to_string(),
+                InfoField::new(disk(language), na(language)),
+                Some(InfoField::new(space(language), na(language))),
             ));
         } else {
             for (i, disk) in hw.disks.iter().enumerate() {
-                let subtitle = format!("Disk {}", i + 1);
+                let subtitle = disk_n(language, i + 1);
                 specs.push(InfoCard::new(
                     icons::STORAGE,
                     pal.primary,
-                    "Storage".to_string(),
+                    storage(language).to_string(),
                     subtitle,
-                    InfoField::new("Disk", format!("{} ({})", disk.mount_point, disk.name)),
+                    InfoField::new(
+                        translations::disk(language),
+                        format!("{} ({})", disk.mount_point, disk.name),
+                    ),
                     Some(InfoField::new(
-                        "Space",
+                        space(language),
                         format!(
                             "{} / {}",
-                            format_bytes_gb(disk.used_bytes),
-                            format_bytes_gb(disk.total_bytes)
+                            format_bytes_gb(disk.used_bytes, language),
+                            format_bytes_gb(disk.total_bytes, language)
                         ),
                     )),
                 ));
@@ -114,28 +132,28 @@ impl InfoPage {
 
         if hw.battery.present {
             let capacity = match (hw.battery.design_capacity_wh, hw.battery.cycle_count) {
-                (Some(cap), Some(cycles)) => format!("{:.1} Wh ({} cycles)", cap, cycles),
-                (Some(cap), None) => format!("{:.1} Wh", cap),
-                (None, Some(cycles)) => format!("N/A ({} cycles)", cycles),
-                (None, None) => "N/A".to_string(),
+                (Some(cap), Some(cycles)) => capacity_wh_cycles(language, cap, cycles),
+                (Some(cap), None) => capacity_wh_only(language, cap),
+                (None, Some(cycles)) => na_with_cycles(language, cycles),
+                (None, None) => na(language).to_string(),
             };
 
             specs.push(InfoCard::new(
                 icons::BATTERY,
                 pal.warning,
-                "Battery".to_string(),
-                "Battery Status".to_string(),
-                InfoField::new("Name", hw.battery.name.as_deref().unwrap_or("N/A")),
-                Some(InfoField::new("Capacity", capacity)),
+                battery(language).to_string(),
+                battery_status(language).to_string(),
+                InfoField::new(name(language), hw.battery.name.as_deref().unwrap_or(na(language))),
+                Some(InfoField::new(translations::capacity(language), capacity)),
             ));
         } else {
             specs.push(InfoCard::new(
                 icons::BATTERY,
                 pal.warning,
-                "Battery".to_string(),
-                "Battery Status".to_string(),
-                InfoField::new("Name", "N/A"),
-                Some(InfoField::new("Capacity", "N/A")),
+                battery(language).to_string(),
+                battery_status(language).to_string(),
+                InfoField::new(name(language), na(language)),
+                Some(InfoField::new(capacity(language), na(language))),
             ));
         }
 
@@ -143,10 +161,10 @@ impl InfoPage {
             specs.push(InfoCard::new(
                 icons::DISPLAY,
                 pal.success,
-                "Display".to_string(),
-                "Screen Information".to_string(),
-                InfoField::new("Model", "N/A"),
-                Some(InfoField::new("Mode", "N/A")),
+                display(language).to_string(),
+                screen_information(language).to_string(),
+                InfoField::new(model(language), na(language)),
+                Some(InfoField::new(mode(language), na(language))),
             ));
         } else {
             let mut displays = hw.displays.iter().collect::<Vec<_>>();
@@ -154,18 +172,18 @@ impl InfoPage {
 
             for d in displays {
                 let subtitle = if d.is_primary {
-                    "Primary Display"
+                    primary_display(language)
                 } else {
-                    "Secondary Display"
+                    secondary_display(language)
                 };
                 specs.push(InfoCard::new(
                     icons::DISPLAY,
                     pal.success,
-                    "Display".to_string(),
+                    display(language).to_string(),
                     subtitle.to_string(),
-                    InfoField::new("Model", &d.model),
+                    InfoField::new(model(language), &d.model),
                     Some(InfoField::new(
-                        "Mode",
+                        mode(language),
                         format_display_mode(&d.resolution, d.refresh_rate_hz),
                     )),
                 ));
@@ -215,9 +233,9 @@ impl InfoPage {
     }
 }
 
-fn format_bytes_gb(bytes: u64) -> String {
+fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
     if bytes == 0 {
-        return "N/A".to_string();
+        return na(language).to_string();
     }
     let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
     format!("{:.2} GB", gb)

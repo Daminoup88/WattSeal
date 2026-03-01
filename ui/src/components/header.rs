@@ -12,6 +12,8 @@ use crate::{
         style_constants::{FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, PADDING_LARGE, PADDING_MEDIUM, SPACING_MEDIUM},
     },
     themes::AppTheme,
+    translations::settings_title,
+    types::AppLanguage,
 };
 
 pub struct Header {
@@ -28,15 +30,15 @@ impl Header {
         self.active_page = new_page;
     }
 
-    pub fn view(&self) -> Element<'_, Message, AppTheme> {
+    pub fn view(&self, language: AppLanguage) -> Element<'_, Message, AppTheme> {
         let title = Container::new(
-            Text::new(self.active_page.to_string())
+            Text::new(self.active_page.translated_name(language))
                 .size(FONT_SIZE_HEADER)
                 .font(FONT_BOLD),
         )
         .width(Length::Fill);
 
-        let settings_button = button(Text::new("Settings").size(FONT_SIZE_BODY))
+        let settings_button = button(Text::new(settings_title(language)).size(FONT_SIZE_BODY))
             .padding(Padding::from([8.0, 16.0]))
             .class(ButtonStyle::Standard)
             .on_press(Message::OpenSettings);
@@ -50,7 +52,7 @@ impl Header {
             };
 
             row.push(
-                button(Text::new(page.to_string()).size(FONT_SIZE_BODY))
+                button(Text::new(page.translated_name(language)).size(FONT_SIZE_BODY))
                     .padding(Padding::from([8.0, 16.0]))
                     .class(button_style)
                     .on_press(Message::NavigateTo(*page)),
