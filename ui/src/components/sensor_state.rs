@@ -42,7 +42,7 @@ const SNAPSHOT_AREA_HEIGHT: f32 = 34.0;
 const PROCESS_APP_WIDTH: f32 = 400.0;
 const PROCESS_ICON_COLUMN_WIDTH: f32 = 24.0;
 const PROCESS_ICON_SIZE: f32 = 16.0;
-const PROCESS_POWER_WIDTH: f32 = 65.0;
+const PROCESS_POWER_WIDTH: f32 = 100.0;
 const PROCESS_CPU_WIDTH: f32 = 48.0;
 const PROCESS_GPU_WIDTH: f32 = 48.0;
 const PROCESS_RAM_WIDTH: f32 = 55.0;
@@ -75,6 +75,13 @@ impl PowerChartState {
 
     fn prune_before(&self, cutoff: DateTime<Local>) {
         prune_history(&self.power_history, cutoff);
+    }
+
+    fn latest_timestamp(&self) -> Option<DateTime<Local>> {
+        self.power_history
+            .try_borrow()
+            .ok()
+            .and_then(|h| h.back().map(|(ts, _)| *ts))
     }
 
     fn clear(&self) {
@@ -139,6 +146,12 @@ impl ComponentState {
         for history in &self.secondary_histories {
             prune_history(history, cutoff);
         }
+    }
+
+    fn is_newer_than_latest(&self, timestamp: DateTime<Local>) -> bool {
+        self.power_graph
+            .latest_timestamp()
+            .map_or(true, |latest| timestamp > latest)
     }
 
     fn clear(&self) {
@@ -273,6 +286,12 @@ impl TotalState {
 
     fn prune_before(&self, cutoff: DateTime<Local>) {
         self.power_graph.prune_before(cutoff);
+    }
+
+    fn is_newer_than_latest(&self, timestamp: DateTime<Local>) -> bool {
+        self.power_graph
+            .latest_timestamp()
+            .map_or(true, |latest| timestamp > latest)
     }
 
     fn clear(&self) {
@@ -419,12 +438,16 @@ impl SensorState {
         if self.time_range.is_real_time() {
             match &mut self.sensor_category {
                 SensorCategory::Component(state) => {
-                    state.append(timestamp, data);
+                    if state.is_newer_than_latest(timestamp) {
+                        state.append(timestamp, data);
+                    }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
                 }
                 SensorCategory::Total(state) => {
-                    state.append(timestamp, data);
+                    if state.is_newer_than_latest(timestamp) {
+                        state.append(timestamp, data);
+                    }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
                 }
@@ -451,6 +474,7 @@ impl SensorState {
                 }
             }
             _ => {
+                self.clear_data();
                 for (timestamp, sensor) in data {
                     self.push_to_history_only(*timestamp, sensor);
                 }
