@@ -94,15 +94,16 @@ pub enum GPUSensor {
 
 impl Sensor for GPUSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
-        let data = match self {
+        match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensor::Nvidia(sensor) => sensor.read_full_data()?,
+            GPUSensor::Nvidia(sensor) => sensor.read_full_data(),
             #[cfg(target_os = "windows")]
-            GPUSensor::Amd(sensor) => sensor.read_full_data()?,
+            GPUSensor::Amd(sensor) => sensor.read_full_data(),
             #[cfg(target_os = "windows")]
-            GPUSensor::Intel(sensor) => sensor.read_full_data()?,
-        };
-        Ok(data)
+            GPUSensor::Intel(sensor) => sensor.read_full_data(),
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            _ => Err(SensorError::NotSupported),
+        }
     }
 
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
@@ -150,6 +151,8 @@ impl GPUSensor {
             GPUSensor::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
             #[cfg(target_os = "windows")]
             GPUSensor::Amd(_) | GPUSensor::Intel(_) => Err(SensorError::NotSupported),
+            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+            _ => Err(SensorError::NotSupported),
         }
     }
 }

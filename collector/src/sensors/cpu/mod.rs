@@ -144,7 +144,7 @@ pub fn get_cpu_list(system: Rc<RefCell<System>>) -> Result<Vec<String>, String> 
 pub fn get_cpu_power_sensor(
     system: Rc<RefCell<System>>,
     index: usize,
-    is_admin: bool,
+    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] is_admin: bool,
 ) -> Result<SensorType, SensorError> {
     let s = system
         .try_borrow_mut()
