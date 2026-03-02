@@ -12,10 +12,9 @@ use std::{
     time::{Instant, SystemTime},
 };
 
-use adlx::system;
 use battery::{Battery, Manager};
 pub use common::{
-    AllTimeData, Event, GeneralData, ProcessData, SensorData, TotalData,
+    AllTimeData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
     types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
 pub use cpu::CPUSensor;
@@ -25,7 +24,7 @@ pub use gpu::{GPUSensor, get_gpu_list};
 pub use network::NetworkSensor;
 pub use process::get_processes;
 pub use ram::RamSensor;
-use sysinfo::{Components, CpuRefreshKind, Disks, Networks, System};
+use sysinfo::System;
 
 pub enum SensorType {
     CPU(CPUSensor),
@@ -103,6 +102,7 @@ pub fn create_event_from_sensors(
     let (mut gpu_power, mut gpu_usage, mut nb_gpus) = (0.0, 0.0, 0);
 
     let mut total_power = 0.0;
+    let mut integrated_gpu_power: Option<f64> = None;
     let mut proc_gpu_usage = HashMap::new();
     for sensor in sensors {
         match sensor {
@@ -124,7 +124,18 @@ pub fn create_event_from_sensors(
 
         let sensor_data = sensor.read_full_data();
         match sensor_data {
-            Ok(d) => {
+            Ok(mut d) => {
+                if let SensorData::CPU(ref mut cpu) = d {
+                    if let Some(pp1) = cpu.pp1_power_watts.take() {
+                        if pp1 > 0.0 {
+                            if let Some(ref mut total) = cpu.total_power_watts {
+                                *total -= pp1;
+                            }
+                            integrated_gpu_power = Some(pp1);
+                        }
+                    }
+                }
+
                 if let Some(power) = d.total_power_watts() {
                     total_power += power;
 
@@ -145,6 +156,29 @@ pub fn create_event_from_sensors(
             Err(e) => eprintln!("✗ Error reading sensor data: {:?}", e),
         }
     }
+
+    if let Some(igpu_power) = integrated_gpu_power {
+        let merged = data.iter_mut().any(|d| {
+            if let SensorData::GPU(gpu) = d {
+                if gpu.total_power_watts.is_none() {
+                    gpu.total_power_watts = Some(igpu_power);
+                    return true;
+                }
+            }
+            false
+        });
+        if !merged {
+            data.push(SensorData::GPU(GPUData {
+                total_power_watts: Some(igpu_power),
+                usage_percent: None,
+                vram_usage_percent: None,
+            }));
+            nb_gpus += 1;
+        }
+        gpu_power += igpu_power;
+        total_power += igpu_power;
+    }
+
     data.push(SensorData::Total(TotalData {
         total_power_watts: total_power,
         period_type: "second".to_string(),

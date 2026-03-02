@@ -2,7 +2,7 @@ use std::{collections::HashMap, os::windows::process, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo, ProcessData, SensorData, TotalData,
+    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData,
     generic_name_for_table,
 };
 use iced::{
@@ -197,8 +197,7 @@ impl App {
     }
 
     fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
-        let data = from_db(self.database.select_last_n_records(n));
-        normalize_integrated_cpu(data)
+        from_db(self.database.select_last_n_records(n))
     }
 
     fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
@@ -217,7 +216,7 @@ impl App {
                     .select_last_n_seconds_average(time_range as i64, table_name, window)
             }
         };
-        normalize_integrated_cpu(from_db(result))
+        from_db(result)
     }
 
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
@@ -403,38 +402,6 @@ impl App {
             self.all_time_data = all_time_data;
         }
     }
-}
-
-fn normalize_integrated_cpu(mut data: Vec<(DateTime<Local>, SensorData)>) -> Vec<(DateTime<Local>, SensorData)> {
-    let mut latest_pp1: Option<f64> = None;
-    let mut latest_pp1_timestamp: Option<DateTime<Local>> = None;
-
-    for (time, sensor) in data.iter_mut() {
-        if let SensorData::CPU(cpu) = sensor {
-            if let Some(pp1) = cpu.pp1_power_watts {
-                latest_pp1 = Some(pp1);
-                latest_pp1_timestamp = Some(time.clone());
-                if let Some(total) = cpu.total_power_watts {
-                    cpu.total_power_watts = Some(total - pp1);
-                }
-            }
-        }
-    }
-
-    if let Some(pp1) = latest_pp1
-        && let Some(pp1_time) = latest_pp1_timestamp
-    {
-        data.push((
-            pp1_time,
-            SensorData::GPU(GPUData {
-                total_power_watts: Some(pp1),
-                usage_percent: None,
-                vram_usage_percent: None,
-            }),
-        ));
-    }
-
-    data
 }
 
 fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorData)> {

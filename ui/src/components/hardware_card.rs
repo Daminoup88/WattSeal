@@ -95,11 +95,10 @@ pub fn hardware_card<'a>(
         .push(title_col.width(Length::Fill));
 
     if let Some(msg) = on_info {
-        let info_btn: Button<'a, Message, AppTheme> =
-            button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
-                .class(ButtonStyle::InfoHelp)
-                .on_press(msg)
-                .padding(Padding::from([2, 8]));
+        let info_btn: Button<'a, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
+            .class(ButtonStyle::InfoHelp)
+            .on_press(msg)
+            .padding(Padding::from([2, 8]));
         header = header.push(info_btn);
     }
 
