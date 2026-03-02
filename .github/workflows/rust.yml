@@ -15,11 +15,9 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Install nightly toolchain
-        uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@nightly
         with:
           components: rustfmt
 
@@ -27,20 +25,57 @@ jobs:
         run: cargo +nightly fmt -- --check
 
   build:
-    name: Build
+    name: Build (Windows)
     runs-on: windows-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     steps:
-      - name: Checkout sources
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
-      - name: Install stable toolchain
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
 
-      - name: Use cache
-        uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
-      - name: Compile project
+      - name: Build all
         run: cargo build --all
+
+  check-linux:
+    name: Check (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev pkg-config \
+            libx11-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxi-dev \
+            libgl1-mesa-dev libegl1-mesa-dev libvulkan-dev libwayland-dev
+
+      - name: Check workspace
+        run: cargo check --workspace
+
+  check-macos:
+    name: Check (macOS)
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Check workspace
+        run: cargo check --workspace
