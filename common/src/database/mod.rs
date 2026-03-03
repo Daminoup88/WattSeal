@@ -75,6 +75,14 @@ impl Database {
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "OFF")?;
 
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS ui_settings (
+                id                        INTEGER PRIMARY KEY CHECK (id = 1),
+                language                  TEXT NOT NULL DEFAULT 'EN',
+                carbon_intensity_g_per_kwh REAL NOT NULL DEFAULT 475.0
+            )",
+        )?;
+
         let tables = match conn.prepare("SELECT tables FROM hardware_info ORDER BY id DESC LIMIT 1") {
             Err(_) => None,
             Ok(mut stmt) => match stmt.query_row([], |row| row.get::<_, String>(0)).optional() {
@@ -195,17 +203,31 @@ impl Database {
         energy_wh: f64,
     ) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
-        let updated_rows = tx.execute(
-            "UPDATE component_all_time_data SET total_energy_wh = total_energy_wh + ?1 WHERE component_name = ?2",
-            params![energy_wh, component_name],
+        tx.execute(
+            "INSERT INTO component_all_time_data (component_name, total_energy_wh) VALUES (?1, ?2) \
+             ON CONFLICT(component_name) DO UPDATE SET total_energy_wh = total_energy_wh + ?2",
+            params![component_name, energy_wh],
         )?;
-        if updated_rows == 0 {
-            tx.execute(
-                "INSERT INTO component_all_time_data (component_name, total_energy_wh) VALUES (?1, ?2)",
-                params![component_name, energy_wh],
-            )?;
-        }
         tx.commit()?;
+        Ok(())
+    }
+
+    pub fn load_ui_settings(&self) -> Result<Option<(String, f64)>, DatabaseError> {
+        let mut stmt = self
+            .conn
+            .prepare("SELECT language, carbon_intensity_g_per_kwh FROM ui_settings WHERE id = 1")?;
+        let result = stmt
+            .query_row([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)))
+            .optional()?;
+        Ok(result)
+    }
+
+    pub fn save_ui_settings(&mut self, language: &str, carbon_g_per_kwh: f64) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO ui_settings (id, language, carbon_intensity_g_per_kwh) VALUES (1, ?1, ?2) \
+             ON CONFLICT(id) DO UPDATE SET language = ?1, carbon_intensity_g_per_kwh = ?2",
+            params![language, carbon_g_per_kwh],
+        )?;
         Ok(())
     }
 
@@ -557,12 +579,12 @@ impl Database {
                 ?2 AS timestamp,
                 p.app_name AS app_name,
                 MAX(p.process_exe_path) AS process_exe_path,
-                SUM(COALESCE(p.process_power_watts, 0.0)) / ?4 AS process_power_watts,
-                SUM(COALESCE(p.process_cpu_usage, 0.0)) / ?4 AS process_cpu_usage,
-                SUM(COALESCE(p.process_gpu_usage, 0.0)) / ?4 AS process_gpu_usage,
-                SUM(COALESCE(p.process_mem_usage, 0.0)) / ?4 AS process_mem_usage,
-                SUM(COALESCE(p.read_bytes_per_sec, 0.0)) / ?4 AS read_bytes_per_sec,
-                SUM(COALESCE(p.written_bytes_per_sec, 0.0)) / ?4 AS written_bytes_per_sec,
+                AVG(COALESCE(p.process_power_watts, 0.0)) AS process_power_watts,
+                AVG(COALESCE(p.process_cpu_usage, 0.0))   AS process_cpu_usage,
+                AVG(COALESCE(p.process_gpu_usage, 0.0))   AS process_gpu_usage,
+                AVG(COALESCE(p.process_mem_usage, 0.0))   AS process_mem_usage,
+                AVG(COALESCE(p.read_bytes_per_sec, 0.0))  AS read_bytes_per_sec,
+                AVG(COALESCE(p.written_bytes_per_sec, 0.0)) AS written_bytes_per_sec,
                 MAX(p.subprocess_count) AS subprocess_count
              FROM timestamp t
              JOIN process_data p ON t.id = p.timestamp_id
@@ -574,7 +596,7 @@ impl Database {
         let rows = self.execute_sensor_query(
             ProcessData::table_name_static(),
             &query,
-            params![start, now_ms, top_n as i64, n_seconds as f64],
+            params![start, now_ms, top_n as i64],
         )?;
 
         let mut processes = Vec::new();

@@ -568,8 +568,15 @@ impl SensorState {
     }
 
     fn time_range_selector(&self) -> Element<'_, Message, AppTheme> {
+        let options = if self.table_name == TotalData::table_name_static()
+            || self.table_name == ProcessData::table_name_static()
+        {
+            TranslatedTimeRange::options_total(self.language)
+        } else {
+            TranslatedTimeRange::options_component(self.language)
+        };
         pick_list(
-            TranslatedTimeRange::options(self.language),
+            options,
             Some(TranslatedTimeRange::new(self.time_range.clone(), self.language)),
             |tr: TranslatedTimeRange| Message::ChangeChartTimeRange(self.table_name.clone(), tr.range),
         )

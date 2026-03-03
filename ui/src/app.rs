@@ -9,7 +9,8 @@ use iced::{
     Alignment, Element, Length, Padding, Subscription, Task,
     time::{Duration, every},
     widget::{
-        Button, Column, Container, Row, Scrollable, Space, Text, button, center, image, mouse_area, opaque, stack,
+        Button, Column, Container, Row, Scrollable, Space, Text, button, center, image, mouse_area, opaque, pick_list,
+        stack, text_input,
     },
 };
 
@@ -28,10 +29,12 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        self, info_modal_all_time_power, info_modal_current_power, info_modal_description, info_modal_title,
-        info_modal_top_consumer, info_modal_top_process, modal_close, na, window_title,
+        self, custom_carbon_invalid, custom_carbon_placeholder, info_modal_all_time_power, info_modal_current_power,
+        info_modal_description, info_modal_title, info_modal_top_consumer, info_modal_top_process, modal_close, na,
+        settings_carbon_intensity, settings_language, setup_choose_carbon, setup_choose_language, setup_confirm,
+        setup_welcome_title, window_title,
     },
-    types::{AppLanguage, TimeRange},
+    types::{AppLanguage, CarbonIntensity, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -47,6 +50,9 @@ pub struct App {
     settings_open: bool,
     info_modal_open: Option<String>,
     language: AppLanguage,
+    carbon_intensity: CarbonIntensity,
+    custom_carbon_input: String,
+    show_setup: bool,
     header: Header,
     theme: AppTheme,
     database: Database,
@@ -58,8 +64,21 @@ impl App {
     pub fn new() -> (Self, Task<Message>) {
         let theme = AppTheme::EcoEnergy;
         let current_page = Page::Dashboard;
-        let language = AppLanguage::default();
         let mut database = Database::new().expect("Failed to create database");
+
+        let (language, carbon_intensity, show_setup) = match database.load_ui_settings() {
+            Ok(Some((lang_str, ci))) => {
+                let lang = AppLanguage::from_code(lang_str.as_str());
+                (lang, CarbonIntensity::from_g_per_kwh(ci), false)
+            }
+            _ => (AppLanguage::default(), CarbonIntensity::PRESETS[8], true),
+        };
+        let custom_carbon_input = if carbon_intensity.is_custom() {
+            format!("{:.0}", carbon_intensity.g_per_kwh)
+        } else {
+            String::new()
+        };
+
         let sensors = database
             .get_tables()
             .into_iter()
@@ -90,6 +109,9 @@ impl App {
                 settings_open: false,
                 info_modal_open: None,
                 language,
+                carbon_intensity,
+                custom_carbon_input,
+                show_setup,
                 theme,
                 database,
                 hardware_info,
@@ -141,6 +163,44 @@ impl App {
                 self.language = language;
                 for sensor in self.sensors.values_mut() {
                     sensor.update_language(language);
+                }
+                self.persist_ui_settings();
+                Task::none()
+            }
+            Message::ChangeCarbonIntensity(ci) => {
+                if ci.is_custom() {
+                    if !self.carbon_intensity.is_custom() {
+                        self.custom_carbon_input = String::new();
+                    }
+                    let g = self
+                        .custom_carbon_input
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|&v| v > 0.0)
+                        .unwrap_or(0.0);
+                    self.carbon_intensity = CarbonIntensity {
+                        label: "Custom",
+                        g_per_kwh: g,
+                    };
+                } else {
+                    self.carbon_intensity = ci;
+                    self.persist_ui_settings();
+                }
+                Task::none()
+            }
+            Message::CustomCarbonInput(text) => {
+                self.custom_carbon_input = text.clone();
+                if let Some(val) = text.parse::<f64>().ok().filter(|&v| v > 0.0) {
+                    self.carbon_intensity = CarbonIntensity {
+                        label: "Custom",
+                        g_per_kwh: val,
+                    };
+                    self.persist_ui_settings();
+                } else {
+                    self.carbon_intensity = CarbonIntensity {
+                        label: "Custom",
+                        g_per_kwh: 0.0,
+                    };
                 }
                 Task::none()
             }
@@ -203,6 +263,11 @@ impl App {
                 }
                 Task::none()
             }
+            Message::ConfirmSetup => {
+                self.show_setup = false;
+                self.persist_ui_settings();
+                Task::none()
+            }
             _ => Task::none(),
         }
     }
@@ -228,21 +293,25 @@ impl App {
             _ => {
                 let window = time_range.granularity_seconds();
                 self.database
-                    .select_last_n_seconds_average(time_range as i64, table_name, window)
+                    .select_last_n_seconds_average(time_range.duration_secs(), table_name, window)
             }
         };
         from_db(result)
     }
 
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
-        from_db(self.database.select_top_processes_average(time_range as i64, 10))
+        from_db(
+            self.database
+                .select_top_processes_average(time_range.duration_secs(), 10),
+        )
     }
 
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let page_content = match self.current_page {
-            Page::Dashboard => self
-                .dashboard_page
-                .view(&self.sensors, &self.all_time_data, self.language),
+            Page::Dashboard => {
+                self.dashboard_page
+                    .view(&self.sensors, &self.all_time_data, self.language, self.carbon_intensity)
+            }
             Page::Info => self.info_page.view(&self.hardware_info, self.theme, self.language),
             Page::Optimization => self.optimization_page.view(self.language),
         };
@@ -255,9 +324,16 @@ impl App {
         if self.settings_open {
             modal(
                 content,
-                self.settings_page.view(self.theme, self.language),
+                self.settings_page.view(
+                    self.theme,
+                    self.language,
+                    self.carbon_intensity,
+                    &self.custom_carbon_input,
+                ),
                 Message::CloseSettings,
             )
+        } else if self.show_setup {
+            modal(content, self.setup_view(), Message::ConfirmSetup)
         } else if let Some(ref target) = self.info_modal_open {
             modal(content, self.info_modal_view(target), Message::CloseInfoModal)
         } else {
@@ -421,6 +497,81 @@ impl App {
         if let Ok(all_time_data) = self.database.get_all_time_data() {
             self.all_time_data = all_time_data;
         }
+    }
+
+    fn persist_ui_settings(&mut self) {
+        let _ = self
+            .database
+            .save_ui_settings(self.language.code(), self.carbon_intensity.g_per_kwh);
+    }
+
+    fn setup_view(&self) -> Element<'_, Message, AppTheme> {
+        let language = self.language;
+
+        let title = Text::new(setup_welcome_title(language))
+            .size(FONT_SIZE_HEADER)
+            .font(FONT_BOLD)
+            .width(Length::Fill);
+
+        let lang_label = Text::new(setup_choose_language(language)).size(FONT_SIZE_BODY);
+        let lang_picker = pick_list(AppLanguage::all(), Some(self.language), Message::ChangeLanguage)
+            .width(Length::Fill)
+            .padding(8);
+
+        let ci_label = Text::new(setup_choose_carbon(language)).size(FONT_SIZE_BODY);
+        let ci_picker = pick_list(
+            CarbonIntensity::PRESETS.to_vec(),
+            Some(self.carbon_intensity),
+            Message::ChangeCarbonIntensity,
+        )
+        .width(Length::Fill)
+        .padding(8);
+
+        let custom_input_valid = self
+            .custom_carbon_input
+            .parse::<f64>()
+            .ok()
+            .filter(|&v| v > 0.0)
+            .is_some();
+
+        let carbon_section: Element<'_, Message, AppTheme> = if self.carbon_intensity.is_custom() {
+            let input = text_input(custom_carbon_placeholder(language), &self.custom_carbon_input)
+                .on_input(Message::CustomCarbonInput)
+                .width(Length::Fill)
+                .padding(8);
+            let mut col = Column::new().spacing(SPACING_SMALL).push(ci_picker).push(input);
+            if !self.custom_carbon_input.is_empty() && !custom_input_valid {
+                col = col.push(
+                    Text::new(custom_carbon_invalid(language))
+                        .size(FONT_SIZE_SMALL)
+                        .class(TextStyle::Muted),
+                );
+            }
+            col.into()
+        } else {
+            ci_picker.into()
+        };
+
+        let can_confirm = !self.carbon_intensity.is_custom() || custom_input_valid;
+        let confirm_btn = button(Text::new(setup_confirm(language)).size(FONT_SIZE_BODY))
+            .class(ButtonStyle::Standard)
+            .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
+
+        let content = Column::new()
+            .spacing(SPACING_LARGE)
+            .align_x(Alignment::Start)
+            .push(title)
+            .push(lang_label)
+            .push(lang_picker)
+            .push(ci_label)
+            .push(carbon_section)
+            .push(confirm_btn);
+
+        Container::new(content)
+            .width(Length::Fixed(520.0))
+            .padding(PADDING_XLARGE)
+            .class(ContainerStyle::ModalCard)
+            .into()
     }
 }
 

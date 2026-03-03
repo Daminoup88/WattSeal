@@ -13,10 +13,22 @@ pub fn averaging_and_purging_data(
     purge_until_time: i64,
 ) -> Result<(), String> {
     let start = Instant::now();
-    averaging_data(database, average_until_time)
-        .map_err(|e| format!("Failed to average data: {}", e))
+    averaging_total_data(database, average_until_time)
+        .map_err(|e| format!("Failed to average total data: {}", e))
         .ok();
-    println!("Time to average data: {:.2?}", Instant::now().duration_since(start));
+    println!(
+        "Time to average total data: {:.2?}",
+        Instant::now().duration_since(start)
+    );
+
+    let start = Instant::now();
+    averaging_process_data(database, average_until_time)
+        .map_err(|e| format!("Failed to average process data: {}", e))
+        .ok();
+    println!(
+        "Time to average process data: {:.2?}",
+        Instant::now().duration_since(start)
+    );
 
     let start = Instant::now();
     purge_old_events(database, purge_until_time)
@@ -28,7 +40,7 @@ pub fn averaging_and_purging_data(
 }
 
 // Insert records of TotalData with average values every hour until the duration specified (ex: 24h ago)
-fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
+fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
     let cutoff_end_timestamp = get_timestamp_oclock() - duration_in_hours * HOUR_MS;
 
     let first_timestamp: Option<i64> = database
@@ -140,6 +152,121 @@ fn averaging_data(database: &mut Database, duration_in_hours: i64) -> Result<(),
 
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
+
+    Ok(())
+}
+
+/// Aggregate top-N process data into hourly buckets so that process history
+/// survives the raw-data purge and can be queried over weeks / months.
+fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
+    let cutoff_end_timestamp = get_timestamp_oclock() - duration_in_hours * HOUR_MS;
+
+    // Check whether there are any un-averaged process rows to aggregate
+    let has_rows: bool = database
+        .conn
+        .prepare(
+            "SELECT 1 FROM timestamp t \
+             JOIN process_data p ON t.id = p.timestamp_id \
+             WHERE t.period_type = 1 AND t.timestamp < ?1 \
+             LIMIT 1",
+        )
+        .and_then(|mut s| s.query_row([cutoff_end_timestamp], |_| Ok(true)))
+        .unwrap_or(false);
+
+    if !has_rows {
+        println!("No process data to average");
+        return Ok(());
+    }
+
+    // Top-10 processes per hourly bucket, averaged
+    let mut stmt = database
+        .conn
+        .prepare(
+            "SELECT
+                (t.timestamp / ?2) * ?2 AS bucket_start,
+                p.app_name,
+                MAX(p.process_exe_path)              AS process_exe_path,
+                SUM(COALESCE(p.process_power_watts, 0.0)) / MAX(1, COUNT(*)) AS process_power_watts,
+                SUM(COALESCE(p.process_cpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_cpu_usage,
+                SUM(COALESCE(p.process_gpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_gpu_usage,
+                SUM(COALESCE(p.process_mem_usage, 0.0))   / MAX(1, COUNT(*)) AS process_mem_usage,
+                SUM(COALESCE(p.read_bytes_per_sec, 0.0))  / MAX(1, COUNT(*)) AS read_bytes_per_sec,
+                SUM(COALESCE(p.written_bytes_per_sec, 0.0))/ MAX(1, COUNT(*)) AS written_bytes_per_sec,
+                MAX(p.subprocess_count)               AS subprocess_count
+             FROM timestamp t
+             JOIN process_data p ON t.id = p.timestamp_id
+             WHERE t.period_type = 1
+               AND t.timestamp < ?1
+             GROUP BY bucket_start, p.app_name
+             ORDER BY bucket_start, process_power_watts DESC",
+        )
+        .map_err(|e| format!("prepare process avg: {}", e))?;
+
+    // Collect rows grouped by bucket
+    let rows = stmt
+        .query_map(params![cutoff_end_timestamp, HOUR_MS], |row| {
+            Ok((
+                row.get::<_, i64>(0)?,            // bucket_start
+                row.get::<_, String>(1)?,         // app_name
+                row.get::<_, Option<String>>(2)?, // exe_path
+                row.get::<_, f64>(3)?,            // power
+                row.get::<_, f64>(4)?,            // cpu
+                row.get::<_, f64>(5)?,            // gpu
+                row.get::<_, f64>(6)?,            // mem
+                row.get::<_, f64>(7)?,            // read
+                row.get::<_, f64>(8)?,            // write
+                row.get::<_, u32>(9)?,            // subprocs
+            ))
+        })
+        .map_err(|e| format!("query process avg: {}", e))?;
+
+    // Keep only top-10 per bucket
+    let mut buckets: Vec<(i64, Vec<(String, Option<String>, f64, f64, f64, f64, f64, f64, u32)>)> = Vec::new();
+    for row in rows {
+        let (bucket, app, exe, pw, cpu, gpu, mem, rd, wr, sub) = row.map_err(|e| format!("row: {}", e))?;
+        if buckets.last().map_or(true, |(b, _)| *b != bucket) {
+            buckets.push((bucket, Vec::new()));
+        }
+        let procs = &mut buckets.last_mut().unwrap().1;
+        if procs.len() < 10 {
+            procs.push((app, exe, pw, cpu, gpu, mem, rd, wr, sub));
+        }
+    }
+    drop(stmt);
+
+    if buckets.is_empty() {
+        return Ok(());
+    }
+
+    let tx = database.conn.transaction().map_err(|e| format!("tx: {}", e))?;
+
+    let mut insert_ts = tx
+        .prepare("INSERT INTO timestamp (timestamp, period_type) VALUES (?1, ?2)")
+        .map_err(|e| format!("prepare ts: {}", e))?;
+    let mut insert_proc = tx
+        .prepare(
+            "INSERT INTO process_data (timestamp_id, app_name, process_exe_path, \
+             process_power_watts, process_cpu_usage, process_gpu_usage, \
+             process_mem_usage, read_bytes_per_sec, written_bytes_per_sec, \
+             subprocess_count) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
+        )
+        .map_err(|e| format!("prepare proc: {}", e))?;
+
+    for (bucket_start, procs) in &buckets {
+        insert_ts
+            .execute(params![bucket_start, 3600_i64])
+            .map_err(|e| format!("insert ts: {}", e))?;
+        let ts_id = tx.last_insert_rowid();
+        for (app, exe, pw, cpu, gpu, mem, rd, wr, sub) in procs {
+            insert_proc
+                .execute(params![ts_id, app, exe, pw, cpu, gpu, mem, rd, wr, sub])
+                .map_err(|e| format!("insert proc: {}", e))?;
+        }
+    }
+
+    drop(insert_proc);
+    drop(insert_ts);
+    tx.commit().map_err(|e| format!("commit: {}", e))?;
 
     Ok(())
 }

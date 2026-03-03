@@ -4,7 +4,7 @@ use common::{MetricType, SensorData};
 use crate::{
     pages::Page,
     themes::AppTheme,
-    types::{AppLanguage, TimeRange},
+    types::{AppLanguage, CarbonIntensity, TimeRange},
 };
 
 #[derive(Debug, Clone)]
@@ -13,6 +13,8 @@ pub enum Message {
     NavigateTo(Page),
     ChangeTheme(AppTheme),
     ChangeLanguage(AppLanguage),
+    ChangeCarbonIntensity(CarbonIntensity),
+    CustomCarbonInput(String),
     OpenSettings,
     CloseSettings,
     ChangeChartMetricType(String, MetricType),
@@ -25,4 +27,5 @@ pub enum Message {
     LoadChartEvents(i64),
     OpenInfoModal(String),
     CloseInfoModal,
+    ConfirmSetup,
 }

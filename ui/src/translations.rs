@@ -96,6 +96,13 @@ pub fn emissions(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn zero_carbon_intensity_warning(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "\u{26a0} Choose a real carbon intensity in the settings! \u{26a0}",
+        AppLanguage::French => "\u{26a0} Choisissez une intensité carbone réelle dans les paramètres ! \u{26a0}",
+    }
+}
+
 // Info page
 
 pub fn cpu(language: AppLanguage) -> &'static str {
@@ -442,11 +449,35 @@ pub fn last_24_hours(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn last_week(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Last Week",
+        AppLanguage::French => "Dernière semaine",
+    }
+}
+
+pub fn last_month(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Last Month",
+        AppLanguage::French => "Dernier mois",
+    }
+}
+
+pub fn last_year(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Last Year",
+        AppLanguage::French => "Dernière année",
+    }
+}
+
 pub fn time_range_name(language: AppLanguage, range: &TimeRange) -> &'static str {
     match range {
         TimeRange::LastMinute => last_minute(language),
         TimeRange::LastHour => last_hour(language),
         TimeRange::Last24Hours => last_24_hours(language),
+        TimeRange::LastWeek => last_week(language),
+        TimeRange::LastMonth => last_month(language),
+        TimeRange::LastYear => last_year(language),
     }
 }
 
@@ -555,6 +586,57 @@ pub fn optimization_content(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Optimization Page Content",
         AppLanguage::French => "Contenu de la page d'optimisation",
+    }
+}
+
+// Carbon intensity / setup
+
+pub fn settings_carbon_intensity(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Carbon Intensity",
+        AppLanguage::French => "Intensité carbone",
+    }
+}
+
+pub fn setup_welcome_title(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Welcome to Energy Monitor",
+        AppLanguage::French => "Bienvenue sur le Moniteur d'Énergie",
+    }
+}
+
+pub fn setup_choose_language(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Choose your language",
+        AppLanguage::French => "Choisissez votre langue",
+    }
+}
+
+pub fn setup_choose_carbon(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Select the carbon intensity of your electricity grid",
+        AppLanguage::French => "Sélectionnez l'intensité carbone de votre réseau électrique",
+    }
+}
+
+pub fn setup_confirm(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Confirm",
+        AppLanguage::French => "Confirmer",
+    }
+}
+
+pub fn custom_carbon_placeholder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "e.g. 300",
+        AppLanguage::French => "ex. 300",
+    }
+}
+
+pub fn custom_carbon_invalid(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Please enter a positive number (g CO₂/kWh)",
+        AppLanguage::French => "Entrez un nombre positif (g CO₂/kWh)",
     }
 }
 
@@ -862,12 +944,22 @@ impl TranslatedTimeRange {
         Self { range, language }
     }
 
+    pub fn options_total(language: AppLanguage) -> Vec<Self> {
+        TimeRange::all_total()
+            .iter()
+            .map(|r| Self::new(r.clone(), language))
+            .collect()
+    }
+
+    pub fn options_component(language: AppLanguage) -> Vec<Self> {
+        TimeRange::all_component()
+            .iter()
+            .map(|r| Self::new(r.clone(), language))
+            .collect()
+    }
+
     pub fn options(language: AppLanguage) -> Vec<Self> {
-        vec![
-            Self::new(TimeRange::LastMinute, language),
-            Self::new(TimeRange::LastHour, language),
-            Self::new(TimeRange::Last24Hours, language),
-        ]
+        Self::options_component(language)
     }
 }
 

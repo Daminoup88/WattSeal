@@ -21,12 +21,11 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    translations::{self, all_time, current_power_consumption, emissions},
-    types::AppLanguage,
+    translations::{self, all_time, current_power_consumption, emissions, zero_carbon_intensity_warning},
+    types::{AppLanguage, CarbonIntensity},
 };
 
 const MAX_COMPONENT_CARD_WIDTH: f32 = 600.0;
-const CARBON_INTENSITY_G_PER_KWH: f64 = 475.0;
 
 pub struct DashboardPage;
 
@@ -36,13 +35,14 @@ impl DashboardPage {
         sensors: &'a HashMap<String, SensorState>,
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
+        carbon_intensity: CarbonIntensity,
     ) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(sensors, all_time_data, language));
+            .push(self.view_power_summary(sensors, all_time_data, language, carbon_intensity));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
@@ -68,6 +68,7 @@ impl DashboardPage {
         sensors: &'a HashMap<String, SensorState>,
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
+        carbon_intensity: CarbonIntensity,
     ) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
@@ -106,9 +107,10 @@ impl DashboardPage {
             .get(TotalData::table_name_static())
             .copied()
             .unwrap_or(0.0);
-        let carbon_grams = wh_to_co2_grams(total_energy_wh);
 
-        let side = Column::new()
+        let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
+
+        let mut side_col = Column::new()
             .width(Length::FillPortion(1))
             .spacing(SPACING_SMALL)
             .align_x(Alignment::Center)
@@ -124,6 +126,17 @@ impl DashboardPage {
                 "g CO₂",
                 TextStyle::Tertiary,
             ));
+
+        if carbon_intensity.g_per_kwh == 0.0 {
+            side_col = side_col.push(
+                Text::new(zero_carbon_intensity_warning(language))
+                    .size(FONT_SIZE_BODY)
+                    .align_x(Alignment::Center)
+                    .class(TextStyle::Tertiary),
+            );
+        }
+
+        let side = side_col;
 
         let content = Row::new()
             .width(Length::Fill)
@@ -266,8 +279,8 @@ fn metric_tile<'a>(
     .into()
 }
 
-fn wh_to_co2_grams(energy_wh: f64) -> f64 {
-    (energy_wh / 1000.0) * CARBON_INTENSITY_G_PER_KWH
+fn wh_to_co2_grams(energy_wh: f64, intensity_g_per_kwh: f64) -> f64 {
+    (energy_wh / 1000.0) * intensity_g_per_kwh
 }
 
 fn format_wh(energy_wh: f64) -> String {
