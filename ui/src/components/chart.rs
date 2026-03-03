@@ -45,7 +45,7 @@ const CHART_MARGIN: f32 = 20.0;
 const CHART_MARGIN_LEFT: f32 = 0.0;
 const CHART_MARGIN_RIGHT: f32 = 10.0;
 
-const TOOLTIP_WIDTH: f32 = 150.0;
+const TOOLTIP_WIDTH: f32 = 160.0;
 const TOOLTIP_MIN_HEIGHT: f32 = 60.0;
 const TOOLTIP_PADDING: f32 = 8.0;
 const TOOLTIP_OFFSET: f32 = 20.0;
@@ -108,6 +108,7 @@ pub struct TooltipContent {
     pub description: Option<String>,
     pub series_index: usize,
     pub color_index: Option<usize>,
+    pub x_range_secs: i64,
 }
 
 impl TooltipContent {
@@ -118,6 +119,7 @@ impl TooltipContent {
         time: DateTime<Local>,
         series_index: usize,
         color_index: Option<usize>,
+        x_range_secs: i64,
     ) -> Self {
         Self {
             title,
@@ -127,6 +129,7 @@ impl TooltipContent {
             description: None,
             series_index,
             color_index,
+            x_range_secs,
         }
     }
 
@@ -141,7 +144,11 @@ impl TooltipContent {
     }
 
     fn timestamp_text(&self) -> String {
-        self.time.format("%H:%M:%S").to_string()
+        if self.x_range_secs > 86400 {
+            self.time.format("%Y-%m-%d %H:%M").to_string()
+        } else {
+            self.time.format("%H:%M:%S").to_string()
+        }
     }
 
     pub fn calculate_height(&self) -> f32 {
@@ -233,8 +240,6 @@ pub struct SensorChart {
     x_range: Duration,
     y_range: Range,
     y_label_area_size: f32,
-    x_axis_label: &'static str,
-    y_axis_label: &'static str,
     x_unit: &'static str,
     y_unit: &'static str,
     dynamic_range: bool,
@@ -330,8 +335,6 @@ impl SensorChart {
             y_label_area_size: Y_LABEL_AREA_SIZE,
             dynamic_range: true,
             style: theme.into(),
-            x_axis_label: "Time",
-            y_axis_label: "Value",
             x_unit: "",
             y_unit: "",
             language,
@@ -374,13 +377,11 @@ impl SensorChart {
         self.clear_cache();
     }
 
-    pub fn set_x_axis_label_and_unit(&mut self, label: &'static str, unit: &'static str) {
-        self.x_axis_label = label;
+    pub fn set_x_axis_unit(&mut self, unit: &'static str) {
         self.x_unit = unit;
     }
 
-    pub fn set_y_axis_label_and_unit(&mut self, label: &'static str, unit: &'static str) {
-        self.y_axis_label = label;
+    pub fn set_y_axis_unit(&mut self, unit: &'static str) {
         self.y_unit = unit;
         self.recalculate_y_label_area_size();
         self.clear_cache();
@@ -407,13 +408,6 @@ impl SensorChart {
     pub fn update_language(&mut self, language: AppLanguage) {
         self.language = language;
         self.clear_cache();
-    }
-
-    pub fn update_display_label(&mut self, key: &str, display_label: &str) {
-        if let Some(series) = self.data.get_mut(key) {
-            series.display_label = display_label.to_string();
-            self.clear_cache();
-        }
     }
 
     pub fn set_x_range(&mut self, duration: Duration) {
@@ -744,6 +738,7 @@ impl SensorChart {
                 time,
                 idx,
                 color_index,
+                self.x_range.num_seconds(),
             );
             TooltipData::new(content, px, py, chart_bounds.width, chart_bounds.height)
         };

@@ -272,6 +272,14 @@ impl MetricType {
     pub fn legend(&self, component_name: &str) -> String {
         format!("{} {}", component_name, self.label())
     }
+
+    pub fn effective_unit(&self, energy_mode: bool) -> &'static str {
+        if *self == MetricType::Power && energy_mode {
+            "Wh"
+        } else {
+            self.unit()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -351,6 +359,24 @@ impl SensorData {
             SensorData::Network(data) => data.total_power_watts,
             SensorData::Total(power) => Some(power.total_power_watts),
             SensorData::Process(_) => None,
+        }
+    }
+
+    /// Multiply all power fields by `factor`.
+    /// Used to convert average watts → Wh when switching to energy mode.
+    pub fn scale_power(&mut self, factor: f64) {
+        match self {
+            SensorData::CPU(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
+            SensorData::GPU(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
+            SensorData::Ram(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
+            SensorData::Disk(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
+            SensorData::Network(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
+            SensorData::Total(d) => d.total_power_watts *= factor,
+            SensorData::Process(procs) => {
+                for p in procs {
+                    p.process_power_watts *= factor;
+                }
+            }
         }
     }
 

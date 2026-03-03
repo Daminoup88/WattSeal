@@ -14,7 +14,7 @@ pub enum TimeRange {
 }
 
 impl TimeRange {
-    pub fn duration_secs(&self) -> i64 {
+    pub fn seconds(&self) -> i64 {
         match self {
             TimeRange::LastMinute => 60,
             TimeRange::LastHour => 3_600,
@@ -51,8 +51,30 @@ impl TimeRange {
         matches!(self, TimeRange::LastMinute)
     }
 
+    /// Returns true when the granularity is >= 1 hour,
+    /// meaning we display energy (Wh) instead of average power (W).
+    pub fn is_energy_mode(&self) -> bool {
+        self.granularity_seconds() >= 3600
+    }
+
+    /// Returns the power/energy unit string for the current mode.
+    pub fn power_unit(&self) -> &'static str {
+        if self.is_energy_mode() { "Wh" } else { "W" }
+    }
+
+    /// Conversion factor from average watts to the display unit.
+    /// For energy mode: avg_watts * window_hours = Wh.
+    /// For power mode: factor is 1 (already watts).
+    pub fn power_scale_factor(&self) -> f64 {
+        if self.is_energy_mode() {
+            self.granularity_seconds() as f64 / 3600.0
+        } else {
+            1.0
+        }
+    }
+
     pub fn duration_seconds(&self) -> Duration {
-        Duration::seconds(self.duration_secs())
+        Duration::seconds(self.seconds())
     }
 
     pub fn start_time(&self) -> DateTime<Local> {

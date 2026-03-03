@@ -293,16 +293,26 @@ impl App {
             _ => {
                 let window = time_range.granularity_seconds();
                 self.database
-                    .select_last_n_seconds_average(time_range.duration_secs(), table_name, window)
+                    .select_last_n_seconds_average(time_range.seconds(), table_name, window)
             }
         };
-        from_db(result)
+        let mut data = from_db(result);
+
+        // In energy mode, convert average watts → Wh per window
+        if time_range.is_energy_mode() {
+            let factor = time_range.power_scale_factor();
+            for (_, sensor_data) in &mut data {
+                sensor_data.scale_power(factor);
+            }
+        }
+
+        data
     }
 
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
         from_db(
             self.database
-                .select_top_processes_average(time_range.duration_secs(), 10),
+                .select_top_processes_average(time_range.seconds(), 10, time_range.is_energy_mode()),
         )
     }
 
@@ -451,10 +461,15 @@ impl App {
                     }
 
                     proc_row = proc_row.push(
-                        Text::new(format!("{} ({:.1} W)", top_proc.app_name, top_proc.process_power_watts))
-                            .size(FONT_SIZE_SUBTITLE)
-                            .font(FONT_BOLD)
-                            .class(TextStyle::Primary),
+                        Text::new(format!(
+                            "{} ({:.1} {})",
+                            top_proc.app_name,
+                            top_proc.process_power_watts,
+                            proc_sensor.current_time_range().power_unit()
+                        ))
+                        .size(FONT_SIZE_SUBTITLE)
+                        .font(FONT_BOLD)
+                        .class(TextStyle::Primary),
                     );
 
                     content = content.push(proc_row);

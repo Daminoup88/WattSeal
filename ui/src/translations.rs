@@ -375,6 +375,19 @@ pub fn power_label(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn energy_label(language: AppLanguage) -> &'static str {
+    energy(language)
+}
+
+/// Returns "Power:" or "Energy:" label depending on energy mode.
+pub fn power_or_energy_label(language: AppLanguage, energy_mode: bool) -> &'static str {
+    if energy_mode {
+        energy_label(language)
+    } else {
+        power_label(language)
+    }
+}
+
 pub fn tooltip_value(language: AppLanguage, value_text: &str) -> String {
     match language {
         AppLanguage::English => format!("Value: {}", value_text),
@@ -402,6 +415,27 @@ pub fn power(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Power",
         AppLanguage::French => "Puissance",
+    }
+}
+
+pub fn energy(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Energy",
+        AppLanguage::French => "Énergie",
+    }
+}
+
+/// Returns "Power" or "Energy" depending on whether energy mode is active.
+pub fn power_or_energy(language: AppLanguage, energy_mode: bool) -> &'static str {
+    if energy_mode { energy(language) } else { power(language) }
+}
+
+/// Returns the label for the power/energy column header with unit.
+pub fn power_or_energy_with_unit(language: AppLanguage, energy_mode: bool) -> String {
+    if energy_mode {
+        format!("{} (Wh)", energy(language))
+    } else {
+        format!("{} (W)", power(language))
     }
 }
 
@@ -488,6 +522,10 @@ pub fn metric_power(language: AppLanguage) -> &'static str {
         AppLanguage::English => "Power",
         AppLanguage::French => "Puissance",
     }
+}
+
+pub fn metric_energy(language: AppLanguage) -> &'static str {
+    energy(language)
 }
 
 pub fn metric_usage(language: AppLanguage) -> &'static str {

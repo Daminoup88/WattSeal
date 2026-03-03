@@ -568,6 +568,7 @@ impl Database {
         &self,
         n_seconds: i64,
         top_n: usize,
+        energy_mode: bool,
     ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
         if n_seconds <= 0 {
             return Ok(vec![(SystemTime::now(), SensorData::Process(Vec::new()))]);
@@ -575,28 +576,86 @@ impl Database {
 
         let now_ms = to_epoch_millis(SystemTime::now())?;
         let start = now_ms - n_seconds * 1000;
-        let query = "SELECT
+
+        let query = if energy_mode {
+            // Energy mode: combine second-level and hour-level data.
+            // Second rows: each row = 1 s → power/3600 = Wh contribution.
+            // Hour rows:   each row = 1 h of averaged power → value IS Wh.
+            // CPU/GPU/RAM/disk are "unfolded" so the final AVG = time-weighted avg
+            // (missing time = 0).
+            "SELECT
+                ?2 AS timestamp,
+                combined.app_name AS app_name,
+                MAX(combined.process_exe_path) AS process_exe_path,
+                SUM(combined.energy_wh) AS process_power_watts,
+                SUM(combined.cpu_contrib) / ?4 AS process_cpu_usage,
+                SUM(combined.gpu_contrib) / ?4 AS process_gpu_usage,
+                SUM(combined.mem_contrib) / ?4 AS process_mem_usage,
+                SUM(combined.read_contrib) / ?4 AS read_bytes_per_sec,
+                SUM(combined.write_contrib) / ?4 AS written_bytes_per_sec,
+                MAX(combined.subprocess_count) AS subprocess_count
+             FROM (
+                 SELECT
+                     p.app_name,
+                     p.process_exe_path,
+                     COALESCE(p.process_power_watts, 0.0) / 3600.0 AS energy_wh,
+                     COALESCE(p.process_cpu_usage, 0.0) AS cpu_contrib,
+                     COALESCE(p.process_gpu_usage, 0.0) AS gpu_contrib,
+                     COALESCE(p.process_mem_usage, 0.0) AS mem_contrib,
+                     COALESCE(p.read_bytes_per_sec, 0.0) AS read_contrib,
+                     COALESCE(p.written_bytes_per_sec, 0.0) AS write_contrib,
+                     p.subprocess_count
+                 FROM timestamp t
+                 JOIN process_data p ON t.id = p.timestamp_id
+                 WHERE t.period_type = 1
+                   AND t.timestamp >= ?1 AND t.timestamp < ?2
+                 UNION ALL
+                 SELECT
+                     p.app_name,
+                     p.process_exe_path,
+                     COALESCE(p.process_power_watts, 0.0) AS energy_wh,
+                     COALESCE(p.process_cpu_usage, 0.0) * 3600.0 AS cpu_contrib,
+                     COALESCE(p.process_gpu_usage, 0.0) * 3600.0 AS gpu_contrib,
+                     COALESCE(p.process_mem_usage, 0.0) * 3600.0 AS mem_contrib,
+                     COALESCE(p.read_bytes_per_sec, 0.0) * 3600.0 AS read_contrib,
+                     COALESCE(p.written_bytes_per_sec, 0.0) * 3600.0 AS write_contrib,
+                     p.subprocess_count
+                 FROM timestamp t
+                 JOIN process_data p ON t.id = p.timestamp_id
+                 WHERE t.period_type = 3600
+                   AND t.timestamp >= ?1 AND t.timestamp < ?2
+             ) combined
+             GROUP BY combined.app_name
+             ORDER BY process_power_watts DESC
+             LIMIT ?3"
+                .to_string()
+        } else {
+            // Average mode: only second-level data, simple average.
+            "SELECT
                 ?2 AS timestamp,
                 p.app_name AS app_name,
                 MAX(p.process_exe_path) AS process_exe_path,
-                AVG(COALESCE(p.process_power_watts, 0.0)) AS process_power_watts,
-                AVG(COALESCE(p.process_cpu_usage, 0.0))   AS process_cpu_usage,
-                AVG(COALESCE(p.process_gpu_usage, 0.0))   AS process_gpu_usage,
-                AVG(COALESCE(p.process_mem_usage, 0.0))   AS process_mem_usage,
-                AVG(COALESCE(p.read_bytes_per_sec, 0.0))  AS read_bytes_per_sec,
-                AVG(COALESCE(p.written_bytes_per_sec, 0.0)) AS written_bytes_per_sec,
+                SUM(COALESCE(p.process_power_watts, 0.0)) / ?4 AS process_power_watts,
+                SUM(COALESCE(p.process_cpu_usage, 0.0)) / ?4 AS process_cpu_usage,
+                SUM(COALESCE(p.process_gpu_usage, 0.0)) / ?4 AS process_gpu_usage,
+                SUM(COALESCE(p.process_mem_usage, 0.0)) / ?4 AS process_mem_usage,
+                SUM(COALESCE(p.read_bytes_per_sec, 0.0)) / ?4 AS read_bytes_per_sec,
+                SUM(COALESCE(p.written_bytes_per_sec, 0.0)) / ?4 AS written_bytes_per_sec,
                 MAX(p.subprocess_count) AS subprocess_count
              FROM timestamp t
              JOIN process_data p ON t.id = p.timestamp_id
-             WHERE t.timestamp >= ?1 AND t.timestamp < ?2
+             WHERE t.period_type = 1
+               AND t.timestamp >= ?1 AND t.timestamp < ?2
              GROUP BY p.app_name
              ORDER BY process_power_watts DESC
-             LIMIT ?3";
+             LIMIT ?3"
+                .to_string()
+        };
 
         let rows = self.execute_sensor_query(
             ProcessData::table_name_static(),
             &query,
-            params![start, now_ms, top_n as i64],
+            params![start, now_ms, top_n as i64, n_seconds as f64],
         )?;
 
         let mut processes = Vec::new();
