@@ -8,6 +8,14 @@ use crate::{
     sensors::{Sensor, SensorError},
 };
 
+const SSD_IDLE_W: f64 = 0.05;
+const HDD_IDLE_W: f64 = 3.0;
+const UNKNOWN_IDLE_W: f64 = 0.3;
+
+const SSD_W_PER_MB_S: f64 = 0.015;
+const HDD_W_PER_MB_S: f64 = 0.035;
+const UNKNOWN_W_PER_MB_S: f64 = 0.02;
+
 pub struct DiskSensor {
     disks: RefCell<Disks>,
 }
@@ -22,11 +30,9 @@ impl DiskSensor {
 
 impl Sensor for DiskSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
-        // let mut total_space = 0.0;
-        // let mut used_space = 0.0;
-        // let mut free_space = 0.0;
         let mut read_speed = 0.0;
         let mut write_speed = 0.0;
+        let mut total_power = 0.0;
 
         let mut disks = self
             .disks
@@ -36,18 +42,22 @@ impl Sensor for DiskSensor {
 
         for disk in disks.iter() {
             let usage = disk.usage();
-            read_speed += usage.read_bytes as f64 / 1_048_576.0; // Convert to MB/s
-            write_speed += usage.written_bytes as f64 / 1_048_576.0; // Convert to MB/s
-            // total_space += disk.total_space() as f64 / 1_073_741_824.0; // Convert to GB
-            // used_space += (disk.total_space() - disk.available_space()) as f64 / 1_073_741_824.0; // Convert to GB
-            // free_space += disk.available_space() as f64 / 1_073_741_824.0; // Convert to GB
+            let rd_mb = usage.read_bytes as f64 / 1_048_576.0;
+            let wr_mb = usage.written_bytes as f64 / 1_048_576.0;
+            read_speed += rd_mb;
+            write_speed += wr_mb;
+
+            let throughput = rd_mb + wr_mb;
+            let (idle, per_mb) = match disk.kind() {
+                sysinfo::DiskKind::SSD => (SSD_IDLE_W, SSD_W_PER_MB_S),
+                sysinfo::DiskKind::HDD => (HDD_IDLE_W, HDD_W_PER_MB_S),
+                _ => (UNKNOWN_IDLE_W, UNKNOWN_W_PER_MB_S),
+            };
+            total_power += idle + throughput * per_mb;
         }
 
         Ok(SensorData::Disk(DiskData {
-            total_power_watts: None,
-            // total_gb: total_space,
-            // used_gb: used_space,
-            // free_gb: free_space,
+            total_power_watts: Some(total_power),
             read_usage_mb_s: read_speed,
             write_usage_mb_s: write_speed,
         }))

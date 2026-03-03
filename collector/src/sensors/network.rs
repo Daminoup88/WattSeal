@@ -7,6 +7,10 @@ use crate::{
     sensors::{Sensor, SensorError, network},
 };
 
+const NIC_IDLE_W: f64 = 0.2;
+const NIC_W_PER_MB_S: f64 = 0.01;
+const NIC_MAX_W: f64 = 3.0;
+
 pub struct NetworkSensor {
     networks: RefCell<Networks>,
 }
@@ -29,14 +33,21 @@ impl Sensor for NetworkSensor {
 
         let mut download_speed_mb_s = 0.0;
         let mut upload_speed_mb_s = 0.0;
+        let mut total_power = 0.0;
 
         for (_, data) in networks.iter() {
-            download_speed_mb_s += data.received() as f64 / 1_048_576.0; // Convert to MB/s
-            upload_speed_mb_s += data.transmitted() as f64 / 1_048_576.0; // Convert to MB/s
+            let dl = data.received() as f64 / 1_048_576.0;
+            let ul = data.transmitted() as f64 / 1_048_576.0;
+            download_speed_mb_s += dl;
+            upload_speed_mb_s += ul;
+
+            let throughput = dl + ul;
+            let nic_power = NIC_IDLE_W + throughput * NIC_W_PER_MB_S;
+            total_power += nic_power;
         }
 
         Ok(SensorData::Network(NetworkData {
-            total_power_watts: None,
+            total_power_watts: Some(total_power.min(NIC_MAX_W)),
             download_speed_mb_s,
             upload_speed_mb_s,
         }))
