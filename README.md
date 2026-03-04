@@ -141,7 +141,7 @@ With admin privileges, WattSeal provides the most comprehensive power monitoring
 
 </div>
 
-The rest of this README is aimed at contributors and developers who want to build WattSeal from source, understand the architecture, or add new features.
+The rest of this README is aimed at contributors and developers who want to build WattSeal from source, understand its architecture, or add new features.
 
 ---
 
@@ -183,7 +183,7 @@ The collector and UI share the same SQLite database file via WAL (Write-Ahead Lo
 ## Prerequisites
 
 - **Rust** stable toolchain (version pinned in [`rust-toolchain.toml`](rust-toolchain.toml)).
-- You may need platform-specific dependencies (nothing needed for Windows).
+- You may need platform-specific dependencies (none required for Windows).
 
 ---
 
@@ -209,7 +209,7 @@ cargo build --release
 ```
 
 > ⚠️ **Elevated privileges are required** to access hardware energy counters.
-> Run with administrator rights on Windows (will be prompted to elevate), or `sudo` on Linux.
+> Run with administrator rights on Windows (you will be prompted to elevate), or use `sudo` on Linux.
 
 ---
 
@@ -226,10 +226,10 @@ cargo build --release
 
 ## Code Style & Quality
 
-The project enforces the formatting and linting rules defined in `rustfmt.toml`. The compliance is checked in CI, and you can run the following commands locally to ensure your code meets the standards before pushing:
+The project enforces the formatting and linting rules defined in `rustfmt.toml`. Compliance is checked in CI. You can run the following command locally to ensure your code meets the project's style guidelines before pushing:
 
 ```bash
 cargo +nightly fmt
 ```
 
-> The `.vscode/settings.json` is configured to format on save, so if you're using VS Code, your code will be automatically formatted according to the project's style guidelines whenever you save a file.
+> The `.vscode/settings.json` is configured to format on save, so if you're using VS Code your code will be formatted automatically when you save a file.
