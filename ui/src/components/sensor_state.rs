@@ -432,6 +432,9 @@ impl SensorState {
                     s.power_graph
                         .chart
                         .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                    s.power_graph
+                        .chart
+                        .set_all_display_labels(power_or_energy(self.language, energy_mode));
                 }
             }
             SensorCategory::Total(s) => {
@@ -439,6 +442,10 @@ impl SensorState {
                 s.power_graph
                     .chart
                     .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                s.power_graph.chart.set_all_line_types(line_type);
+                s.power_graph
+                    .chart
+                    .set_all_display_labels(power_or_energy(self.language, energy_mode));
             }
             SensorCategory::Processes(_) => {}
         }
