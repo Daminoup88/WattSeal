@@ -57,7 +57,8 @@ jobs:
           sudo apt-get install -y \
             libgtk-3-dev pkg-config \
             libx11-dev libxkbcommon-dev libxcursor-dev libxrandr-dev libxi-dev \
-            libgl1-mesa-dev libegl1-mesa-dev libvulkan-dev libwayland-dev
+            libgl1-mesa-dev libegl1-mesa-dev libvulkan-dev libwayland-dev \
+            libxdo-dev
 
       - name: Build release
         run: cargo build --release
