@@ -160,10 +160,19 @@ wattseal/               ← Root binary (tray icon, lifecycle management)
 
 ```mermaid
 flowchart TD
-  A[wattseal (root)<br>System tray icon<br>spawns collector thread<br>launches UI]
-  A -->|spawns| B[collector<br>Polls sensors @1Hz<br>Estimates power<br>Writes → SQLite]
-  A -->|launches| C[ui<br>Iced GUI, live charts<br>Per-process view<br>Reads ← SQLite]
-  B --> D[power_monitoring.db (WAL)]
+  A["wattseal (root)
+    System tray icon
+    spawns collector thread
+    launches UI"]
+  A -->|spawns| B["collector
+                  Polls sensors @1Hz
+                  Estimates power
+                  Writes → SQLite"]
+  A -->|launches| C["ui
+                    Iced GUI, live charts
+                    Per-process view
+                    Reads ← SQLite"]
+  B --> D["power_monitoring.db (WAL)"]
   C --> D
 ```
 
