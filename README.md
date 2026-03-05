@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="https://img.shields.io/badge/WattSeal-power%20monitor-00d4aa?style=for-the-badge&logoColor=white" alt="WattSeal" height="40"/>
+<img src="https://img.shields.io/badge/WattSeal-power%20monitor-00cce6?style=for-the-badge" alt="WattSeal" height="40"/>
 
 # WattSeal
 
@@ -55,7 +55,8 @@ WattSeal doesn't need administrative privileges to run, but it does need them fo
 <summary><strong>🪟 Windows</strong></summary>
 
 1. Double-click the downloaded `WattSeal-windows-x86_64.exe` file
-2. If prompted by User Account Control (UAC), and you want the most accurate CPU power readings, click "Yes" to allow it to run with administrator privileges. If you click "No", it will still work but with less precise CPU power estimates.
+2. If prompted by Windows Defender SmartScreen, click "More info" and then "Run anyway" to launch the app. This is a standard warning for new apps that haven't yet built up reputation on Windows.
+3. If prompted by User Account Control (UAC), and you want the most accurate CPU power readings, click "Yes" to allow it to run with administrator privileges. If you click "No", it will still work but with less precise CPU power estimates.
 
 The app will launch in the system tray in the taskbar and the dashboard will open in a new window. If you close the dashboard, WattSeal will keep running in the background and you can reopen it by clicking the tray icon.
 
@@ -108,7 +109,7 @@ With admin privileges, WattSeal provides the most comprehensive power monitoring
 |  | Windows | Linux | macOS |
 |---|:---:|:---:|:---:|
 | Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | ✅ RAPL | ✅ RAPL | Estimated |
+| CPU energy counters | ✅ | ✅ | Estimated |
 | NVIDIA GPU | ✅ | ✅ | ❌ |
 | AMD GPU | ✅ | ❌ | ❌ |
 | Intel GPU | ✅ | ❌ | ❌ |
