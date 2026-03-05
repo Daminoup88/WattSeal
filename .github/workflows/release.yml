@@ -33,7 +33,7 @@ jobs:
         run: |
           Copy-Item target/release/wattseal.exe WattSeal-windows.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows-build
           path: WattSeal-windows.exe
@@ -68,7 +68,7 @@ jobs:
           cp target/release/wattseal WattSeal-linux
           chmod +x WattSeal-linux
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux-build
           path: WattSeal-linux
@@ -94,7 +94,7 @@ jobs:
           cp target/release/wattseal WattSeal-macos
           chmod +x WattSeal-macos
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: macos-build
           path: WattSeal-macos
