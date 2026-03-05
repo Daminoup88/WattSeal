@@ -12,12 +12,62 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  sync-version:
+    name: Sync Cargo version to tag
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      sha: ${{ steps.bump.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Update Cargo.toml version if needed
+        id: bump
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF#refs/tags/v}"
+          # Normalize tag to full semver (e.g. "0.4" -> "0.4.0")
+          case "$TAG" in
+            *.*.* ) ;; # already MAJOR.MINOR.PATCH
+            *.* )   TAG="${TAG}.0" ;;
+            * )     TAG="${TAG}.0.0" ;;
+          esac
+          # POSIX-only; ignores version.workspace lines (no leading quote)
+          CARGO_VERSION=$(grep '^version[[:space:]]*=[[:space:]]*"' Cargo.toml \
+            | head -1 \
+            | sed 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)"/\1/')
+          echo "Tag version:   $TAG"
+          echo "Cargo version: $CARGO_VERSION"
+          if [ "$TAG" != "$CARGO_VERSION" ]; then
+            echo "Updating Cargo.toml from $CARGO_VERSION to $TAG"
+            # Replace any quoted version value — no need to know the old one
+            sed -i "s/^version[[:space:]]*=[[:space:]]*\"[^\"]*\"/version = \"$TAG\"/" Cargo.toml
+            git config user.name  "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git add Cargo.toml
+            git commit -m "chore: bump version to $TAG [skip ci]"
+            git fetch origin main
+            git rebase origin/main
+            git push origin HEAD:main --force-with-lease
+            git tag -f "v$TAG"
+            git push origin "v$TAG" --force
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
   build-windows:
+    needs: sync-version
     name: Build (Windows)
     runs-on: windows-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
+          fetch-tags: false
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -39,11 +89,15 @@ jobs:
           path: WattSeal-windows.exe
 
   build-linux:
+    needs: sync-version
     name: Build (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
+          fetch-tags: false
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -74,11 +128,15 @@ jobs:
           path: WattSeal-linux
 
   build-macos:
+    needs: sync-version
     name: Build (macOS)
     runs-on: macos-latest
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.sync-version.outputs.sha }}
+          fetch-tags: false
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -101,7 +159,7 @@ jobs:
 
   release:
     name: Create GitHub Release
-    needs: [build-windows, build-linux, build-macos]
+    needs: [sync-version, build-windows, build-linux, build-macos]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@v4
