@@ -63,22 +63,6 @@ define_themes! {
     //     Ferra => Ferra,
     // ]
     custom: [
-        EcoEnergy => "Sleeping": Palette {
-            background: Color::from_rgb(0.12, 0.14, 0.16),
-            text: Color::from_rgb(0.9, 0.92, 0.94),
-            primary: Color::from_rgb(0.2, 0.78, 0.35),
-            success: Color::from_rgb(0.2, 0.6, 0.86),
-            danger: Color::from_rgb(0.95, 0.45, 0.25),
-            warning: Color::from_rgb(0.95, 0.75, 0.25),
-        },
-        EcoEnergyLight => "Splashing": Palette {
-            background: Color::from_rgb(0.96, 0.97, 0.98),
-            text: Color::from_rgb(0.15, 0.18, 0.22),
-            primary: Color::from_rgb(0.13, 0.58, 0.26),
-            success: Color::from_rgb(0.15, 0.45, 0.65),
-            danger: Color::from_rgb(0.85, 0.35, 0.15),
-            warning: Color::from_rgb(0.85, 0.65, 0.15),
-        },
         DeepOcean => "Hunting": Palette {
             background: Color::from_rgb(0.05, 0.07, 0.13),      // #0d1221
             text: Color::from_rgb(0.9, 0.95, 1.0),              // #e6f2ff
@@ -95,6 +79,23 @@ define_themes! {
             danger: Color::from_rgb(0.85, 0.55, 0.0),          // #d98c00
             warning: Color::from_rgb(0.78, 0.85, 0.25),        // #c7d940
         },
+        EcoEnergy => "Sleeping": Palette {
+            background: Color::from_rgb(0.12, 0.14, 0.16),
+            text: Color::from_rgb(0.9, 0.92, 0.94),
+            primary: Color::from_rgb(0.2, 0.78, 0.35),
+            success: Color::from_rgb(0.2, 0.6, 0.86),
+            danger: Color::from_rgb(0.95, 0.45, 0.25),
+            warning: Color::from_rgb(0.95, 0.75, 0.25),
+        },
+        EcoEnergyLight => "Splashing": Palette {
+            background: Color::from_rgb(0.96, 0.97, 0.98),
+            text: Color::from_rgb(0.15, 0.18, 0.22),
+            primary: Color::from_rgb(0.13, 0.58, 0.26),
+            success: Color::from_rgb(0.15, 0.45, 0.65),
+            danger: Color::from_rgb(0.85, 0.35, 0.15),
+            warning: Color::from_rgb(0.85, 0.65, 0.15),
+        },
+
         GeothermalCore => "Sunbathing": Palette {
             background: Color::from_rgb(0.10, 0.09, 0.09),
             text: Color::from_rgb(0.95, 0.93, 0.91),
@@ -146,6 +147,15 @@ impl Base for AppTheme {
 }
 
 impl AppTheme {
+    /// Resolves a theme by its display name, falling back to the default.
+    pub fn from_name(name: &str) -> Self {
+        Self::all()
+            .iter()
+            .copied()
+            .find(|t| t.name() == name)
+            .unwrap_or_default()
+    }
+
     pub fn palette(self) -> Palette {
         self.to_iced_theme().palette()
     }

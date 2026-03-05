@@ -4,7 +4,7 @@ use common::{MetricType, SensorData};
 use crate::{
     pages::Page,
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, TimeRange},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
 };
 
 /// UI event variants dispatched by user actions and background tasks.
@@ -16,6 +16,8 @@ pub enum Message {
     ChangeLanguage(AppLanguage),
     ChangeCarbonIntensity(CarbonIntensity),
     CustomCarbonInput(String),
+    ChangeElectricityCost(ElectricityCost),
+    CustomKwhCostInput(String),
     OpenSettings,
     CloseSettings,
     ChangeChartMetricType(String, MetricType),

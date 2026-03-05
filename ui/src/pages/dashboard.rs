@@ -4,13 +4,14 @@ use common::{AllTimeData, DatabaseEntry, ProcessData, TotalData};
 use iced::{
     Alignment, Element, Length, Padding,
     alignment::{Horizontal, Vertical},
-    widget::{Column, Container, Row, Scrollable, Text, rule},
+    widget::{Column, Container, Row, Scrollable, Text, button, rule},
 };
 
 use crate::{
     components::{helpers::no_data_placeholder, sensor_state::SensorState},
     message::Message,
     styles::{
+        button::ButtonStyle,
         container::ContainerStyle,
         scrollable::ScrollableStyle,
         style_constants::{
@@ -20,7 +21,7 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    translations::{all_time, current_power_consumption, emissions, zero_carbon_intensity_warning},
+    translations::{all_time, current_power_consumption, electricity_bill, emissions, zero_carbon_intensity_warning},
     types::{AppLanguage, CarbonIntensity},
 };
 
@@ -34,13 +35,14 @@ impl DashboardPage {
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
+        kwh_cost_per_kwh: f64,
     ) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(sensors, all_time_data, language, carbon_intensity));
+            .push(self.view_power_summary(sensors, all_time_data, language, carbon_intensity, kwh_cost_per_kwh));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
@@ -67,6 +69,7 @@ impl DashboardPage {
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
+        kwh_cost_per_kwh: f64,
     ) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
@@ -107,6 +110,7 @@ impl DashboardPage {
             .unwrap_or(0.0);
 
         let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
+        let bill_usd = total_energy_wh / 1000.0 * kwh_cost_per_kwh;
 
         let mut side_col = Column::new()
             .width(Length::FillPortion(1))
@@ -118,11 +122,27 @@ impl DashboardPage {
                 "Wh",
                 TextStyle::Secondary,
             ))
+            .push(
+                Row::new()
+                    .align_y(Alignment::Center)
+                    .push(metric_tile(
+                        emissions(language),
+                        format_grams(carbon_grams),
+                        "g CO₂",
+                        TextStyle::Tertiary,
+                    ))
+                    .push(
+                        button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
+                            .class(ButtonStyle::InfoHelp)
+                            .on_press(Message::OpenInfoModal("carbon_emissions".to_string()))
+                            .padding(Padding::from([2, 8])),
+                    ),
+            )
             .push(metric_tile(
-                emissions(language),
-                format_grams(carbon_grams),
-                "g CO₂",
-                TextStyle::Tertiary,
+                electricity_bill(language),
+                format!("{:.2}", bill_usd.max(0.0)),
+                "$",
+                TextStyle::Primary,
             ));
 
         if carbon_intensity.g_per_kwh == 0.0 {

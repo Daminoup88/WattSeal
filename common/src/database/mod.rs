@@ -42,6 +42,15 @@ pub struct Database {
     tables: Option<Vec<String>>,
 }
 
+/// All persisted UI preference fields.
+#[derive(Debug, Clone)]
+pub struct UiSettings {
+    pub language: String,
+    pub carbon_g_per_kwh: f64,
+    pub kwh_cost_eur: f64,
+    pub theme: String,
+}
+
 /// Error types for database operations.
 #[derive(Debug)]
 pub enum DatabaseError {
@@ -81,9 +90,11 @@ impl Database {
 
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS ui_settings (
-                id                        INTEGER PRIMARY KEY CHECK (id = 1),
-                language                  TEXT NOT NULL DEFAULT 'EN',
-                carbon_intensity_g_per_kwh REAL NOT NULL DEFAULT 475.0
+                id                         INTEGER PRIMARY KEY CHECK (id = 1),
+                language                   TEXT NOT NULL DEFAULT 'EN',
+                carbon_intensity_g_per_kwh REAL NOT NULL DEFAULT 475.0,
+                kwh_cost_eur               REAL NOT NULL DEFAULT 0.20,
+                theme                      TEXT NOT NULL DEFAULT 'Hunting'
             )",
         )?;
 
@@ -260,23 +271,38 @@ impl Database {
         Ok(())
     }
 
-    /// Loads persisted UI language and carbon intensity settings.
-    pub fn load_ui_settings(&self) -> Result<Option<(String, f64)>, DatabaseError> {
-        let mut stmt = self
-            .conn
-            .prepare("SELECT language, carbon_intensity_g_per_kwh FROM ui_settings WHERE id = 1")?;
+    /// Loads all persisted UI settings.
+    pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT language, carbon_intensity_g_per_kwh, kwh_cost_eur, theme \
+             FROM ui_settings WHERE id = 1",
+        )?;
         let result = stmt
-            .query_row([], |row| Ok((row.get::<_, String>(0)?, row.get::<_, f64>(1)?)))
+            .query_row([], |row| {
+                Ok(UiSettings {
+                    language: row.get(0)?,
+                    carbon_g_per_kwh: row.get(1)?,
+                    kwh_cost_eur: row.get(2)?,
+                    theme: row.get(3)?,
+                })
+            })
             .optional()?;
         Ok(result)
     }
 
-    /// Persists UI language and carbon intensity settings.
-    pub fn save_ui_settings(&mut self, language: &str, carbon_g_per_kwh: f64) -> Result<(), DatabaseError> {
+    /// Persists all UI settings.
+    pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity_g_per_kwh) VALUES (1, ?1, ?2) \
-             ON CONFLICT(id) DO UPDATE SET language = ?1, carbon_intensity_g_per_kwh = ?2",
-            params![language, carbon_g_per_kwh],
+            "INSERT INTO ui_settings (id, language, carbon_intensity_g_per_kwh, kwh_cost_eur, theme) \
+             VALUES (1, ?1, ?2, ?3, ?4) \
+             ON CONFLICT(id) DO UPDATE SET \
+               language = ?1, carbon_intensity_g_per_kwh = ?2, kwh_cost_eur = ?3, theme = ?4",
+            params![
+                settings.language,
+                settings.carbon_g_per_kwh,
+                settings.kwh_cost_eur,
+                settings.theme
+            ],
         )?;
         Ok(())
     }

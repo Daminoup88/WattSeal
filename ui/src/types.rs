@@ -245,3 +245,88 @@ impl Display for CarbonIntensity {
         write!(f, "{} ({:.0} g/kWh)", self.label, self.g_per_kwh)
     }
 }
+
+/// Electricity cost preset for common countries / regions.
+#[derive(Debug, Clone, Copy)]
+pub struct ElectricityCost {
+    pub label: &'static str,
+    /// Price in $/kWh.
+    pub usd_per_kwh: f64,
+}
+
+impl ElectricityCost {
+    pub const PRESETS: &[ElectricityCost] = &[
+        ElectricityCost {
+            label: "France",
+            usd_per_kwh: 0.27,
+        },
+        ElectricityCost {
+            label: "Germany",
+            usd_per_kwh: 0.44,
+        },
+        ElectricityCost {
+            label: "Spain",
+            usd_per_kwh: 0.31,
+        },
+        ElectricityCost {
+            label: "Italy",
+            usd_per_kwh: 0.36,
+        },
+        ElectricityCost {
+            label: "Netherlands",
+            usd_per_kwh: 0.39,
+        },
+        ElectricityCost {
+            label: "Switzerland",
+            usd_per_kwh: 0.31,
+        },
+        ElectricityCost {
+            label: "UK",
+            usd_per_kwh: 0.37,
+        },
+        ElectricityCost {
+            label: "USA (average)",
+            usd_per_kwh: 0.16,
+        },
+        ElectricityCost {
+            label: "World average",
+            usd_per_kwh: 0.15,
+        },
+        ElectricityCost {
+            label: "Custom",
+            usd_per_kwh: 0.0,
+        },
+    ];
+
+    pub fn is_custom(self) -> bool {
+        self.label == "Custom"
+    }
+
+    /// Finds the matching preset or creates a custom entry.
+    pub fn from_usd_per_kwh(value: f64) -> Self {
+        Self::PRESETS
+            .iter()
+            .find(|p| !p.is_custom() && (p.usd_per_kwh - value).abs() < 0.001)
+            .copied()
+            .unwrap_or(ElectricityCost {
+                label: "Custom",
+                usd_per_kwh: value,
+            })
+    }
+}
+
+impl PartialEq for ElectricityCost {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+    }
+}
+
+impl Display for ElectricityCost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_custom() {
+            write!(f, "Custom")
+        } else {
+            write!(f, "{} ({:.2} $/kWh)", self.label, self.usd_per_kwh)
+        }
+    }
+}

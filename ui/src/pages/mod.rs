@@ -1,9 +1,11 @@
 pub mod dashboard;
 pub mod info;
-pub mod optimization;
 pub mod settings;
 
-use crate::translations::{page_dashboard, page_info, page_optimization};
+use crate::{
+    translations::{page_dashboard, page_info},
+    types::AppLanguage,
+};
 
 macro_rules! define_pages {
     ($($variant:ident),+ $(,)?) => {
@@ -28,15 +30,14 @@ macro_rules! define_pages {
     };
 }
 
-define_pages!(Dashboard, Info, Optimization);
+define_pages!(Dashboard, Info);
 
 impl Page {
     /// Returns the translated page name for the given language.
-    pub fn translated_name(&self, language: crate::types::AppLanguage) -> &'static str {
+    pub fn translated_name(&self, language: AppLanguage) -> &'static str {
         match self {
             Page::Dashboard => page_dashboard(language),
             Page::Info => page_info(language),
-            Page::Optimization => page_optimization(language),
         }
     }
 }

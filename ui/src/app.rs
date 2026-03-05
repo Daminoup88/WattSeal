@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData,
+    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData, UiSettings,
     generic_name_for_table,
 };
 use iced::{
@@ -15,7 +15,7 @@ use iced::{
 use crate::{
     components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
     message::Message,
-    pages::{Page, dashboard::DashboardPage, info::InfoPage, optimization::OptimizationPage, settings::SettingsPage},
+    pages::{Page, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
     styles::{
         button::ButtonStyle,
         container::ContainerStyle,
@@ -27,12 +27,14 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        app_name, close_dialog_description, close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid,
-        custom_carbon_placeholder, info_modal_all_time_power, info_modal_current_power, info_modal_description,
-        info_modal_title, info_modal_top_consumer, info_modal_top_process, modal_close, na, setup_choose_carbon,
-        setup_choose_language, setup_confirm, setup_welcome_title,
+        app_name, carbon_info_all_time, carbon_info_annual, carbon_info_base, carbon_info_measured,
+        close_dialog_description, close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid,
+        custom_carbon_placeholder, custom_kwh_cost_placeholder, info_modal_all_time_power, info_modal_current_power,
+        info_modal_description, info_modal_title, info_modal_top_consumer, info_modal_top_process, kwh_cost_invalid,
+        modal_close, na, setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm,
+        setup_welcome_title,
     },
-    types::{AppLanguage, CarbonIntensity, TimeRange},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -44,13 +46,14 @@ pub struct App {
     hardware_info: HardwareInfo,
     dashboard_page: DashboardPage,
     info_page: InfoPage,
-    optimization_page: OptimizationPage,
     settings_page: SettingsPage,
     settings_open: bool,
     info_modal_open: Option<String>,
     language: AppLanguage,
     carbon_intensity: CarbonIntensity,
     custom_carbon_input: String,
+    electricity_cost: ElectricityCost,
+    custom_kwh_cost_input: String,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -64,19 +67,32 @@ pub struct App {
 impl App {
     /// Initializes the app, opens the database, and loads settings.
     pub fn new() -> (Self, Task<Message>) {
-        let theme = AppTheme::DeepOcean;
         let current_page = Page::Dashboard;
         let mut database = Database::new().expect("Failed to create database");
 
-        let (language, carbon_intensity, show_setup) = match database.load_ui_settings() {
-            Ok(Some((lang_str, ci))) => {
-                let lang = AppLanguage::from_code(lang_str.as_str());
-                (lang, CarbonIntensity::from_g_per_kwh(ci), false)
+        let (language, carbon_intensity, theme, electricity_cost, show_setup) = match database.load_ui_settings() {
+            Ok(Some(s)) => {
+                let lang = AppLanguage::from_code(&s.language);
+                let ci = CarbonIntensity::from_g_per_kwh(s.carbon_g_per_kwh);
+                let theme = AppTheme::from_name(&s.theme);
+                let ec = ElectricityCost::from_usd_per_kwh(s.kwh_cost_eur);
+                (lang, ci, theme, ec, false)
             }
-            _ => (AppLanguage::default(), CarbonIntensity::PRESETS[8], true),
+            _ => (
+                AppLanguage::default(),
+                CarbonIntensity::PRESETS[8],
+                AppTheme::default(),
+                ElectricityCost::PRESETS[8],
+                true,
+            ),
         };
         let custom_carbon_input = if carbon_intensity.is_custom() {
             format!("{:.0}", carbon_intensity.g_per_kwh)
+        } else {
+            String::new()
+        };
+        let custom_kwh_cost_input = if electricity_cost.is_custom() {
+            format!("{:.4}", electricity_cost.usd_per_kwh)
         } else {
             String::new()
         };
@@ -107,13 +123,14 @@ impl App {
                 header: Header::new(Page::all(), current_page),
                 footer: Footer,
                 info_page: InfoPage::new(),
-                optimization_page: OptimizationPage::new(),
                 settings_page: SettingsPage::new(),
                 settings_open: false,
                 info_modal_open: None,
                 language,
                 carbon_intensity,
                 custom_carbon_input,
+                electricity_cost,
+                custom_kwh_cost_input,
                 show_setup,
                 theme,
                 database,
@@ -162,6 +179,7 @@ impl App {
                 for sensor in self.sensors.values_mut() {
                     sensor.update_theme(theme);
                 }
+                self.persist_ui_settings();
                 Task::none()
             }
             Message::ChangeLanguage(language) => {
@@ -223,6 +241,43 @@ impl App {
             }
             Message::CloseInfoModal => {
                 self.info_modal_open = None;
+                Task::none()
+            }
+            Message::ChangeElectricityCost(ec) => {
+                if ec.is_custom() {
+                    if !self.electricity_cost.is_custom() {
+                        self.custom_kwh_cost_input = String::new();
+                    }
+                    let v = self
+                        .custom_kwh_cost_input
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|&v| v >= 0.0)
+                        .unwrap_or(0.0);
+                    self.electricity_cost = ElectricityCost {
+                        label: "Custom",
+                        usd_per_kwh: v,
+                    };
+                } else {
+                    self.electricity_cost = ec;
+                    self.persist_ui_settings();
+                }
+                Task::none()
+            }
+            Message::CustomKwhCostInput(text) => {
+                self.custom_kwh_cost_input = text.clone();
+                if let Some(val) = text.parse::<f64>().ok().filter(|&v| v >= 0.0) {
+                    self.electricity_cost = ElectricityCost {
+                        label: "Custom",
+                        usd_per_kwh: val,
+                    };
+                    self.persist_ui_settings();
+                } else {
+                    self.electricity_cost = ElectricityCost {
+                        label: "Custom",
+                        usd_per_kwh: 0.0,
+                    };
+                }
                 Task::none()
             }
             Message::ChangeChartMetricType(table_name, metric_type) => {
@@ -332,12 +387,14 @@ impl App {
     /// Builds the root UI element tree.
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
         let page_content = match self.current_page {
-            Page::Dashboard => {
-                self.dashboard_page
-                    .view(&self.sensors, &self.all_time_data, self.language, self.carbon_intensity)
-            }
+            Page::Dashboard => self.dashboard_page.view(
+                &self.sensors,
+                &self.all_time_data,
+                self.language,
+                self.carbon_intensity,
+                self.electricity_cost.usd_per_kwh,
+            ),
             Page::Info => self.info_page.view(&self.hardware_info, self.theme, self.language),
-            Page::Optimization => self.optimization_page.view(self.language),
         };
 
         let content: Element<'_, Message, AppTheme> = Column::new()
@@ -354,6 +411,8 @@ impl App {
                     self.language,
                     self.carbon_intensity,
                     &self.custom_carbon_input,
+                    self.electricity_cost,
+                    &self.custom_kwh_cost_input,
                 ),
                 Message::CloseSettings,
             )
@@ -494,6 +553,55 @@ impl App {
             }
         }
 
+        if target == "carbon_emissions" {
+            let total_energy_wh = self
+                .all_time_data
+                .components
+                .get(TotalData::table_name_static())
+                .copied()
+                .unwrap_or(0.0);
+            let measured_g = (total_energy_wh / 1000.0) * self.carbon_intensity.g_per_kwh;
+
+            const BASE_KG: f64 = 400.0;
+            const ANNUAL_KG: f64 = 50.0;
+            let all_time_kg = BASE_KG + ANNUAL_KG + measured_g / 1000.0;
+
+            let make_co2_row = |label: &'static str, value: String, style: TextStyle| {
+                Row::new()
+                    .spacing(SPACING_MEDIUM)
+                    .align_y(Alignment::Center)
+                    .push(Text::new(label).size(FONT_SIZE_BODY).class(TextStyle::Muted))
+                    .push(Text::new(value).size(FONT_SIZE_SUBTITLE).font(FONT_BOLD).class(style))
+            };
+
+            let measured_row = make_co2_row(
+                carbon_info_measured(language),
+                format!("{:.1} g CO₂", measured_g.max(0.0)),
+                TextStyle::Tertiary,
+            );
+            let base_row = make_co2_row(
+                carbon_info_base(language),
+                format!("~{:.0} kg CO₂eq", BASE_KG),
+                TextStyle::Secondary,
+            );
+            let annual_row = make_co2_row(
+                carbon_info_annual(language),
+                format!("~{:.0} kg CO₂/yr", ANNUAL_KG),
+                TextStyle::Secondary,
+            );
+            let all_time_row = make_co2_row(
+                carbon_info_all_time(language),
+                format!("~{:.2} kg CO₂eq", all_time_kg),
+                TextStyle::Primary,
+            );
+
+            content = content
+                .push(measured_row)
+                .push(base_row)
+                .push(annual_row)
+                .push(all_time_row);
+        }
+
         Container::new(Scrollable::new(content).width(Length::Fill).height(Length::Shrink))
             .width(Length::Fixed(560.0))
             .max_height(500.0)
@@ -544,9 +652,13 @@ impl App {
     }
 
     fn persist_ui_settings(&mut self) {
-        let _ = self
-            .database
-            .save_ui_settings(self.language.code(), self.carbon_intensity.g_per_kwh);
+        let settings = UiSettings {
+            language: self.language.code().to_string(),
+            carbon_g_per_kwh: self.carbon_intensity.g_per_kwh,
+            kwh_cost_eur: self.electricity_cost.usd_per_kwh,
+            theme: self.theme.name().to_string(),
+        };
+        let _ = self.database.save_ui_settings(&settings);
     }
 
     fn close_dialog_view(&self) -> Element<'_, Message, AppTheme> {
@@ -630,7 +742,48 @@ impl App {
             ci_picker.into()
         };
 
-        let can_confirm = !self.carbon_intensity.is_custom() || custom_input_valid;
+        let custom_kwh_valid = self
+            .custom_kwh_cost_input
+            .parse::<f64>()
+            .ok()
+            .filter(|&v| v >= 0.0)
+            .is_some();
+
+        let ec_label = Text::new(setup_choose_electricity(language)).size(FONT_SIZE_BODY);
+        let ec_picker = pick_list(
+            ElectricityCost::PRESETS.to_vec(),
+            Some(self.electricity_cost),
+            Message::ChangeElectricityCost,
+        )
+        .width(Length::Fill)
+        .padding(8);
+
+        let electricity_section: Element<'_, Message, AppTheme> = if self.electricity_cost.is_custom() {
+            let input = text_input(custom_kwh_cost_placeholder(language), &self.custom_kwh_cost_input)
+                .on_input(Message::CustomKwhCostInput)
+                .width(Length::Fill)
+                .padding(8);
+            let mut col = Column::new().spacing(SPACING_SMALL).push(ec_picker).push(
+                Row::new()
+                    .spacing(4)
+                    .align_y(Alignment::Center)
+                    .push(input)
+                    .push(Text::new("$/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted)),
+            );
+            if !self.custom_kwh_cost_input.is_empty() && !custom_kwh_valid {
+                col = col.push(
+                    Text::new(kwh_cost_invalid(language))
+                        .size(FONT_SIZE_SMALL)
+                        .class(TextStyle::Muted),
+                );
+            }
+            col.into()
+        } else {
+            ec_picker.into()
+        };
+
+        let can_confirm = (!self.carbon_intensity.is_custom() || custom_input_valid)
+            && (!self.electricity_cost.is_custom() || custom_kwh_valid);
         let confirm_btn = button(Text::new(setup_confirm(language)).size(FONT_SIZE_BODY))
             .class(ButtonStyle::Standard)
             .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
@@ -643,6 +796,8 @@ impl App {
             .push(lang_picker)
             .push(ci_label)
             .push(carbon_section)
+            .push(ec_label)
+            .push(electricity_section)
             .push(confirm_btn);
 
         Container::new(content)
