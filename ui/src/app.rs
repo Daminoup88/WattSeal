@@ -27,12 +27,11 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        app_name, carbon_info_all_time, carbon_info_annual, carbon_info_base, carbon_info_measured,
-        close_dialog_description, close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid,
-        custom_carbon_placeholder, custom_kwh_cost_placeholder, info_modal_all_time_power, info_modal_current_power,
-        info_modal_description, info_modal_title, info_modal_top_consumer, info_modal_top_process, kwh_cost_invalid,
-        modal_close, na, setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm,
-        setup_welcome_title,
+        app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
+        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, info_modal_all_time_power,
+        info_modal_all_time_top_consumer, info_modal_current_power, info_modal_current_top_consumer,
+        info_modal_description, info_modal_title, info_modal_top_process, kwh_cost_invalid, modal_close, na,
+        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
 };
@@ -500,17 +499,35 @@ impl App {
         }
 
         if target == TotalData::table_name_static() {
-            if let Some((name, power)) = self.find_top_consumer() {
+            if let Some((name, power)) = self.find_current_top_consumer() {
                 let consumer_row = Row::new()
                     .spacing(SPACING_MEDIUM)
                     .align_y(Alignment::Center)
                     .push(
-                        Text::new(info_modal_top_consumer(language))
+                        Text::new(info_modal_current_top_consumer(language))
                             .size(FONT_SIZE_BODY)
                             .class(TextStyle::Muted),
                     )
                     .push(
                         Text::new(format!("{} ({:.1} W)", name, power))
+                            .size(FONT_SIZE_SUBTITLE)
+                            .font(FONT_BOLD)
+                            .class(TextStyle::Primary),
+                    );
+                content = content.push(consumer_row);
+            }
+
+            if let Some((name, energy)) = self.find_all_time_top_consumer() {
+                let consumer_row = Row::new()
+                    .spacing(SPACING_MEDIUM)
+                    .align_y(Alignment::Center)
+                    .push(
+                        Text::new(info_modal_all_time_top_consumer(language))
+                            .size(FONT_SIZE_BODY)
+                            .class(TextStyle::Muted),
+                    )
+                    .push(
+                        Text::new(format!("{} ({:.1} Wh)", name, energy))
                             .size(FONT_SIZE_SUBTITLE)
                             .font(FONT_BOLD)
                             .class(TextStyle::Secondary),
@@ -562,10 +579,6 @@ impl App {
                 .unwrap_or(0.0);
             let measured_g = (total_energy_wh / 1000.0) * self.carbon_intensity.g_per_kwh;
 
-            const BASE_KG: f64 = 400.0;
-            const ANNUAL_KG: f64 = 50.0;
-            let all_time_kg = BASE_KG + ANNUAL_KG + measured_g / 1000.0;
-
             let make_co2_row = |label: &'static str, value: String, style: TextStyle| {
                 Row::new()
                     .spacing(SPACING_MEDIUM)
@@ -579,27 +592,8 @@ impl App {
                 format!("{:.1} g CO₂", measured_g.max(0.0)),
                 TextStyle::Tertiary,
             );
-            let base_row = make_co2_row(
-                carbon_info_base(language),
-                format!("~{:.0} kg CO₂eq", BASE_KG),
-                TextStyle::Secondary,
-            );
-            let annual_row = make_co2_row(
-                carbon_info_annual(language),
-                format!("~{:.0} kg CO₂/yr", ANNUAL_KG),
-                TextStyle::Secondary,
-            );
-            let all_time_row = make_co2_row(
-                carbon_info_all_time(language),
-                format!("~{:.2} kg CO₂eq", all_time_kg),
-                TextStyle::Primary,
-            );
 
-            content = content
-                .push(measured_row)
-                .push(base_row)
-                .push(annual_row)
-                .push(all_time_row);
+            content = content.push(measured_row);
         }
 
         Container::new(Scrollable::new(content).width(Length::Fill).height(Length::Shrink))
@@ -610,7 +604,7 @@ impl App {
             .into()
     }
 
-    fn find_top_consumer(&self) -> Option<(String, f64)> {
+    fn find_current_top_consumer(&self) -> Option<(String, f64)> {
         self.sensors
             .iter()
             .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
@@ -619,6 +613,15 @@ impl App {
                 Some((sensor.name().to_string(), power))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+    }
+
+    fn find_all_time_top_consumer(&self) -> Option<(String, f64)> {
+        self.all_time_data
+            .components
+            .iter()
+            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
+            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(name, energy)| (info_modal_title(self.language, name), *energy))
     }
 
     /// Produces a 1 Hz tick and listens for window-close requests.
@@ -686,6 +689,7 @@ impl App {
             .align_x(Alignment::Start)
             .push(title)
             .push(description)
+            .align_x(Alignment::Center)
             .push(buttons);
 
         Container::new(content)

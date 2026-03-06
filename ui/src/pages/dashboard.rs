@@ -112,41 +112,39 @@ impl DashboardPage {
         let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
         let bill_usd = total_energy_wh / 1000.0 * kwh_cost_per_kwh;
 
-        let mut side_col = Column::new()
-            .width(Length::FillPortion(1))
+        let help_button = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
+            .class(ButtonStyle::InfoHelp)
+            .on_press(Message::OpenInfoModal("carbon_emissions".to_string()))
+            .padding(Padding::from([2, 8]));
+
+        let mut metrics_left = Column::new()
             .spacing(SPACING_SMALL)
             .align_x(Alignment::Center)
-            .push(metric_tile(
-                all_time(language),
-                format_wh(total_energy_wh),
-                "Wh",
-                TextStyle::Secondary,
-            ))
             .push(
                 Row::new()
-                    .align_y(Alignment::Center)
+                    .push(metric_tile(
+                        all_time(language),
+                        format_wh(total_energy_wh),
+                        "Wh",
+                        TextStyle::Secondary,
+                    ))
+                    // space for help button alignment
+                    .push(Text::new(" ").size(FONT_SIZE_BODY).width(Length::Fixed(24.0))),
+            )
+            .push(
+                Row::new()
                     .push(metric_tile(
                         emissions(language),
                         format_grams(carbon_grams),
                         "g CO₂",
                         TextStyle::Tertiary,
                     ))
-                    .push(
-                        button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
-                            .class(ButtonStyle::InfoHelp)
-                            .on_press(Message::OpenInfoModal("carbon_emissions".to_string()))
-                            .padding(Padding::from([2, 8])),
-                    ),
-            )
-            .push(metric_tile(
-                electricity_bill(language),
-                format!("{:.2}", bill_usd.max(0.0)),
-                "$",
-                TextStyle::Primary,
-            ));
+                    .align_y(Alignment::Center)
+                    .push(help_button),
+            );
 
         if carbon_intensity.g_per_kwh == 0.0 {
-            side_col = side_col.push(
+            metrics_left = metrics_left.push(
                 Text::new(zero_carbon_intensity_warning(language))
                     .size(FONT_SIZE_BODY)
                     .align_x(Alignment::Center)
@@ -154,7 +152,22 @@ impl DashboardPage {
             );
         }
 
-        let side = side_col;
+        let bill_col = Column::new()
+            .spacing(SPACING_SMALL)
+            .align_x(Alignment::Center)
+            .push(metric_tile(
+                electricity_bill(language),
+                format!("{:.2}", bill_usd.max(0.0)),
+                "$",
+                TextStyle::Primary,
+            ));
+
+        let side = Row::new()
+            .width(Length::FillPortion(1))
+            .align_y(Alignment::Center)
+            .spacing(SPACING_SMALL)
+            .push(metrics_left.width(Length::FillPortion(1)))
+            .push(bill_col.width(Length::FillPortion(1)));
 
         let content = Row::new()
             .width(Length::Fill)

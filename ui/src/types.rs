@@ -21,9 +21,9 @@ impl TimeRange {
             TimeRange::LastMinute => 60,
             TimeRange::LastHour => 3_600,
             TimeRange::Last24Hours => 86_400,
-            TimeRange::LastWeek => 604_800,
-            TimeRange::LastMonth => 2_592_000,
-            TimeRange::LastYear => 31_536_000,
+            TimeRange::LastWeek => 604_800,    // 7 days
+            TimeRange::LastMonth => 2_592_000, // 30 days
+            TimeRange::LastYear => 31_536_000, // 365 days
         }
     }
 
@@ -44,10 +44,10 @@ impl TimeRange {
         match self {
             TimeRange::LastMinute => 1,
             TimeRange::LastHour => 60,
-            TimeRange::Last24Hours => 3600,
-            TimeRange::LastWeek => 3600,
-            TimeRange::LastMonth => 21600,
-            TimeRange::LastYear => 86400,
+            TimeRange::Last24Hours => 3_600, // 1 hour
+            TimeRange::LastWeek => 3_600,    // 1 hour
+            TimeRange::LastMonth => 86_400,  // 1 day
+            TimeRange::LastYear => 604_800,  // 1 week
         }
     }
 

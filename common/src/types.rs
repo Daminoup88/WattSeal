@@ -61,7 +61,6 @@ pub struct GPUData {
 #[derive(Debug, Clone)]
 pub struct RamData {
     pub total_power_watts: Option<f64>,
-    // pub total_gb: f64,
     pub usage_percent: Option<f64>,
 }
 
@@ -69,9 +68,6 @@ pub struct RamData {
 #[derive(Debug, Clone)]
 pub struct DiskData {
     pub total_power_watts: Option<f64>,
-    // pub total_gb: f64,
-    // pub used_gb: f64,
-    // pub free_gb: f64,
     pub read_usage_mb_s: f64,
     pub write_usage_mb_s: f64,
 }

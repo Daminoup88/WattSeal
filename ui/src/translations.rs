@@ -6,8 +6,7 @@ use crate::types::{AppLanguage, TimeRange};
 
 pub fn app_name(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "WattSeal",
-        AppLanguage::French => "WattSeal",
+        AppLanguage::English | AppLanguage::French => "WattSeal",
     }
 }
 
@@ -76,7 +75,13 @@ pub fn current_power_consumption(language: AppLanguage) -> &'static str {
 pub fn all_time(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "All Time",
-        AppLanguage::French => "Total",
+        AppLanguage::French => "Depuis le début",
+    }
+}
+
+pub fn total(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English | AppLanguage::French => "Total",
     }
 }
 
@@ -98,8 +103,7 @@ pub fn zero_carbon_intensity_warning(language: AppLanguage) -> &'static str {
 
 pub fn cpu(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "CPU",
-        AppLanguage::French => "CPU",
+        AppLanguage::English | AppLanguage::French => "CPU",
     }
 }
 
@@ -133,8 +137,7 @@ pub fn cores_and_threads(language: AppLanguage, physical: u16, logical: u16) -> 
 
 pub fn gpu(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "GPU",
-        AppLanguage::French => "GPU",
+        AppLanguage::English | AppLanguage::French => "GPU",
     }
 }
 
@@ -175,8 +178,7 @@ pub fn total_memory(language: AppLanguage) -> &'static str {
 
 pub fn swap(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Swap",
-        AppLanguage::French => "Swap",
+        AppLanguage::English | AppLanguage::French => "Swap",
     }
 }
 
@@ -231,8 +233,7 @@ pub fn disk(language: AppLanguage) -> &'static str {
 
 pub fn disk_n(language: AppLanguage, n: usize) -> String {
     match language {
-        AppLanguage::English => format!("Disk {}", n),
-        AppLanguage::French => format!("Disque {}", n),
+        AppLanguage::English | AppLanguage::French => format!("{} {}", disk(language), n),
     }
 }
 
@@ -345,8 +346,7 @@ pub fn secondary_display(language: AppLanguage) -> &'static str {
 
 pub fn na(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "N/A",
-        AppLanguage::French => "N/A",
+        AppLanguage::English | AppLanguage::French => "N/A",
     }
 }
 
@@ -397,8 +397,7 @@ pub fn tooltip_time(language: AppLanguage, time_text: &str) -> String {
 
 pub fn application(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Application",
-        AppLanguage::French => "Application",
+        AppLanguage::English | AppLanguage::French => "Application",
     }
 }
 
@@ -545,8 +544,7 @@ pub fn metric_type_name(language: AppLanguage, metric: MetricType) -> &'static s
 
 pub fn label_usage(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Usage",
-        AppLanguage::French => "Utilisation",
+        AppLanguage::English | AppLanguage::French => metric_speed(language),
     }
 }
 
@@ -650,8 +648,8 @@ pub fn custom_kwh_cost_placeholder(language: AppLanguage) -> &'static str {
 
 pub fn electricity_bill(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Est. Bill",
-        AppLanguage::French => "Facture est.",
+        AppLanguage::English => "Estimated Bill",
+        AppLanguage::French => "Facture estimée",
     }
 }
 
@@ -720,17 +718,24 @@ pub fn info_modal_all_time_power(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn info_modal_top_consumer(language: AppLanguage) -> &'static str {
+pub fn info_modal_current_top_consumer(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Highest consumer",
-        AppLanguage::French => "Plus gros consommateur",
+        AppLanguage::English => "Current highest consumer",
+        AppLanguage::French => "Plus gros consommateur actuel",
+    }
+}
+
+pub fn info_modal_all_time_top_consumer(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "All-time top consumer",
+        AppLanguage::French => "Plus gros consommateur total",
     }
 }
 
 pub fn info_modal_top_process(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Top process",
-        AppLanguage::French => "Processus principal",
+        AppLanguage::French => "Processus le plus gourmand",
     }
 }
 
@@ -753,7 +758,7 @@ pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
     } else if key == NetworkData::table_name_static() {
         return network(language).to_string();
     } else if key == TotalData::table_name_static() {
-        return all_time(language).to_string();
+        return total(language).to_string();
     } else if key == ProcessData::table_name_static() {
         return process(language).to_string();
     } else {
@@ -812,7 +817,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Principaux consommateurs d'énergie :\n\
                  \u{2022} Rendu 3D et jeux vidéo\n\
                  \u{2022} Encodage / décodage vidéo\n\
-                 \u{2022} Charges IA et apprentissage automatique\n\
+                 \u{2022} Charges IA et machine learning\n\
                  \u{2022} Utilisation élevée de la VRAM"
             }
         };
@@ -824,8 +829,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Main power consumers:\n\
                  \u{2022} Higher memory frequencies (MHz)\n\
                  \u{2022} More active memory modules\n\
-                 \u{2022} Frequent read/write operations\n\
-                 \u{2022} Always draws power while the system is on"
+                 \u{2022} Frequent read/write operations\n\n\
+                 Overall, RAM consumes power as long as the system is on, even when idle."
             }
             AppLanguage::French => {
                 "La RAM (mémoire vive) fournit un stockage temporaire rapide pour les \
@@ -833,8 +838,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Principaux consommateurs d'énergie :\n\
                  \u{2022} Fréquences mémoire plus élevées (MHz)\n\
                  \u{2022} Plus de modules mémoire actifs\n\
-                 \u{2022} Opérations de lecture/écriture fréquentes\n\
-                 \u{2022} Consomme toujours de l'énergie tant que le système est allumé"
+                 \u{2022} Opérations de lecture/écriture fréquentes\n\n\
+                 Globalement, la RAM consomme de l'énergie tant que le système est allumé, même au repos."
             }
         };
     } else if key == DiskData::table_name_static() {
@@ -859,6 +864,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
             }
         };
     } else if key == NetworkData::table_name_static() {
+        // Source for network emissions:
+        // D. Al Kez, A. M. Foley, D. Laverty, D. F. Del Rio, and B. Sovacool, “Exploring the sustainability challenges facing digitalization and internet data centers,” Journal of Cleaner Production, vol. 371, no. 371, p. 133633, Aug. 2022, doi: https://doi.org/10.1016/j.jclepro.2022.133633.
         return match language {
             AppLanguage::English => {
                 "Network interfaces handle data transmission between your computer \
@@ -867,7 +874,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} High data throughput\n\
                  \u{2022} Wi-Fi radio transmission\n\
                  \u{2022} Active network connections\n\
-                 \u{2022} Bluetooth and wireless peripherals"
+                 \u{2022} Bluetooth and wireless peripherals\n\n\
+                Note: Internet usage generates indirect emissions from network infrastructure and remote servers (28\u{2013}63 g CO₂/GB), which are not included in WattSeal's measurements for your PC."
             }
             AppLanguage::French => {
                 "Les interfaces réseau gèrent la transmission de données entre votre \
@@ -876,21 +884,24 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Débit de données élevé\n\
                  \u{2022} Transmission radio Wi-Fi\n\
                  \u{2022} Connexions réseau actives\n\
-                 \u{2022} Bluetooth et périphériques sans fil"
+                 \u{2022} Bluetooth et périphériques sans fil\n\n\
+                 Note : L'utilisation d'internet engendre des émissions indirectes dues aux infrastructures réseau et aux serveurs distants (28 à 63 g CO₂/Go), qui ne sont pas incluses dans les mesures de WattSeal pour votre PC."
             }
         };
     } else if key == ProcessData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "Shows which applications consume the most power on your system.\n\n\
-                 Power is estimated based on CPU, GPU, and disk usage of each process. \
+                 Power is estimated based on CPU and GPU (highest variable consumption) usage of each process.\n\
                  Background processes and services also contribute to total consumption."
             }
             AppLanguage::French => {
                 "Montre quelles applications consomment le plus d'énergie sur votre \
                  système.\n\n\
-                 La puissance est estimée à partir de l'utilisation CPU, GPU et disque \
-                 de chaque processus. Les processus en arrière-plan et les services \
+                 La puissance est estimée à partir de l'utilisation CPU et GPU \
+                 (consommations variables les plus élevées) \
+                 de chaque processus.\n\
+                 Les processus en arrière-plan et les services \
                  contribuent aussi à la consommation totale."
             }
         };
@@ -911,26 +922,27 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
         };
     } else if key == "carbon_emissions" {
         return match language {
+            // Source for manufacturing emissions:
+            // N. Six, “What’s the carbon footprint of a computer?,” Le Monde.fr, Apr. 30, 2023. https://www.lemonde.fr/en/pixels/article/2023/04/30/what-s-the-carbon-footprint-of-a-computer_6024865_13.html
+            // Source for water consumption:
+            // M. Yañez-Barnuevo, “Data Centers and Water Consumption | Article | EESI,” Eesi.org, Jun. 25, 2025. https://www.eesi.org/articles/view/data-centers-and-water-consumption
             AppLanguage::English => {
                 "These emissions reflect only the CO₂ generated by the electricity \
                  your PC consumes while running.\n\n\
                  To estimate your full carbon footprint, you should also add:\n\
-                 \u{2022} Manufacturing emissions (~300–500 kg CO₂eq one-time)\n\
-                 \u{2022} Transport emissions (~20–50 kg CO₂eq one-time)\n\
-                 \u{2022} Network infrastructure emissions (~30–70 kg CO₂/year)\n\n\
-                 The estimates below use ~400 kg CO₂eq for manufacturing + transport \
-                 and ~50 kg CO₂/year for network usage."
+                 \u{2022} Manufacturing and transport emissions (~250\u{2013}500 kg CO₂eq one-time), add more for gaming PCs, additional monitors and peripherals\n\
+                 \u{2022} Network infrastructure emissions (28\u{2013}63 g CO₂/GB), which are increasing with the rise of AI\n\
+                 \u{2022} Hardware disposal and e-waste emissions (varies widely, leaching of toxic materials in landfills)\n\n\
+                 Note: Digital technology also consumes a lot of water for datacenter cooling (around 1,9L/kWh) and mineral extraction, especially in water-stressed regions."
             }
             AppLanguage::French => {
-                "Ces émissions ne reflètent que le CO₂ généré par l'électricité \
+                "Ces émissions reflètent le CO₂ généré par l'électricité \
                  consommée par votre PC en fonctionnement.\n\n\
-                 Pour estimer votre empreinte carbone complète, vous devriez aussi \
-                 inclure :\n\
-                 \u{2022} Émissions de fabrication (~300–500 kg CO₂eq une fois)\n\
-                 \u{2022} Émissions de transport (~20–50 kg CO₂eq une fois)\n\
-                 \u{2022} Émissions liées aux réseaux (~30–70 kg CO₂/an)\n\n\
-                 Les estimations ci-dessous utilisent ~400 kg CO₂eq pour fabrication \
-                 + transport et ~50 kg CO₂/an pour l'utilisation réseau."
+                 Pour estimer l'empreinte carbone complète de votre ordinateur, vous devriez aussi ajouter :\n\
+                 \u{2022} Émissions de fabrication et de transport (~250\u{2013}500 kg CO₂eq)\n\
+                 \u{2022} Émissions d'infrastructure réseau (28 à 63 g CO₂/Go), en constante augmentation avec l'essor de l'IA\n\
+                 \u{2022} Émissions liées à la fin de vie du matériel (varie largement, écoulement de matériaux toxiques dans les décharges)\n\n\
+                 Note: Le numérique consomme aussi énormément d'eau pour le refroidissement des datacenters (environ 1,9L/kWh) et l'extraction des minerais, notamment dans des régions en stress hydrique."
             }
         };
     } else {
@@ -942,7 +954,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      Impact on power:\n\
                      \u{2022} Background services and scheduled tasks\n\
                      \u{2022} System indexing and updates\n\
-                     \u{2022} Power plan settings affect all components"
+                     \u{2022} Power plan settings affect all components\n\n\
+                     You can optimize this by disabling unnecessary startup programs, background processes running in the taskbar (weather, news...), and using power-saving modes."
                 }
                 AppLanguage::French => {
                     "Votre système d'exploitation gère toutes les ressources matérielles \
@@ -951,7 +964,9 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Services en arrière-plan et tâches planifiées\n\
                      \u{2022} Indexation et mises à jour du système\n\
                      \u{2022} Les paramètres du plan d'alimentation affectent tous les \
-                     composants"
+                     composants\n\n\
+                    Vous pouvez optimiser cela en désactivant les programmes de démarrage \
+                    inutiles, les processus d'arrière-plan dans la barre des tâches (météo, actualités...), et en utilisant les modes d'économie d'énergie."
                 }
             },
             "battery" => match language {
@@ -1026,8 +1041,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
 /// Label for measured (app-tracked) CO₂ emissions row in the carbon info modal.
 pub fn carbon_info_measured(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Measured by app",
-        AppLanguage::French => "Mesuré par l'application",
+        AppLanguage::English => "Measured by WattSeal",
+        AppLanguage::French => "Mesuré par WattSeal",
     }
 }
 

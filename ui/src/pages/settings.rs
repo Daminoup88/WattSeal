@@ -101,11 +101,7 @@ fn settings_row<'a>(label: &'a str, control: Element<'a, Message, AppTheme>) -> 
     Row::new()
         .spacing(SPACING_LARGE)
         .align_y(Alignment::Center)
-        .push(
-            Text::new(label)
-                .size(FONT_SIZE_BODY)
-                .width(Length::FillPortion(2)),
-        )
+        .push(Text::new(label).size(FONT_SIZE_BODY).width(Length::FillPortion(2)))
         .push(control)
         .into()
 }
@@ -130,7 +126,11 @@ fn carbon_intensity_row<'a>(
             .on_input(Message::CustomCarbonInput)
             .width(Length::FillPortion(3))
             .padding(PADDING_MEDIUM);
-        let mut col = Column::new().width(Length::FillPortion(3)).spacing(4).push(picker).push(input);
+        let mut col = Column::new()
+            .width(Length::FillPortion(3))
+            .spacing(4)
+            .push(picker)
+            .push(input);
         if !custom_carbon_input.is_empty() && !custom_valid {
             col = col.push(
                 Text::new(custom_carbon_invalid(language))
@@ -160,7 +160,11 @@ fn electricity_cost_row<'a>(
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: &'a str,
 ) -> Element<'a, Message, AppTheme> {
-    let custom_valid = custom_kwh_cost_input.parse::<f64>().ok().filter(|&v| v >= 0.0).is_some();
+    let custom_valid = custom_kwh_cost_input
+        .parse::<f64>()
+        .ok()
+        .filter(|&v| v >= 0.0)
+        .is_some();
 
     let picker = pick_list(
         ElectricityCost::PRESETS.to_vec(),
@@ -180,7 +184,11 @@ fn electricity_cost_row<'a>(
             .align_y(Alignment::Center)
             .push(input)
             .push(Text::new("$/kWh").size(FONT_SIZE_BODY).class(TextStyle::Muted));
-        let mut col = Column::new().width(Length::FillPortion(3)).spacing(4).push(picker).push(input_row);
+        let mut col = Column::new()
+            .width(Length::FillPortion(3))
+            .spacing(4)
+            .push(picker)
+            .push(input_row);
         if !custom_kwh_cost_input.is_empty() && !custom_valid {
             col = col.push(
                 Text::new(kwh_cost_invalid(language))
