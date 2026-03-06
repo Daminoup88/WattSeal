@@ -24,3 +24,6 @@ pub use types::{
 
 /// Exit code the UI subprocess uses to signal "stop the collector too".
 pub const EXIT_CODE_SHUTDOWN_ALL: i32 = 42;
+
+pub const WINDOW_ICON_BYTES: &[u8] = include_bytes!("../../resources/icon.png");
+pub const WINDOW_ICON_TYPE: image::ImageFormat = image::ImageFormat::Png;

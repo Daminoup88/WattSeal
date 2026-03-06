@@ -13,6 +13,7 @@ pub mod types;
 use std::borrow::Cow;
 
 use app::App;
+use common::{WINDOW_ICON_BYTES, WINDOW_ICON_TYPE};
 use styles::style_constants::{FONT_MEDIUM, FONT_SIZE_BODY, ICONS_BYTES};
 
 /// Launches the WattSeal GUI application.
@@ -26,6 +27,10 @@ pub fn run() -> iced::Result {
             default_text_size: FONT_SIZE_BODY.into(),
             antialiasing: true,
             vsync: true,
+        })
+        .window(iced::window::Settings {
+            icon: iced::window::icon::from_file_data(WINDOW_ICON_BYTES, Some(WINDOW_ICON_TYPE)).ok(),
+            ..Default::default()
         })
         .antialiasing(true)
         .default_font(Font::with_name("Roboto"))

@@ -173,22 +173,27 @@ pub struct CarbonIntensity {
 }
 
 impl CarbonIntensity {
+    /// Carbon intensity presets for various countries and the world average (updated in 2026).
+    // Source:
+    // Our World in Data, “Carbon intensity of electricity,” Our World in Data, 2022. https://ourworldindata.org/grapher/carbon-intensity-electricity
+    // World average:
+    // Emissions – Electricity 2025 – Analysis - IEA, “Emissions – Electricity 2025 – Analysis - IEA,” IEA, 2025. https://www.iea.org/reports/electricity-2025/emissions
     pub const PRESETS: &[CarbonIntensity] = &[
         CarbonIntensity {
             label: "France",
-            g_per_kwh: 56.0,
+            g_per_kwh: 42.0,
         },
         CarbonIntensity {
             label: "Germany",
-            g_per_kwh: 385.0,
+            g_per_kwh: 332.0,
         },
         CarbonIntensity {
             label: "UK",
-            g_per_kwh: 230.0,
+            g_per_kwh: 217.0,
         },
         CarbonIntensity {
             label: "USA (average)",
-            g_per_kwh: 390.0,
+            g_per_kwh: 384.0,
         },
         CarbonIntensity {
             label: "China",
@@ -196,19 +201,19 @@ impl CarbonIntensity {
         },
         CarbonIntensity {
             label: "India",
-            g_per_kwh: 710.0,
+            g_per_kwh: 707.0,
         },
         CarbonIntensity {
             label: "Sweden",
-            g_per_kwh: 45.0,
+            g_per_kwh: 35.0,
         },
         CarbonIntensity {
             label: "Poland",
-            g_per_kwh: 635.0,
+            g_per_kwh: 592.0,
         },
         CarbonIntensity {
             label: "World average",
-            g_per_kwh: 475.0,
+            g_per_kwh: 399.0,
         },
         CarbonIntensity {
             label: "Custom",
@@ -255,42 +260,47 @@ pub struct ElectricityCost {
 }
 
 impl ElectricityCost {
+    /// Electricity cost presets for various countries and the world average (updated in 2026).
+    // Source:
+    // Statista, “Electricity prices around the world 2018 | Statista,” Statista, 2018. https://www.statista.com/statistics/263492/electricity-prices-in-selected-countries/
+    // World average:
+    // Global Petrol Prices, “Electricity prices around the world, March 2019 | GlobalPetrolPrices.com,” GlobalPetrpPrices.com, 2023. https://www.globalpetrolprices.com/electricity_prices/
     pub const PRESETS: &[ElectricityCost] = &[
         ElectricityCost {
             label: "France",
-            usd_per_kwh: 0.27,
+            usd_per_kwh: 0.28,
         },
         ElectricityCost {
             label: "Germany",
-            usd_per_kwh: 0.44,
+            usd_per_kwh: 0.4,
         },
         ElectricityCost {
             label: "Spain",
-            usd_per_kwh: 0.31,
+            usd_per_kwh: 0.25,
         },
         ElectricityCost {
             label: "Italy",
-            usd_per_kwh: 0.36,
+            usd_per_kwh: 0.42,
         },
         ElectricityCost {
             label: "Netherlands",
-            usd_per_kwh: 0.39,
+            usd_per_kwh: 0.28,
         },
         ElectricityCost {
             label: "Switzerland",
-            usd_per_kwh: 0.31,
-        },
-        ElectricityCost {
-            label: "UK",
             usd_per_kwh: 0.37,
         },
         ElectricityCost {
+            label: "UK",
+            usd_per_kwh: 0.4,
+        },
+        ElectricityCost {
             label: "USA (average)",
-            usd_per_kwh: 0.16,
+            usd_per_kwh: 0.18,
         },
         ElectricityCost {
             label: "World average",
-            usd_per_kwh: 0.15,
+            usd_per_kwh: 0.17,
         },
         ElectricityCost {
             label: "Custom",

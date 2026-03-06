@@ -39,9 +39,9 @@ Grab the latest release for your operating system from the **[Releases page](htt
 
 | Your system | File to download |
 |---|---|
-| Windows (64-bit) | `WattSeal-windows-x86_64.exe` |
-| Linux (64-bit) | `WattSeal-linux-x86_64` |
-| macOS (Apple Silicon) | `WattSeal-macos-aarch64` |
+| Windows (64-bit) | `WattSeal-windows.exe` |
+| Linux (64-bit) | `WattSeal-linux` |
+| macOS (Apple Silicon) | `WattSeal-macos` |
 
 WattSeal is a single executable file — no installation needed. Just download it, and you're ready for the next step.
 
@@ -68,8 +68,8 @@ The app will launch in the system tray in the taskbar and the dashboard will ope
 Open a terminal in the folder where you downloaded WattSeal and run:
 
 ```bash
-chmod +x WattSeal-linux-x86_64
-sudo ./WattSeal-linux-x86_64
+chmod +x WattSeal-linux
+sudo ./WattSeal-linux
 ```
 
 The `chmod` command makes the file runnable (only needed once). The `sudo` gives WattSeal access to RAPL energy sensors. If you run it without `sudo`, it will still work but with less accurate CPU power estimates.

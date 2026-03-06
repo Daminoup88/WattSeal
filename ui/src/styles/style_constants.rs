@@ -7,6 +7,8 @@ use iced::{
 /// Raw bytes of the embedded icon font (compiled into the binary).
 pub const ICONS_BYTES: &[u8] = include_bytes!("../../../resources/wattseal-icons.ttf");
 
+/// Raw bytes of the window icon
+
 /// Font descriptor for the icon font.
 pub const ICONS: Font = Font::with_name("wattseal-icons");
 

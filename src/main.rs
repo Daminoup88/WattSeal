@@ -8,6 +8,7 @@ use std::{
 };
 
 use collector::CollectorApp;
+use common::WINDOW_ICON_BYTES;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -47,6 +48,13 @@ fn spawn_ui(ui_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
         common::clog!("✗ {msg}");
         Err(msg)
     }
+}
+
+/// Loads the application icon from the embedded PNG for the system tray.
+fn load_tray_icon() -> Option<tray_icon::Icon> {
+    let img = image::load_from_memory(WINDOW_ICON_BYTES).ok()?.into_rgba8();
+    let (w, h) = img.dimensions();
+    tray_icon::Icon::from_rgba(img.into_raw(), w, h).ok()
 }
 
 fn main() {
@@ -147,7 +155,7 @@ fn main() {
         }
     }));
 
-    let icon = tray_icon::Icon::from_rgba(vec![0, 255, 0, 0], 1, 1).ok();
+    let icon = load_tray_icon();
 
     let _tray_icon = icon.and_then(|icon| {
         TrayIconBuilder::new()

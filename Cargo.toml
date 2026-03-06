@@ -28,6 +28,7 @@ description = "WattSeal is a tool to monitor and analyze the power consumption o
 
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
+image = { version = "0.25", default-features = false, features = ["png", "ico"] }
 
 [dependencies]
 collector = { path = "collector" }
@@ -36,6 +37,7 @@ common = { path = "common" }
 tray-icon = "0.21.2"
 chrono = "0.4.43"
 winit = "0.30.12"
+image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(windows)'.dependencies]
 is-admin = "0.1.4"
