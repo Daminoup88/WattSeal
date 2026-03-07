@@ -1,7 +1,7 @@
 use collector::CollectorApp;
 
 fn main() {
-    let _singleton = match common::SingletonGuard::acquire() {
+    let _singleton = match common::SingletonGuard::acquire(common::DATABASE_PATH) {
         Ok(guard) => guard,
         Err(msg) => {
             eprintln!("{msg}");

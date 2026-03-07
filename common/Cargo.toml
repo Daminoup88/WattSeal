@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 chrono = "0.4.43"
+fs2 = "0.4"
 rusqlite = { version = "0.38.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.149"

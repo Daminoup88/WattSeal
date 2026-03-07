@@ -11,7 +11,7 @@ use collector::CollectorApp;
 use common::WINDOW_ICON_BYTES;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
-    menu::{AboutMetadata, Menu, MenuEvent, MenuItem, PredefinedMenuItem},
+    menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
 };
 use winit::{
     application::ApplicationHandler,
@@ -76,8 +76,8 @@ fn main() {
         return;
     }
 
-    // Prevent a second collector from running
-    let _singleton = match common::SingletonGuard::acquire() {
+    // Prevent a second collector from writing the same database
+    let _singleton = match common::SingletonGuard::acquire(common::DATABASE_PATH) {
         Ok(guard) => guard,
         Err(msg) => {
             common::clog!("✗ {msg}");
@@ -116,20 +116,7 @@ fn main() {
     let quit_id = quit_i.id().to_owned();
 
     tray_menu
-        .append_items(&[
-            &open_ui_i,
-            &PredefinedMenuItem::separator(),
-            &PredefinedMenuItem::about(
-                None,
-                Some(AboutMetadata {
-                    name: Some("WattSeal".to_string()),
-                    copyright: Some("Copyright 2026".to_string()),
-                    ..Default::default()
-                }),
-            ),
-            &PredefinedMenuItem::separator(),
-            &quit_i,
-        ])
+        .append_items(&[&open_ui_i, &PredefinedMenuItem::separator(), &quit_i])
         .ok();
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
