@@ -1,0 +1,80 @@
+name: Bug Report
+description: File a bug report.
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to fill out this bug report!
+
+  - type: checkboxes
+    attributes:
+      label: Is it a known issue?
+      description: |
+        Please check if your issue has already been reported by searching through [existing issues](https://github.com/Daminoup88/WattSeal/issues). Duplicate reports make it harder for us to track and fix bugs efficiently.
+      options:
+        - label: I have searched the existing issues.
+          required: true
+
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: What did you expect to happen?
+      placeholder: Describe the bug clearly.
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: WattSeal version
+      placeholder: "e.g. 1.0.0"
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: "e.g. Windows 11, Ubuntu 24.04"
+    validations:
+      required: true
+
+  - type: input
+    id: gpu
+    attributes:
+      label: GPU
+      placeholder: "e.g. NVIDIA RTX 4070, AMD RX 7900, Intel Arc"
+
+  - type: dropdown
+    id: admin
+    attributes:
+      label: Running as admin/root?
+      options:
+        - "Yes"
+        - "No"
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Paste any relevant logs. You can find them in the collector.log file next to the app executable.
+      render: shell
+
+  - type: upload
+    id: screenshots
+    attributes:
+      label: Screenshots
+      description: If applicable, add screenshots to help explain the problem.

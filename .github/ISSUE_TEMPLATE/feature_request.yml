@@ -1,0 +1,49 @@
+name: Feature Request
+description: Suggest an idea for WattSeal.
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for suggesting a new feature!
+
+  - type: checkboxes
+    attributes:
+      label: Has this feature already been requested?
+      description: |
+        Please check if your feature has already been requested by searching through [existing issues](https://github.com/Daminoup88/WattSeal/issues). Duplicate requests make it harder for us to track and implement features efficiently.
+      options:
+        - label: I have searched the existing issues.
+          required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      placeholder: "e.g. I'm frustrated when..."
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the solution you'd like
+      placeholder: What should happen?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      placeholder: Any alternative solutions or workarounds you've thought of?
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Any other details, mockups, or references.
+
+  - type: upload
+    id: attachments
+    attributes:
+      label: Attachments
+      description: Screenshots, mockups, or any other relevant files.
