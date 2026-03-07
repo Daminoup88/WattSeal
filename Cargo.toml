@@ -35,9 +35,14 @@ collector = { path = "collector" }
 ui = { path = "ui" }
 common = { path = "common" }
 tray-icon = { version = "0.21.2", default-features = false }
-chrono = "0.4.43"
-winit = "0.30.12"
+chrono = "0.4.44"
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+winit = "0.30.12"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
 
 [target.'cfg(windows)'.dependencies]
 is-admin = "0.1.4"

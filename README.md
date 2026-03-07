@@ -74,7 +74,11 @@ chmod +x WattSeal-linux
 sudo ./WattSeal-linux
 ```
 
-The `chmod` command makes the file runnable (only needed once). The `sudo` gives WattSeal access to RAPL energy sensors. If you run it without `sudo`, it will still work but with less accurate CPU power estimates.
+> **Note:** the only extra runtime dependency is an X11 system tray library.
+> If either `libappindicator` **or** `libayatana-appindicator` is installed
+> the app will show a tray icon with menu items; otherwise WattSeal will
+> simply run in the background without a tray icon (you can still open the
+> dashboard by re‑running the command).
 
 </details>
 
@@ -188,7 +192,11 @@ The collector and UI share the same SQLite database file via WAL (Write-Ahead Lo
 ## Prerequisites
 
 - **Rust** stable toolchain (version pinned in [`rust-toolchain.toml`](rust-toolchain.toml)).
-- You may need platform-specific dependencies (none required for Windows).
+- On linux, install the build deps for the tray icon, not needed at runtime but required to build the Linux version:
+
+  ```bash
+  sudo apt install libgtk-3-dev pkg-config libxkbcommon-dev libwayland-dev
+  ```
 
 ---
 
