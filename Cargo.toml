@@ -35,7 +35,7 @@ collector = { path = "collector" }
 ui = { path = "ui" }
 common = { path = "common" }
 tray-icon = { version = "0.21.2", default-features = false }
-chrono = "0.4.43"
+chrono = "0.4.44"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]

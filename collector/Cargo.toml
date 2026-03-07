@@ -23,7 +23,7 @@ nvml-wrapper = "0.11.0"
 
 [dependencies]
 common = { path = "../common" }
-chrono = "0.4.43"
+chrono = "0.4.44"
 display-info = "0.5.7"
 sysinfo = "0.37.2"
 battery = "0.7.8"
