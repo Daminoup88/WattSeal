@@ -1083,9 +1083,9 @@ dependencies = [
 
 [[package]]
 name = "display-info"
-version = "0.5.7"
+version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35269e5d1f477f90f9f6c353943e3464466271369ac8499cc17b8dbb82289f3"
+checksum = "5bce305c30b9819766d4cb345932806d98bc8f142fce5269eb3cbc41f6e3e375"
 dependencies = [
  "fxhash",
  "log",
@@ -3133,9 +3133,9 @@ dependencies = [
 
 [[package]]
 name = "nvml-wrapper"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d5c6c0ef9702176a570f06ad94f3198bc29c524c8b498f1b9346e1b1bdcbb3a"
+checksum = "7d9e6eebc1fe424d24c864e40092072618169bd0130f103919aaf615f153e4d0"
 dependencies = [
  "bitflags 2.10.0",
  "libloading 0.8.9",
