@@ -1,5 +1,5 @@
-name: Bug Report
-description: File a bug report.
+name: Bug Report ❌
+description: Report an abnormal behavior.
 body:
   - type: markdown
     attributes:
@@ -18,19 +18,9 @@ body:
     id: description
     attributes:
       label: What happened?
-      description: What did you expect to happen?
+      description: What did you expect to happen? |
+        Please provide the steps to reproduce the bug.
       placeholder: Describe the bug clearly.
-    validations:
-      required: true
-
-  - type: textarea
-    id: steps
-    attributes:
-      label: Steps to reproduce
-      placeholder: |
-        1. ...
-        2. ...
-        3. ...
     validations:
       required: true
 
@@ -38,23 +28,22 @@ body:
     id: version
     attributes:
       label: WattSeal version
+      description: You can see that at the bottom left of the app.
       placeholder: "e.g. 1.0.0"
     validations:
-      required: true
+      required: false
 
-  - type: input
+  - type: dropdown
     id: os
     attributes:
       label: Operating system
-      placeholder: "e.g. Windows 11, Ubuntu 24.04"
+      description: Select the operating system you're running the app on.
+      options:
+        - Windows
+        - Linux
+        - MacOS
     validations:
       required: true
-
-  - type: input
-    id: gpu
-    attributes:
-      label: GPU
-      placeholder: "e.g. NVIDIA RTX 4070, AMD RX 7900, Intel Arc"
 
   - type: dropdown
     id: admin
@@ -69,8 +58,8 @@ body:
   - type: textarea
     id: logs
     attributes:
-      label: Relevant log output
-      description: Paste any relevant logs. You can find them in the collector.log file next to the app executable.
+      label: Additional information
+      description: Do you want to add anything or paste any relevant logs? You can find them in the collector.log file next to the app executable.
       render: shell
 
   - type: upload
