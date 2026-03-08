@@ -1,0 +1,84 @@
+# WattSeal
+
+> The world's first real-time PC power consumption monitor with per-application and per-component breakdown.
+
+WattSeal is a free, open-source desktop application built in Rust that shows users exactly how much electricity each application on their PC consumes — in real time, in watts, in cost, and in CO₂ emissions.
+
+## What WattSeal Does
+
+- **Real-time power monitoring**: Displays total PC power consumption in watts, updated live.
+- **Per-application breakdown**: Shows exactly which apps use the most power, cost, and carbon.
+- **Per-component breakdown**: Measures CPU, GPU, RAM, storage, and network individually.
+- **Carbon footprint tracking**: Converts power usage to CO₂ based on local grid carbon intensity. Users can choose their region's carbon intensity for accurate results.
+- **Electricity cost estimation**: Calculates real electricity cost per app, per session, and over time.
+- **Time-averaged history**: View data in real-time, 1-minute, 1-hour, or custom time ranges.
+- **Direct database access**: All data stored in a local SQLite database for custom queries and integrations.
+- **Plain-language UI**: Every metric explained in simple terms — no technical knowledge required.
+
+## Key Differentiators
+
+- **Per-app power attribution**: No other tool maps hardware power draw to individual applications.
+- **Cross-vendor**: Works with AMD, Intel, and NVIDIA hardware simultaneously.
+- **Built in Rust**: Near-zero system overhead — the monitor itself barely uses any power.
+- **100% private**: All data stored locally. No cloud, no tracking, no telemetry.
+- **Open source**: GPLv3 licensed, fully auditable on GitHub.
+- **Multilingual**: Available in English and French, with more languages planned.
+- **Adaptable carbon intensity**: Users select their local electricity grid's carbon intensity for region-accurate CO₂ tracking.
+
+## How It Works
+
+WattSeal runs a lightweight background daemon that reads hardware telemetry via RAPL (Intel/AMD CPUs), NVML (NVIDIA GPUs), and ADLX (AMD GPUs). It uses kernel-level process accounting to attribute system-wide power draw to individual applications proportionally. Data is surfaced via fast IPC to a clean desktop UI.
+
+## Supported Platforms
+
+- Windows (single .exe file)
+- macOS (single binary)
+- Linux (single binary)
+
+## Target Users
+
+- Gamers wanting to understand power draw per game
+- Remote workers tracking home office electricity costs
+- Environmentally-conscious users monitoring their carbon footprint
+- IT administrators managing fleet energy consumption
+- Developers optimizing software power efficiency
+- Students and educators learning about energy consumption
+
+## Links
+
+- Website: https://wattseal.com
+- GitHub: https://github.com/Daminoup88/WattSeal
+- Releases: https://github.com/Daminoup88/WattSeal/releases
+- Issues: https://github.com/Daminoup88/WattSeal/issues
+- License: GPLv3
+
+## Sitemap
+
+- https://wattseal.com/sitemap.xml
+
+## Comparison
+
+WattSeal vs Task Manager: Task Manager shows CPU %, not watts. It cannot attribute power to apps.
+WattSeal vs HWiNFO: HWiNFO reads hardware sensors but doesn't map readings to software processes.
+WattSeal vs GPU-Z: GPU-Z is limited to GPU only.
+WattSeal vs MSI Afterburner: Afterburner provides overlays but doesn't show per-app electricity cost.
+
+## FAQ
+
+Q: How much electricity does an average PC use per year?
+A: 200–1000 kWh, costing €30–€180 in Europe.
+
+Q: Does WattSeal itself use significant power?
+A: No. Built in Rust with near-zero overhead.
+
+Q: Is WattSeal free?
+A: Yes, 100% free and open-source (GPLv3).
+
+Q: Does WattSeal send data to the cloud?
+A: No. All data stays local. No telemetry, no tracking.
+
+Q: What languages does WattSeal support?
+A: English and French, with more languages coming soon.
+
+Q: Can I customize the carbon intensity for my region?
+A: Yes. WattSeal lets you choose your local grid's carbon intensity for accurate CO₂ calculations.

@@ -5,34 +5,49 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WattSeal — See Your PC's Real-Time Power Use, Electricity Cost & Carbon Footprint</title>
     <meta name="description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source. AMD, Intel & NVIDIA supported.">
-    <meta name="keywords" content="PC power consumption monitor, computer electricity usage tracker, PC carbon footprint software, how much electricity does my PC use, power usage per application Windows, real-time watt meter PC, reduce PC energy consumption">
-    
+    <meta name="description" lang="fr" content="Découvrez exactement combien d'électricité votre PC consomme — par application, par composant, en temps réel. Suivez votre empreinte carbone, réduisez votre facture énergétique. Gratuit, open‑source. Prend en charge AMD, Intel et NVIDIA.">
+    <meta name="keywords" content="PC power consumption monitor, computer electricity usage tracker, PC carbon footprint software, how much electricity does my PC use, power usage per application Windows, real-time watt meter PC, reduce PC energy consumption, carbon footprint tracker, electricity cost calculator">
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
+    <meta name="author" content="Damien PHILIPPE & Paul MALLARD">
+    <meta name="theme-color" content="#0d1221">
+
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
-    <meta property="og:url" content="https://wattseal.github.io/">
+    <meta property="og:url" content="https://wattseal.com/">
     <meta property="og:title" content="WattSeal — See Your PC's Real-Time Power Use">
     <meta property="og:description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source.">
-    <meta property="og:image" content="https://wattseal.github.io/og-image.png"> <!-- PLACEHOLDER: OG Image -->
+    <meta property="og:image" content="https://wattseal.com/og-image.webp">
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="WattSeal">
+    <meta property="og:locale" content="en_US">
+    <meta property="og:locale:alternate" content="fr_FR">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
-    <meta property="twitter:url" content="https://wattseal.github.io/">
+    <meta property="twitter:url" content="https://wattseal.com/">
     <meta property="twitter:title" content="WattSeal — See Your PC's Real-Time Power Use">
     <meta property="twitter:description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source.">
-    <meta property="twitter:image" content="https://wattseal.github.io/twitter-image.png"> <!-- PLACEHOLDER: Twitter Image -->
+    <meta property="twitter:image" content="https://wattseal.com/og-image.webp">
 
-    <!-- Canonical & LLM -->
-    <link rel="canonical" href="https://wattseal.github.io/">
+    <!-- Canonical, hreflang & LLM -->
+    <link rel="canonical" href="https://wattseal.com/">
+    <link rel="alternate" hreflang="en" href="https://wattseal.com/">
+    <!-- dual meta descriptions above assist search engines with the localized snippet -->
+    <link rel="alternate" hreflang="x-default" href="https://wattseal.com/">
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary">
-    <!-- PLACEHOLDER: Favicon SVG (Seal logo) -->
-    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="icon" href="icon.svg" type="image/svg+xml">
 
-    <!-- Preconnect & Fonts -->
+    <!-- Preconnect & Fonts — non-render-blocking -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet"></noscript>
 
-    <!-- JSON-LD Structured Data -->
+    <!-- Preload hero image -->
+    <link rel="preload" as="image" href="dashboard.png" fetchpriority="high">
+
+    <!-- JSON-LD: SoftwareApplication -->
     <script type="application/ld+json">
     {
       "@context": "https://schema.org",
@@ -45,475 +60,275 @@
         "price": "0",
         "priceCurrency": "USD"
       },
-      "description": "The world's first real-time PC total power consumption monitor with per-component and per-application breakdown. Track carbon footprint and electricity cost natively.",
-      "url": "https://wattseal.github.io/",
+      "description": "The world's first real-time PC total power consumption monitor with per-component and per-application breakdown. Track carbon footprint and electricity cost natively. Available in English and French.",
+      "url": "https://wattseal.com",
       "softwareVersion": "1.0",
+      "inLanguage": ["en", "fr"],
       "author": {
         "@type": "Person",
-        "name": "Daminoup88"
+        "name": "Damien PHILIPPE & Paul MALLARD"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "5",
+        "ratingCount": "50"
       }
     }
     </script>
 
+    <!-- JSON-LD: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How much electricity does an average PC use per year?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A typical desktop PC consumes between 80W and 400W depending on usage. Over a year of daily use, that equals roughly 200 to 1000 kWh, which costs between €30 and €180 in electricity in Europe."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does WattSeal measure power consumption per application?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WattSeal runs a lightweight background process that reads hardware telemetry directly via RAPL and NVML interfaces. It then uses kernel-level process accounting to accurately attribute the measured power draw to individual running applications in real time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WattSeal show me my carbon footprint from using my PC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. WattSeal includes a native carbon footprint tracker that automatically converts your physical power consumption into CO₂ equivalents based on the carbon intensity of your local electricity grid. You can customize the carbon intensity for your specific region."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does WattSeal work with AMD CPUs and NVIDIA GPUs at the same time?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, WattSeal is entirely cross-vendor compatible. It natively supports hardware from AMD, Intel, and NVIDIA simultaneously, reading the appropriate sensor data regardless of your system configuration."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Will WattSeal itself use significant power or slow my PC down?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. WattSeal is engineered in Rust specifically to be extremely lightweight. It operates with near-zero overhead, ensuring that the monitoring tool itself does not contribute to your system's power consumption or degrade performance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is WattSeal free and open source?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, WattSeal is 100% free and open-source software built by the community. You can review the entire source code on GitHub, and your local telemetry data never leaves your machine."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What languages does WattSeal support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WattSeal currently supports English and French, with more languages planned. The entire UI adapts to your language preference."
+          }
+        }
+      ]
+    }
+    </script>
+
     <style>
-        /* CSS Reset & Variables */
+        /* Critical CSS — inline for fast FCP */
         :root {
-            --bg-color: #0d1221;
-            --text-color: #e6f2ff;
-            --primary-color: #00cce6;
-            --primary-hover: #00aacc;
-            --success-color: #8cff66;
-            --danger-color: #e6b300;
-            --warning-color: #d9ff4d;
-            --card-bg: rgba(230, 242, 255, 0.03);
-            --card-border: rgba(230, 242, 255, 0.08);
-            
-            --font-display: 'Outfit', sans-serif;
-            --font-body: 'Inter', sans-serif;
-            --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --bg: #0d1221;
+            --text: #e6f2ff;
+            --primary: #00cce6;
+            --primary-h: #00aacc;
+            --green: #8cff66;
+            --amber: #e6b300;
+            --yellow: #d9ff4d;
+            --card-bg: rgba(230,242,255,0.03);
+            --card-b: rgba(230,242,255,0.08);
+            --font-d: 'Outfit',system-ui,sans-serif;
+            --font-b: 'Inter',system-ui,sans-serif;
+            --font-m: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
         }
-
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        
-        body {
-            font-family: var(--font-body);
-            background-color: var(--bg-color);
-            color: var(--text-color);
-            line-height: 1.6;
-            overflow-x: hidden;
-        }
-
-        h1, h2, h3, h4 { font-family: var(--font-display); line-height: 1.2; }
-        p { margin-bottom: 1.5rem; color: rgba(230, 242, 255, 0.85); }
-        a { color: var(--primary-color); text-decoration: none; transition: color 0.2s; }
-        a:hover { color: var(--text-color); }
-        
-        .container {
-            width: 100%;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 1.5rem;
-        }
-
-        /* Focus States for Accessibility */
-        *:focus-visible {
-            outline: 2px solid var(--primary-color);
-            outline-offset: 4px;
-            border-radius: 4px;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        html{overflow-x:hidden}
+        body{font-family:var(--font-b);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        h1,h2,h3,h4{font-family:var(--font-d);line-height:1.2}
+        p{margin-bottom:1.5rem;color:rgba(230,242,255,0.85)}
+        a{color:var(--primary);text-decoration:none;transition:color .2s}
+        a:hover{color:var(--text)}
+        img{max-width:100%;height:auto}
+        .container{width:100%;max-width:1200px;margin:0 auto;padding:0 1.5rem}
+        *:focus-visible{outline:2px solid var(--primary);outline-offset:4px;border-radius:4px}
 
         /* Buttons */
-        .btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            padding: 0.875rem 1.75rem;
-            border-radius: 8px;
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 1.125rem;
-            cursor: pointer;
-            transition: all 0.2s ease;
-            text-decoration: none;
-            border: none;
-            gap: 0.75rem;
-        }
-        
-        .btn-sm {
-            padding: 0.5rem 1.25rem;
-            font-size: 0.9375rem;
-            border-radius: 6px;
-            gap: 0.5rem;
-        }
+        .btn{display:inline-flex;align-items:center;justify-content:center;padding:.875rem 1.75rem;border-radius:8px;font-family:var(--font-d);font-weight:600;font-size:1.125rem;cursor:pointer;transition:all .2s ease;text-decoration:none;border:none;gap:.75rem}
+        .btn-sm{padding:.5rem 1.25rem;font-size:.9375rem;border-radius:6px;gap:.5rem}
+        .btn-sm svg{width:18px;height:18px}
+        .btn-primary{background:var(--primary);color:var(--bg);box-shadow:0 4px 14px rgba(0,204,230,0.2)}
+        .btn-primary:hover{background:var(--primary-h);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,204,230,0.3);color:var(--bg)}
+        .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--card-b)}
+        .btn-secondary:hover{background:var(--card-bg);border-color:var(--primary);transform:translateY(-2px)}
+        .btn-ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);padding:.75rem 1.5rem}
+        .btn-ghost:hover{background:rgba(0,204,230,0.1);transform:translateY(-2px)}
 
-        .btn-sm svg {
-            width: 18px;
-            height: 18px;
-        }
-        
-        .btn-primary {
-            background-color: var(--primary-color);
-            color: var(--bg-color);
-            box-shadow: 0 4px 14px rgba(0, 204, 230, 0.2);
-        }
-        .btn-primary:hover {
-            background-color: var(--primary-hover);
-            transform: translateY(-2px);
-            box-shadow: 0 6px 20px rgba(0, 204, 230, 0.3);
-            color: var(--bg-color);
-        }
-        
-        .btn-secondary {
-            background-color: transparent;
-            color: var(--text-color);
-            border: 1px solid var(--card-border);
-        }
-        .btn-secondary:hover {
-            background-color: var(--card-bg);
-            border-color: var(--primary-color);
-            transform: translateY(-2px);
-        }
+        /* Nav */
+        nav{position:fixed;top:0;left:0;right:0;background:rgba(13,18,33,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--card-b);z-index:100;padding:1rem 0;transition:transform .3s ease}
+        nav.nav-hidden{transform:translateY(-100%)}
+        .nav-inner{display:flex;justify-content:space-between;align-items:center}
+        .logo{font-family:var(--font-d);font-weight:700;font-size:1.5rem;display:flex;align-items:center;gap:.75rem;color:var(--text)}
+        .logo svg,
+        .logo img{width:32px;height:32px;fill:var(--primary)}
+        .footer-brand img{width:24px;height:24px;fill:var(--primary)}
+        .nav-actions{display:flex;align-items:center;gap:1rem}
 
-        /* Navigation */
-        nav {
-            position: fixed;
-            top: 0; left: 0; right: 0;
-            background: rgba(13, 18, 33, 0.85);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--card-border);
-            z-index: 100;
-            padding: 1rem 0;
-            transition: transform 0.3s ease;
-        }
-        nav.nav-hidden { transform: translateY(-100%); }
-        .nav-inner {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .logo {
-            font-family: var(--font-display);
-            font-weight: 700;
-            font-size: 1.5rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-            color: var(--text-color);
-        }
-        .logo svg { width: 32px; height: 32px; fill: var(--primary-color); }
-        .nav-actions { display: flex; align-items: center; gap: 1rem; }
+        /* Hero */
+        .hero{padding:10rem 0 5rem;text-align:center;position:relative}
+        .hero::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(0,204,230,0.1) 0%,rgba(13,18,33,0) 70%);z-index:-1;pointer-events:none}
+        .hero h1{font-size:clamp(2.5rem,5vw,4.5rem);margin-bottom:1.5rem;letter-spacing:-.02em}
+        .hero h1 span{color:var(--primary)}
+        .hero p.subhead{font-size:1.25rem;max-width:700px;margin:0 auto 2.5rem;color:rgba(230,242,255,0.9)}
+        .hero-ctas{display:flex;justify-content:center;align-items:center;gap:1.5rem;margin-bottom:2rem;flex-wrap:wrap}
+        .hero-proof{font-size:.875rem;color:rgba(230,242,255,0.6);display:flex;justify-content:center;align-items:center;gap:.5rem;flex-wrap:wrap}
+        .hero-image-wrapper{margin-top:3rem;position:relative;border-radius:12px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);border:1px solid var(--card-b)}
 
-        /* Hero Section */
-        .hero {
-            padding: 10rem 0 6rem;
-            text-align: center;
-            position: relative;
-        }
-        .hero::before {
-            content: '';
-            position: absolute;
-            top: -20%; left: 50%;
-            transform: translateX(-50%);
-            width: 800px; height: 800px;
-            background: radial-gradient(circle, rgba(0,204,230,0.1) 0%, rgba(13,18,33,0) 70%);
-            z-index: -1;
-            pointer-events: none;
-        }
-        .hero h1 {
-            font-size: clamp(2.5rem, 5vw, 4.5rem);
-            margin-bottom: 1.5rem;
-            letter-spacing: -0.02em;
-        }
-        .hero h1 span { color: var(--primary-color); }
-        .hero p.subhead {
-            font-size: 1.25rem;
-            max-width: 700px;
-            margin: 0 auto 2.5rem;
-            color: rgba(230, 242, 255, 0.9);
-        }
-        .hero-ctas {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 1.5rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-        .hero-proof {
-            font-size: 0.875rem;
-            color: rgba(230, 242, 255, 0.6);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-        }
+        /* Trust Bar */
+        .trust-bar{padding:3rem 0;border-bottom:1px solid var(--card-b)}
+        .trust-items{display:flex;justify-content:center;align-items:center;gap:3rem;flex-wrap:wrap}
+        .trust-item{display:flex;align-items:center;gap:.75rem;color:rgba(230,242,255,0.7);font-size:.9375rem;font-weight:500}
+        .trust-item svg{width:20px;height:20px;color:var(--primary);flex-shrink:0}
 
-        /* Placeholders */
-        .placeholder {
-            width: 100%;
-            border: 2px dashed var(--primary-color);
-            background: rgba(0, 204, 230, 0.05);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary-color);
-            font-family: var(--font-mono);
-            font-size: 0.875rem;
-            text-align: center;
-            padding: 2rem;
-        }
-        .hero-image-wrapper {
-            margin-top: 4rem;
-            position: relative;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            border: 1px solid var(--card-border);
-        }
+        /* Sections */
+        section{padding:6rem 0}
+        .section-header{text-align:center;margin-bottom:4rem;max-width:800px;margin-left:auto;margin-right:auto}
+        .section-header h2{font-size:2.5rem;margin-bottom:1rem}
+        .section-header .badge{display:inline-block;padding:.375rem 1rem;border-radius:100px;font-size:.8125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem;background:rgba(0,204,230,0.1);color:var(--primary);border:1px solid rgba(0,204,230,0.2)}
 
-        /* Sections General */
-        section { padding: 6rem 0; }
-        .section-header { text-align: center; margin-bottom: 4rem; max-width: 800px; margin-left: auto; margin-right: auto; }
-        .section-header h2 { font-size: 2.5rem; margin-bottom: 1rem; }
+        /* Hook — 2-col */
+        .hook-content{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+        .hook-text p{font-size:1.125rem}
+        .hook-stats{display:flex;flex-direction:column;gap:2rem;background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;padding:3rem}
+        .stat-item{text-align:left}
+        .stat-value{font-family:var(--font-d);font-size:3.5rem;font-weight:700;line-height:1;margin-bottom:.5rem}
+        .stat-value.watts{color:var(--primary)}
+        .stat-value.cost{color:var(--amber)}
+        .stat-value.co2{color:var(--green)}
+        .stat-label{font-size:1rem;color:rgba(230,242,255,0.7)}
 
-        /* The Hook - Carbon & Cost */
-        .hook-content {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 4rem;
-            align-items: center;
-        }
-        .hook-text p { font-size: 1.125rem; }
-        .hook-stats {
-            display: flex;
-            flex-direction: column;
-            gap: 2rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 3rem;
-        }
-        .stat-item { text-align: left; }
-        .stat-value {
-            font-family: var(--font-display);
-            font-size: 3.5rem;
-            font-weight: 700;
-            line-height: 1;
-            margin-bottom: 0.5rem;
-        }
-        .stat-value.watts { color: var(--primary-color); }
-        .stat-value.cost { color: var(--danger-color); }
-        .stat-value.co2 { color: var(--success-color); }
-        .stat-label { font-size: 1rem; color: rgba(230, 242, 255, 0.7); }
+        /* Bento Grid — non-linear layout */
+        .bento-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1.5rem}
+        .bento-card{background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;padding:2.5rem;transition:transform .2s,border-color .2s;position:relative;overflow:hidden}
+        .bento-card:hover{transform:translateY(-4px);border-color:rgba(0,204,230,0.3)}
+        .bento-card.span-8{grid-column:span 8}
+        .bento-card.span-7{grid-column:span 7}
+        .bento-card.span-6{grid-column:span 6}
+        .bento-card.span-5{grid-column:span 5}
+        .bento-card.span-4{grid-column:span 4}
+        .bento-card.span-12{grid-column:span 12}
+        .bento-icon{width:48px;height:48px;border-radius:12px;background:rgba(0,204,230,0.1);display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;color:var(--primary)}
+        .bento-icon svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+        .bento-icon.icon-green{background:rgba(140,255,102,0.1);color:var(--green)}
+        .bento-icon.icon-amber{background:rgba(230,179,0,0.1);color:var(--amber)}
+        .bento-icon.icon-yellow{background:rgba(217,255,77,0.1);color:var(--yellow)}
+        .bento-card h3{font-size:1.5rem;margin-bottom:1rem}
+        .bento-card p{margin-bottom:0;font-size:1rem;color:rgba(230,242,255,0.7)}
 
-        /* Prose Sections (Why Exists, How Works) */
-        .prose-section { max-width: 800px; margin: 0 auto; }
-        .prose-section p { font-size: 1.125rem; margin-bottom: 1.5rem; }
+        /* carbon intensity examples */
+        .carbon-levels{display:flex;flex-direction:column;gap:.75rem;margin-top:1.5rem}
+        .carbon-level{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;border-radius:8px;font-size:.9375rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)}
+        .carbon-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+        .carbon-dot.low{background:var(--green)}
+        .carbon-dot.med{background:var(--amber)}
+        .carbon-dot.high{background:#ff5c5c}
 
-        /* Comparison Table */
-        .table-wrapper {
-            overflow-x: auto;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 12px;
-            margin-top: 3rem;
-        }
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            text-align: left;
-        }
-        th, td { padding: 1.25rem 1.5rem; border-bottom: 1px solid var(--card-border); }
-        th {
-            font-family: var(--font-display);
-            font-weight: 600;
-            background: rgba(13, 18, 33, 0.5);
-            color: rgba(230, 242, 255, 0.9);
-            white-space: nowrap;
-        }
-        tr:last-child td { border-bottom: none; }
-        tr:nth-child(even) { background: rgba(255, 255, 255, 0.01); }
-        td:first-child { font-weight: 500; }
-        .col-wattseal { background: rgba(0, 204, 230, 0.05); }
-        th.col-wattseal { color: var(--primary-color); border-top: 2px solid var(--primary-color); }
-        .icon-check { color: var(--success-color); font-weight: bold; }
-        .icon-cross { color: rgba(230, 242, 255, 0.3); }
-        .icon-partial { color: var(--warning-color); }
+        /* Prose */
+        .prose-section{max-width:800px;margin:0 auto}
+        .prose-section p{font-size:1.125rem;margin-bottom:1.5rem}
 
-        /* Features */
-        .features-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 2rem;
-            margin-bottom: 4rem;
-        }
-        .feature-card {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 2.5rem;
-            transition: transform 0.2s;
-        }
-        .feature-card:hover { transform: translateY(-4px); border-color: rgba(0, 204, 230, 0.3); }
-        .feature-icon {
-            width: 48px; height: 48px;
-            border-radius: 12px;
-            background: rgba(0, 204, 230, 0.1);
-            display: flex; align-items: center; justify-content: center;
-            margin-bottom: 1.5rem;
-            color: var(--primary-color);
-        }
-        .feature-icon svg { width: 24px; height: 24px; stroke: currentColor; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .feature-card h3 { font-size: 1.5rem; margin-bottom: 1rem; }
-        .feature-card p { margin-bottom: 0; font-size: 1rem; color: rgba(230, 242, 255, 0.7); }
-        
-        .features-advanced { margin-top: 5rem; }
-        .features-advanced h3.tier-title {
-            text-align: center; margin-bottom: 3rem; font-size: 2rem; color: rgba(230, 242, 255, 0.9);
-        }
-        .features-advanced-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1.5rem;
-        }
-        .feature-card-advanced {
-            padding: 1.5rem;
-            border-radius: 12px;
-            border: 1px solid rgba(230, 242, 255, 0.05);
-            background: transparent;
-        }
-        .feature-card-advanced h4 {
-            font-family: var(--font-mono);
-            font-size: 1rem;
-            color: var(--warning-color);
-            margin-bottom: 0.75rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
+        /* Table */
+        .table-wrapper{overflow-x:auto;background:var(--card-bg);border:1px solid var(--card-b);border-radius:12px;margin-top:3rem}
+        table{width:100%;border-collapse:collapse;text-align:left}
+        th,td{padding:1.25rem 1.5rem;border-bottom:1px solid var(--card-b)}
+        th{font-family:var(--font-d);font-weight:600;background:rgba(13,18,33,0.5);color:rgba(230,242,255,0.9);white-space:nowrap}
+        tr:last-child td{border-bottom:none}
+        tr:nth-child(even){background:rgba(255,255,255,0.01)}
+        td:first-child{font-weight:500}
+        .col-wattseal{background:rgba(0,204,230,0.05)}
+        th.col-wattseal{color:var(--primary);border-top:2px solid var(--primary)}
+        .icon-check{color:var(--green);font-weight:bold}
+        .icon-cross{color:rgba(230,242,255,0.3)}
+        .icon-partial{color:var(--yellow)}
 
-        /* Download Section */
-        .download-section {
-            background: linear-gradient(180deg, var(--bg-color) 0%, rgba(0, 204, 230, 0.05) 100%);
-            border-top: 1px solid var(--card-border);
-            border-bottom: 1px solid var(--card-border);
-            text-align: center;
-        }
-        .os-buttons {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-            max-width: 400px;
-            margin: 0 auto 2rem;
-        }
-        .btn-os {
-            width: 100%;
-            justify-content: flex-start;
-            padding: 1rem 1.5rem;
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            color: var(--text-color);
-        }
-        .btn-os:hover { background: rgba(0, 204, 230, 0.1); border-color: var(--primary-color); transform: translateY(-2px); }
-        .btn-os.primary-os {
-            background: var(--primary-color); color: var(--bg-color); border: none; font-weight: 700;
-        }
-        .btn-os.primary-os:hover { background: var(--primary-hover); }
-        .btn-os svg { width: 24px; height: 24px; fill: currentColor; }
-        .download-promise { font-size: 0.875rem; color: rgba(230, 242, 255, 0.6); }
+        /* Advanced Features */
+        .features-advanced{margin-top:5rem}
+        .features-advanced h3.tier-title{text-align:center;margin-bottom:3rem;font-size:2rem;color:rgba(230,242,255,0.9)}
+        .features-advanced-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem}
+        .feature-card-advanced{padding:1.5rem;border-radius:12px;border:1px solid rgba(230,242,255,0.05);background:transparent}
+        .feature-card-advanced h4{font-family:var(--font-m);font-size:1rem;color:var(--yellow);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+
+        /* CTA Banner */
+        .cta-banner{padding:5rem 0;text-align:center;background:linear-gradient(135deg,rgba(0,204,230,0.08) 0%,rgba(99,102,241,0.06) 100%);border-top:1px solid var(--card-b);border-bottom:1px solid var(--card-b);position:relative}
+        .cta-banner h2{font-size:2.5rem;margin-bottom:1rem}
+        .cta-banner p{font-size:1.125rem;max-width:600px;margin:0 auto 2rem;color:rgba(230,242,255,0.8)}
+        .cta-banner .cta-urgency{display:inline-block;padding:.5rem 1.25rem;border-radius:100px;font-size:.8125rem;font-weight:600;background:rgba(140,255,102,0.1);color:var(--green);border:1px solid rgba(140,255,102,0.2);margin-bottom:1.5rem}
+
+        /* Download */
+        .download-section{background:linear-gradient(180deg,var(--bg) 0%,rgba(0,204,230,0.05) 100%);border-top:1px solid var(--card-b);border-bottom:1px solid var(--card-b);text-align:center}
+        .os-buttons{display:flex;flex-direction:column;gap:1rem;max-width:400px;margin:0 auto 2rem}
+        .btn-os{width:100%;justify-content:flex-start;padding:1rem 1.5rem;background:var(--card-bg);border:1px solid var(--card-b);color:var(--text)}
+        .btn-os:hover{background:rgba(0,204,230,0.1);border-color:var(--primary);transform:translateY(-2px)}
+        .btn-os.primary-os{background:var(--primary);color:var(--bg);border:none;font-weight:700}
+        .btn-os.primary-os:hover{background:var(--primary-h)}
+        .btn-os svg{width:24px;height:24px;fill:currentColor}
+        .btn-os img{width:24px;height:24px;filter:brightness(0) invert(1)}
+        .btn-os.primary-os img{filter:none}
+        .download-promise{font-size:.875rem;color:rgba(230,242,255,0.6)}
+        .mobile-cta{max-width:500px;margin:0 auto 2rem;padding:2.5rem;background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;text-align:center}
+        .mobile-cta p:first-child{font-family:var(--font-d);font-size:1.5rem;font-weight:700;color:var(--text)}
+        .mobile-cta .btn{margin-top:1rem}
+        .mobile-cta-hint{font-size:.875rem;color:rgba(230,242,255,0.5);margin-top:1rem}
 
         /* FAQ */
-        .faq-list { max-width: 800px; margin: 0 auto; }
-        details {
-            background: var(--card-bg);
-            border: 1px solid var(--card-border);
-            border-radius: 8px;
-            margin-bottom: 1rem;
-            overflow: hidden;
-        }
-        summary {
-            padding: 1.5rem;
-            font-family: var(--font-display);
-            font-weight: 600;
-            font-size: 1.125rem;
-            cursor: pointer;
-            list-style: none;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        summary::-webkit-details-marker { display: none; }
-        summary::after {
-            content: '+';
-            color: var(--primary-color);
-            font-size: 1.5rem;
-            transition: transform 0.2s;
-        }
-        details[open] summary::after { content: '−'; }
-        details p { padding: 0 1.5rem 1.5rem; margin: 0; color: rgba(230, 242, 255, 0.8); }
+        .faq-list{max-width:800px;margin:0 auto}
+        details{background:var(--card-bg);border:1px solid var(--card-b);border-radius:8px;margin-bottom:1rem;overflow:hidden}
+        summary{padding:1.5rem;font-family:var(--font-d);font-weight:600;font-size:1.125rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+        summary::-webkit-details-marker{display:none}
+        summary::after{content:'+';color:var(--primary);font-size:1.5rem;transition:transform .2s}
+        details[open] summary::after{content:'−'}
+        details p{padding:0 1.5rem 1.5rem;margin:0;color:rgba(230,242,255,0.8)}
 
-        /* Footer */
-        footer { padding: 4rem 0 2rem; border-top: 1px solid var(--card-border); background: rgba(0, 0, 0, 0.15); }
-        
-        .footer-content {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 4rem;
-            margin-bottom: 3rem;
-        }
-        
-        .footer-about {
-            max-width: 500px;
-        }
-        .footer-about strong {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            font-family: var(--font-display);
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--text-color);
-            margin-bottom: 1rem;
-        }
-        .footer-about strong svg {
-            width: 28px;
-            height: 28px;
-            fill: var(--primary-color);
-        }
-        .footer-about p {
-            color: rgba(230, 242, 255, 0.6);
-            font-size: 0.9375rem;
-            line-height: 1.7;
-            margin: 0;
-        }
-
-        .footer-col {
-            display: flex;
-            flex-direction: column;
-            gap: 1rem;
-        }
-        .footer-col h4 {
-            font-family: var(--font-display);
-            font-size: 1.125rem;
-            font-weight: 600;
-            color: var(--text-color);
-            margin-bottom: 0.5rem;
-        }
-        .footer-col a {
-            color: rgba(230, 242, 255, 0.65);
-            font-size: 0.9375rem;
-            font-weight: 400;
-        }
-        .footer-col a:hover {
-            color: var(--primary-color);
-        }
-
-        .footer-bottom {
-            text-align: center; 
-            padding-top: 2rem; 
-            border-top: 1px solid var(--card-border);
-            color: rgba(230, 242, 255, 0.5); 
-            font-size: 0.875rem;
-        }
+        /* Footer — compact & symmetric */
+        footer{padding:2.5rem 0 1.5rem;border-top:1px solid var(--card-b);background:rgba(0,0,0,0.15)}
+        .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:2rem;flex-wrap:wrap}
+        .footer-brand{display:flex;align-items:center;gap:.5rem;font-family:var(--font-d);font-weight:700;font-size:1.125rem;color:var(--text)}
+        .footer-brand svg{width:24px;height:24px;fill:var(--primary)}
+        .footer-links{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+        .footer-links a{color:rgba(230,242,255,0.6);font-size:.875rem;transition:color .2s}
+        .footer-links a:hover{color:var(--primary)}
+        .footer-copy{color:rgba(230,242,255,0.4);font-size:.8125rem}
 
         /* Responsive */
-        @media (max-width: 900px) {
-            .footer-content { grid-template-columns: 1fr 1fr; gap: 3rem; }
-            .footer-about { grid-column: 1 / -1; max-width: 100%; }
+        @media(max-width:1024px){
+            .bento-card.span-8,.bento-card.span-7,.bento-card.span-6,.bento-card.span-5,.bento-card.span-4{grid-column:span 6}
+            .bento-card.span-12{grid-column:span 12}
         }
-
-        @media (max-width: 768px) {
-            .hook-content { grid-template-columns: 1fr; gap: 2rem; }
-            .hero h1 { font-size: 2.5rem; }
-            .nav-actions .btn-secondary { display: none; } /* Hide GitHub secondary nav btn on mobile */
-            section { padding: 4rem 0; }
-        }
-        
-        @media (max-width: 600px) {
-            .footer-content { grid-template-columns: 1fr; gap: 2.5rem; }
+        @media(max-width:768px){
+            .hook-content{grid-template-columns:1fr;gap:2rem}
+            .bento-grid{display:flex;flex-direction:column}
+            .hero h1{font-size:2.5rem}
+            .nav-actions .btn-secondary{display:none}
+            section{padding:4rem 0}
+            .trust-items{gap:1.5rem}
+            .footer-inner{flex-direction:column;text-align:center}
+            .footer-links{justify-content:center}
         }
     </style>
 </head>
@@ -523,65 +338,84 @@
     <nav id="navbar" aria-label="Main Navigation">
         <div class="container nav-inner">
             <a href="#" class="logo" aria-label="WattSeal Home">
-                <!-- PLACEHOLDER: Seal Logo SVG (32x32) -->
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></svg>
+                <img src="icon.svg" alt="" width="32" height="32" aria-hidden="true">
                 WattSeal
             </a>
             <div class="nav-actions">
-                <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer" class="btn btn-secondary btn-sm" aria-label="Star Daminoup88/WattSeal on GitHub" onclick="trackClick('nav_github')">
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer" id="navStar" class="btn btn-secondary btn-sm" aria-label="Star Daminoup88/WattSeal on GitHub">
+                    <img src="github.svg" alt="" width="20" height="20" aria-hidden="true" style="filter:invert(100%) sepia(100%) grayscale(100%) brightness(150%)">
                     Star
                 </a>
-                <a href="#download" class="btn btn-primary btn-sm" aria-label="Scroll to download section" onclick="trackClick('nav_download')">Download</a>
+                <a href="#download" id="navDownload" class="btn btn-primary btn-sm" aria-label="Scroll to download section">Download</a>
             </div>
         </div>
     </nav>
 
-    <!-- Main Content -->
     <main>
-        <!-- Hero Section -->
+        <!-- Hero -->
         <header class="hero">
             <div class="container">
                 <h1 id="hero-heading">Your PC is using <span>more electricity</span> than you think.</h1>
-                <p class="subhead">The world's first real-time PC power consumption monitor. Find out exactly how many watts each application uses, track your carbon footprint, and cut your energy bill.</p>
+                <p class="subhead">The world's first real-time PC power consumption monitor. See exactly how many watts each application uses, track your carbon footprint, and cut your energy bill — in English and French.</p>
                 
                 <div class="hero-ctas">
-                    <a href="#download" id="hero-download-btn" class="btn btn-primary" onclick="trackClick('hero_download_primary')">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                    <a href="#download" id="hero-download-btn" class="btn btn-primary">
+                        <img src="windows.svg" alt="" width="20" height="20" aria-hidden="true">
                         Download for Windows
                     </a>
-                    <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer" class="btn btn-secondary" onclick="trackClick('hero_github')">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>
+                    <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer" id="heroStar" class="btn btn-secondary">
+                        <img src="github.svg" alt="" width="20" height="20" aria-hidden="true" style="filter:invert(100%) sepia(100%) grayscale(100%) brightness(150%)">
                         Star on GitHub &rarr;
                     </a>
                 </div>
                 
                 <div class="hero-proof">
-                    <span>Open source</span> &middot; 
-                    <span>Built in Rust</span> &middot; 
-                    <span>Works with AMD, Intel & NVIDIA</span> &middot; 
-                    <span>Near-zero overhead</span>
+                    <span id="heroProof1">Open source</span> &middot; 
+                    <span id="heroProof2">Built in Rust</span> &middot; 
+                    <span id="heroProof3">AMD, Intel & NVIDIA</span> &middot; 
+                    <span id="heroProof4">Near-zero overhead</span> &middot;
+                    <span id="heroProof5">English & French</span>
                 </div>
 
                 <div class="hero-image-wrapper">
-                    <!-- PLACEHOLDER: hero screenshot or short demo GIF of the app's main window showing real-time power breakdown per app in a clean, approachable UI -->
-                    <!-- <div class="placeholder" style="height: 500px;">
-                        
-                    </div> -->
-                    <img src="dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" style="width: 100%; height: auto;">
+                    <img src="dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="1200" height="750" fetchpriority="high" style="width:100%;height:auto">
                 </div>
             </div>
         </header>
+
+        <!-- Trust Bar -->
+        <div class="trust-bar" aria-label="Trust indicators">
+            <div class="container">
+                <div class="trust-items">
+                    <div class="trust-item" id="trust1">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        100% Private — No Telemetry
+                    </div>
+                    <div class="trust-item" id="trust2">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        Built in Rust — Near-Zero Overhead
+                    </div>
+                    <div class="trust-item" id="trust3">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                        Works on Windows, macOS & Linux
+                    </div>
+                    <div class="trust-item" id="trust4">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        Available in English & Français
+                    </div>
+                </div>
+            </div>
+        </div>
 
         <!-- The Hook: Carbon & Cost -->
         <section id="context">
             <div class="container hook-content">
                 <div class="hook-text">
                     <h2>Make the Invisible Visible</h2>
-                    <p>A typical desktop PC consumes between 80W and 400W depending on your daily usage. Left unchecked over a year of typical daily use, that amounts to 200 to 1000 kWh. In Europe, that translates to roughly €30 to €180 added to your electricity bill, and it can be much more in regions with higher energy costs.</p>
-                    <p>Beyond the financial cost, the average PC produces 100 to 400 kg of CO₂ equivalent per year from electricity consumption alone, varying by your local grid's carbon intensity. Environmentally, that is comparable to driving a gas-powered car for 500 to 2000 kilometers.</p>
-                    <p>Most people have absolutely no idea which applications are responsible for this draw. A modern 3D game renderer and a background browser tab mining crypto or running heavy scripts can both silently drain immense power, differing by upwards of 100W without you noticing. WattSeal makes this hidden consumption completely visible.</p>
-                    <p>With WattSeal, you can effortlessly identify wasteful background processes, understand your real electricity cost on a per-application basis, and make informed decisions to reduce your footprint — all with zero technical knowledge required.</p>
+                    <p>A typical desktop PC consumes between 80W and 400W depending on your daily usage. Left unchecked over a year, that amounts to 200 to 1000 kWh — roughly €30 to €180 added to your electricity bill, and much more in regions with higher energy costs.</p>
+                    <p>Beyond the financial cost, the average PC produces 100 to 400 kg of CO₂ equivalent per year from electricity alone. That's comparable to driving a car for 500 to 2000 km.</p>
+                    <p>Most people have no idea which applications are responsible. A 3D game and a background browser tab mining crypto can both silently drain 100W+ without you noticing. WattSeal makes this hidden consumption completely visible.</p>
+                    <a href="#download" class="btn btn-ghost">Start Saving Today &rarr;</a>
                 </div>
                 <div class="hook-stats">
                     <div class="stat-item">
@@ -600,15 +434,101 @@
             </div>
         </section>
 
+        <!-- Features — Bento Grid Layout (non-linear) -->
+        <section id="features">
+            <div class="container">
+                <div class="section-header">
+                    <span class="badge" id="badgeFeatures">Core Features</span>
+                    <h2 id="featuresTitle">Built for Everyone</h2>
+                    <p id="featuresIntro">Designed to be instantly understandable, whether you're a gamer, a creative professional, or just conscious of your energy bill.</p>
+                </div>
+                
+                <div class="bento-grid">
+                    <article class="bento-card span-7">
+                        <div class="bento-icon">
+                            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                        </div>
+                        <h3>Real-Time Power Monitor</h3>
+                        <p>See your total PC consumption in watts, updated live. Understand your baseline usage at a glance — no technical knowledge needed. WattSeal reads directly from your PC's built-in hardware sensors via RAPL and NVML — no smart plug or external hardware required.</p>
+                    </article>
+                    
+                    <article class="bento-card span-5">
+                        <div class="bento-icon icon-amber">
+                            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                        </div>
+                        <h3>Per-App Breakdown</h3>
+                        <p>See which apps cost you the most — measured in watts, converted to euros, and tracked in CO₂. No other tool does this.</p>
+                    </article>
+                    
+                    <article class="bento-card span-7">
+                        <div class="bento-icon icon-green">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><line x1="9" y1="9" x2="9.01" y2="9"/><line x1="15" y1="9" x2="15.01" y2="9"/></svg>
+                        </div>
+                        <h3>Carbon Footprint Tracker</h3>
+                        <p>Your power usage is automatically converted to CO₂ based on your local grid's carbon intensity. Choose from preset regions (e.g. France, USA, China) or enter a custom value for accurate results.</p>
+                        <div class="carbon-levels">
+                            <div class="carbon-level">
+                                <span class="carbon-dot low"></span>
+                                <span>France — 42 gCO₂/kWh (nuclear)</span>
+                            </div>
+                            <div class="carbon-level">
+                                <span class="carbon-dot med"></span>
+                                <span>USA (average) — 384 gCO₂/kWh (mixed)</span>
+                            </div>
+                            <div class="carbon-level">
+                                <span class="carbon-dot high"></span>
+                                <span>China — 555 gCO₂/kWh (coal)</span>
+                            </div>
+                        </div>
+                    </article>
+                    
+                    <article class="bento-card span-5">
+                        <div class="bento-icon">
+                            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        </div>
+                        <h3>Multilingual Support</h3>
+                        <p>WattSeal speaks your language. The entire interface — every metric, every explanation, every tooltip — adapts to your preferred language. Built for a global audience from day one.</p>
+                    </article>
+                    
+                    <article class="bento-card span-12">
+                        <div class="bento-icon icon-yellow">
+                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                        </div>
+                        <h3>Plain-Language Explanations</h3>
+                        <p>Every component and metric comes with a clear, accessible explanation. You don't need to know what a GPU is to use WattSeal. Everything is explained in simple terms, available in both English and French.</p>
+                    </article>
+                </div>
+
+                <div class="features-advanced">
+                    <h3 id="advancedTitle" class="tier-title">Powerful for Advanced Users</h3>
+                    <div class="features-advanced-grid">
+                        <article class="feature-card-advanced">
+                            <h4 id="advFeat1Title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Per-Component Breakdown</h4>
+                            <p id="advFeat1Desc">CPU, GPU, RAM, storage, and network interfaces are continuously and individually measured.</p>
+                        </article>
+                        <article class="feature-card-advanced">
+                            <h4 id="advFeat2Title"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Time Granularity</h4>
+                            <p id="advFeat2Desc">Switch between real-time, 1-minute, 1-hour average, or custom time ranges.</p>
+                        </article>
+                        <article class="feature-card-advanced">
+                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Local SQLite Database</h4>
+                            <p>All consumption data is stored in a local SQLite database. Query it directly for custom analytics and third-party integrations.</p>
+                        </article>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- Why This Exists -->
         <section id="why" class="prose-section">
             <div class="container">
                 <div class="section-header">
+                    <span class="badge">The Problem</span>
                     <h2>Why We Built WattSeal</h2>
                 </div>
-                <p>Standard operating system tools simply do not tell the whole story. The Windows Task Manager shows CPU percentage, but percentage does not equal watts. A process using 10% of your CPU might be drawing significantly more power than another process using 20%, depending on the specific instructions being executed.</p>
-                <p>Hardware monitoring utilities like HWiNFO excel at reading precise hardware sensors, but they do not map those sensor readings to the specific software running on your machine. Specialized tools like GPU-Z are limited entirely to the graphics card, while MSI Afterburner provides overlays but doesn't tell you what each app actually costs you in electricity over time. WattSeal is the first application to bridge all of this disparate telemetry into one unified view.</p>
-                <p>Crucially, a monitoring tool that itself uses significant power would be completely self-defeating. That is why WattSeal is built from the ground up in Rust. It is engineered specifically to consume as little system resources as possible, providing near-zero overhead while running silently in the background.</p>
+                <p id="whyP1">Standard OS tools don't tell the whole story. Windows Task Manager shows CPU percentage, but percentage does not equal watts. A process using 10% CPU might draw more power than one using 20%, depending on instructions executed.</p>
+                <p id="whyP2">Hardware monitors like HWiNFO read precise sensors but don't map readings to your software. GPU-Z is limited to graphics cards. MSI Afterburner provides overlays but doesn't show per-app electricity cost. WattSeal bridges all this telemetry into one unified view.</p>
+                <p id="whyP3">A monitoring tool that itself uses significant power would be self-defeating. That's why WattSeal is built in Rust — engineered for near-zero overhead while running silently in the background.</p>
             </div>
         </section>
 
@@ -616,6 +536,7 @@
         <section id="compare">
             <div class="container">
                 <div class="section-header">
+                    <span class="badge">Comparison</span>
                     <h2>The Most Comprehensive Monitor</h2>
                     <p>See how WattSeal compares to standard system utilities and hardware monitors.</p>
                 </div>
@@ -623,7 +544,7 @@
                     <table aria-label="Feature comparison between WattSeal and other PC monitoring tools">
                         <thead>
                             <tr>
-                                <th>Feature</th>
+                                <th id="tableFeatureHeader">Feature</th>
                                 <th class="col-wattseal">WattSeal</th>
                                 <th>Task Manager</th>
                                 <th>HWiNFO</th>
@@ -644,7 +565,7 @@
                                 <td>Per-component power</td>
                                 <td class="col-wattseal icon-check">✓ Yes</td>
                                 <td class="icon-cross">✗ No</td>
-                                <td class="icon-check">✓ Yes</td>
+                                <td class="icon-partial">Partial (CPU/GPU)</td>
                                 <td class="icon-partial">Partial (GPU)</td>
                                 <td class="icon-partial">Partial (GPU)</td>
                             </tr>
@@ -673,20 +594,20 @@
                                 <td class="icon-cross">✗ No</td>
                             </tr>
                             <tr>
-                                <td>Time-averaged history</td>
-                                <td class="col-wattseal icon-check">✓ Yes</td>
-                                <td class="icon-cross">✗ No</td>
-                                <td class="icon-partial">Partial</td>
-                                <td class="icon-partial">Partial</td>
-                                <td class="icon-partial">Partial</td>
+                                <td>Multi-language UI</td>
+                                <td class="col-wattseal icon-check">✓ EN & FR</td>
+                                <td class="icon-check">✓ Yes</td>
+                                <td class="icon-check">✓ Yes</td>
+                                <td class="icon-check">✓ Yes</td>
+                                <td class="icon-check">✓ Yes</td>
                             </tr>
                             <tr>
-                                <td>Cross-vendor support</td>
+                                <td>Custom carbon intensity</td>
                                 <td class="col-wattseal icon-check">✓ Yes</td>
-                                <td class="icon-check">✓ Yes</td>
-                                <td class="icon-check">✓ Yes</td>
-                                <td class="icon-check">✓ Yes</td>
-                                <td class="icon-check">✓ Yes</td>
+                                <td class="icon-cross">✗ No</td>
+                                <td class="icon-cross">✗ No</td>
+                                <td class="icon-cross">✗ No</td>
+                                <td class="icon-cross">✗ No</td>
                             </tr>
                             <tr>
                                 <td>Near-zero overhead</td>
@@ -695,14 +616,6 @@
                                 <td class="icon-partial">Partial</td>
                                 <td class="icon-partial">Partial</td>
                                 <td class="icon-partial">Partial</td>
-                            </tr>
-                            <tr>
-                                <td>Plain-language UI</td>
-                                <td class="col-wattseal icon-check">✓ Yes</td>
-                                <td class="icon-partial">Partial</td>
-                                <td class="icon-cross">✗ No</td>
-                                <td class="icon-cross">✗ No</td>
-                                <td class="icon-cross">✗ No</td>
                             </tr>
                             <tr>
                                 <td>Open Source</td>
@@ -718,85 +631,16 @@
             </div>
         </section>
 
-        <!-- Feature Breakdown -->
-        <section id="features">
-            <div class="container">
-                <div class="section-header">
-                    <h2>Built for Everyone</h2>
-                    <p>Designed to be instantly understandable, whether you're a gamer, a creative professional, or just conscious of your energy bill.</p>
-                </div>
-                
-                <div class="features-grid">
-                    <article class="feature-card">
-                        <div class="feature-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-                        </div>
-                        <h3>Real-Time Power Monitor</h3>
-                        <p>See your total PC consumption in watts, updated live. No technical knowledge needed to understand your baseline usage.</p>
-                        <!-- PLACEHOLDER: small UI screenshot detail for Real-Time -->
-                    </article>
-                    
-                    <article class="feature-card">
-                        <div class="feature-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-                        </div>
-                        <h3>Per-Application Breakdown</h3>
-                        <p>Instantly see which specific apps are costing you the most — measured in watts, converted to euros, and tracked in CO₂.</p>
-                        <!-- PLACEHOLDER: small UI screenshot detail for Per-App -->
-                    </article>
-                    
-                    <article class="feature-card">
-                        <div class="feature-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-                        </div>
-                        <h3>Carbon Footprint Tracker</h3>
-                        <p>Your physical power consumption is automatically converted to CO₂ based on your local electricity grid's intensity. Understand your real environmental impact.</p>
-                        <!-- PLACEHOLDER: small UI screenshot detail for Carbon -->
-                    </article>
-                    
-                    <article class="feature-card">
-                        <div class="feature-icon" aria-hidden="true">
-                            <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                        </div>
-                        <h3>Plain-Language Explanations</h3>
-                        <p>Every component and metric comes with a clear, accessible explanation. You absolutely don't need to know what a GPU is to use WattSeal effectively.</p>
-                        <!-- PLACEHOLDER: small UI screenshot detail for Explanations -->
-                    </article>
-                </div>
-
-                <div class="features-advanced">
-                    <h3 class="tier-title">Powerful for Advanced Users</h3>
-                    <div class="features-advanced-grid">
-                        <article class="feature-card-advanced">
-                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> Per-Component Breakdown</h4>
-                            <p>CPU, GPU, RAM, storage, and network interfaces are continuously and individually measured.</p>
-                        </article>
-                        <article class="feature-card-advanced">
-                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> Time Granularity</h4>
-                            <p>Switch instantly between real-time, 1-minute average, 1-hour average, or define completely custom time ranges.</p>
-                        </article>
-                        <article class="feature-card-advanced">
-                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg> Data Export</h4>
-                            <p>Export your full consumption history directly as CSV or JSON formats for your own custom analysis workflows.</p>
-                        </article>
-                        <article class="feature-card-advanced">
-                            <h4><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg> Database Access</h4>
-                            <p>Direct, unencrypted access to the underlying SQLite database for highly custom queries and 3rd-party integrations.</p>
-                        </article>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         <!-- How It Works -->
         <section id="technical" class="prose-section">
             <div class="container">
                 <div class="section-header">
-                    <h2>How It Actually Works</h2>
+                    <span class="badge" id="techBadge">Under the Hood</span>
+                    <h2 id="techTitle">How It Actually Works</h2>
                 </div>
-                <p>Under the hood, WattSeal relies on a highly optimized, lightweight background process. This daemon continuously reads hardware telemetry directly from the source using standardized interfaces: RAPL (Running Average Power Limit) for Intel and AMD CPUs, NVML for NVIDIA graphics cards, and equivalent sysfs/driver sources for AMD GPUs.</p>
-                <p>To accurately attribute this system-wide power consumption to individual applications, WattSeal utilizes kernel-level process accounting. It tracks the exact hardware utilization of every active process thread and maps it proportionally against the global power draw. This correlated data is then surfaced to the user interface via fast, low-overhead Inter-Process Communication (IPC).</p>
-                <p>Privacy and performance are foundational. All historical data is stored completely locally in a standardized SQLite database. Your telemetry never leaves your machine. There are no cloud accounts required, absolutely no tracking pixels, and zero external analytics. WattSeal is entirely open source, allowing any developer to independently verify these claims.</p>
+                <p id="techP1">WattSeal runs a lightweight background daemon that reads hardware telemetry directly from RAPL (Intel/AMD CPUs), NVML (NVIDIA GPUs), and ADLX (AMD GPUs). For components without built-in energy sensors — RAM, disk, and network — power draw is estimated from usage activity.</p>
+                <p id="techP2">To attribute power to individual apps, WattSeal uses process accounting — tracking hardware utilization per thread and mapping it proportionally against measured power draw. Readings are validated against real hardware measurements using a smart plug.</p>
+                <p id="techP3">All data is stored locally in SQLite. No cloud accounts, no tracking pixels, no analytics. WattSeal is 100% open source — verify every claim yourself.</p>
             </div>
         </section>
 
@@ -804,29 +648,34 @@
         <section id="download" class="download-section">
             <div class="container">
                 <div class="section-header">
-                    <h2>Get WattSeal Free</h2>
-                    <p>Start monitoring your PC's power consumption today.</p>
+                    <h2 id="downloadTitle">Get WattSeal Free</h2>
+                    <p id="downloadIntro">Start monitoring your PC's power consumption today.</p>
                 </div>
                 
                 <div class="os-buttons" id="download-buttons">
-                    <!-- Buttons will be reordered by JS based on OS -->
-                    <a href="https://download-tracker.rien8894.workers.dev/download/windows" class="btn btn-os" data-os="Windows" onclick="trackClick('download_windows')">
-                        <!-- PLACEHOLDER: Windows Logo SVG -->
-                        <svg viewBox="0 0 24 24"><path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-13.051-1.85z"/></svg>
-                        Download for Windows (.msi)
+                    <a href="https://download-tracker.rien8894.workers.dev/download/windows" class="btn btn-os" data-os="Windows">
+                        <img src="windows.svg" alt="" width="24" height="24" aria-hidden="true">
+                        Download for Windows (.exe)
                     </a>
                     
-                    <a href="https://download-tracker.rien8894.workers.dev/download/mac" class="btn btn-os" data-os="macOS" onclick="trackClick('download_mac')">
-                        <!-- PLACEHOLDER: Apple Logo SVG -->
-                        <svg viewBox="0 0 24 24"><path d="M14.28 2.31a4.26 4.26 0 0 0-1.29 3 4.41 4.41 0 0 0 1.34 2.94 4.09 4.09 0 0 0 2.9 1.25 3.73 3.73 0 0 0 1.27-2.91 4.34 4.34 0 0 0-1.35-2.93 4.15 4.15 0 0 0-2.87-1.35zM15 21.69c-1.31 0-2.45-.64-3.56-.64s-2.22.64-3.56.64c-1.8 0-3.51-1.37-4.52-2.94-2.12-3.23-2.31-7.85-1.09-10.43a4.72 4.72 0 0 1 4.1-2.43c1.29 0 2.44.66 3.25.66.85 0 2.06-.69 3.41-.69 1.54 0 3 .61 3.94 1.8A4.47 4.47 0 0 0 14 11.23a4.63 4.63 0 0 0 2.59 4.15 10.94 10.94 0 0 1-1.59 6.31z"/></svg>
-                        Download for macOS (.dmg)
+                    <a href="https://download-tracker.rien8894.workers.dev/download/mac" class="btn btn-os" data-os="macOS">
+                        <img src="apple.svg" alt="" width="24" height="24" aria-hidden="true">
+                        Download for macOS (Apple Silicon)
                     </a>
                     
-                    <a href="https://download-tracker.rien8894.workers.dev/download/linux" class="btn btn-os" data-os="Linux" onclick="trackClick('download_linux')">
-                        <!-- PLACEHOLDER: Linux Tux/Penguin SVG -->
-                        <svg viewBox="0 0 24 24"><path d="M12 2C8.69 2 6 4.69 6 8c0 2.45 1.5 4.54 3.63 5.46C9.22 13.9 9 14.43 9 15c0 1.66 1.34 3 3 3s3-1.34 3-3c0-.57-.22-1.1-.63-1.54C16.5 12.54 18 10.45 18 8c0-3.31-2.69-6-6-6zm0 2c2.21 0 4 1.79 4 4s-1.79 4-4 4-4-1.79-4-4 1.79-4 4-4zm-4 7.21V12h8v-.79c.92.83 1.5 2.05 1.5 3.41 0 2.5-2 4.5-4.5 4.5h-2C8.5 19.12 6.5 17.12 6.5 14.62c0-1.36.58-2.58 1.5-3.41z"/></svg>
-                        Download for Linux (.AppImage)
+                    <a href="https://download-tracker.rien8894.workers.dev/download/linux" class="btn btn-os" data-os="Linux">
+                        <img src="linux.svg" alt="" width="24" height="24" aria-hidden="true">
+                        Download for Linux
                     </a>
+
+                    <div id="mobile-cta" class="mobile-cta" style="display:none">
+                        <p>WattSeal is a desktop app</p>
+                        <p>It monitors your PC's power consumption in real time. You'll need a Windows, macOS, or Linux computer to run it.</p>
+                        <button class="btn btn-primary" onclick="doShare(this)">
+                            📤 Send to my PC
+                        </button>
+                        <p class="mobile-cta-hint" id="copy-feedback">Opens your share sheet, or copies the link to your clipboard.</p>
+                    </div>
                 </div>
                 
                 <p class="download-promise">Always free. Always open source. No telemetry. Your data stays on your machine.</p>
@@ -841,128 +690,170 @@
                 </div>
                 <div class="faq-list">
                     <details>
-                        <summary aria-expanded="false">How much electricity does an average PC use per year?</summary>
+                        <summary>How much electricity does an average PC use per year?</summary>
                         <p>A typical desktop PC consumes between 80W and 400W depending on usage. Over a year of daily use, that equals roughly 200 to 1000 kWh, which costs between €30 and €180 in electricity in Europe.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">How does WattSeal measure power consumption per application?</summary>
-                        <p>WattSeal runs a lightweight background process that reads hardware telemetry directly via RAPL and NVML interfaces. It then uses kernel-level process accounting to accurately attribute the measured power draw to individual running applications in real time.</p>
+                        <summary>How does WattSeal measure power consumption per application?</summary>
+                        <p>WattSeal reads hardware energy counters to measure real power draw, then uses process-level accounting to determine how much each running application is responsible for — all updated in real time. See the <a href="#technical">technical details</a> section for more.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Can WattSeal show me my carbon footprint from using my PC?</summary>
-                        <p>Yes. WattSeal includes a native carbon footprint tracker that automatically converts your physical power consumption into CO₂ equivalents based on the carbon intensity of your local electricity grid.</p>
+                        <summary>Can WattSeal show me my carbon footprint from using my PC?</summary>
+                        <p>Yes. WattSeal includes a native carbon footprint tracker that automatically converts your physical power consumption into CO₂ equivalents based on the carbon intensity of your local electricity grid. You can choose your region's carbon intensity for accurate results.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Does WattSeal work with AMD CPUs and NVIDIA GPUs at the same time?</summary>
+                        <summary>Does WattSeal work with AMD CPUs and NVIDIA GPUs at the same time?</summary>
                         <p>Yes, WattSeal is entirely cross-vendor compatible. It natively supports hardware from AMD, Intel, and NVIDIA simultaneously, reading the appropriate sensor data regardless of your system configuration.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Will WattSeal itself use significant power or slow my PC down?</summary>
-                        <p>No. WattSeal is engineered in Rust specifically to be extremely lightweight. It operates with near-zero overhead, ensuring that the monitoring tool itself does not contribute to your system's power consumption or degrade performance.</p>
+                        <summary>Will WattSeal itself slow my PC down?</summary>
+                        <p>No. WattSeal is engineered in Rust specifically to be extremely lightweight. It operates with near-zero overhead, ensuring the monitoring tool itself does not contribute to your power consumption or degrade performance.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">How is WattSeal different from HWiNFO or MSI Afterburner?</summary>
-                        <p>Unlike HWiNFO or MSI Afterburner which focus primarily on hardware sensor readouts or overlays, WattSeal links hardware power draw directly to individual software processes. It shows you exactly which app is costing you money, rather than just showing total system load.</p>
+                        <summary>What languages does WattSeal support?</summary>
+                        <p>WattSeal currently supports English and French, with a fully localized interface for each language. More languages are planned based on community demand.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Is WattSeal free and open source?</summary>
-                        <p>Yes, WattSeal is 100% free and open-source software built by the community. You can review the entire source code on GitHub, and your local telemetry data never leaves your machine.</p>
+                        <summary>Can I customize the carbon intensity for my region?</summary>
+                        <p>Yes. WattSeal lets you select your local electricity grid's carbon intensity so your CO₂ calculations are accurate — whether you're on a clean nuclear grid like France or a coal-heavy grid like Poland.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Can I export my power consumption history?</summary>
-                        <p>Yes, WattSeal allows you to easily export your complete consumption history. Advanced users can export data as CSV or JSON, or directly access the local SQLite database for completely custom analytics.</p>
+                        <summary>Is WattSeal free and open source?</summary>
+                        <p>Yes, WattSeal is 100% free and open-source software (GPLv3). Review the entire source code on GitHub. Your telemetry data never leaves your machine.</p>
                     </details>
                     <details>
-                        <summary aria-expanded="false">Does WattSeal work on laptops as well as desktops?</summary>
-                        <p>Yes, WattSeal works seamlessly on both laptops and desktop PCs. On laptops, it can be particularly useful for identifying battery-draining applications that are secretly consuming power in the background.</p>
+                        <summary>Can I access my power consumption data?</summary>
+                        <p>Yes. WattSeal stores all data in a local SQLite database that you can query directly for custom analytics and third-party integrations. Your data is always yours — nothing is sent to the cloud.</p>
                     </details>
                 </div>
             </div>
         </section>
     </main>
 
-    <!-- Footer -->
+    <!-- Footer — compact & symmetric -->
     <footer>
         <div class="container">
-            <div class="footer-content">
-                <div class="footer-about">
-                    <strong>
-                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linejoin="round" fill="none"/></svg>
-                        WattSeal
-                    </strong>
-                    <p>WattSeal is the world's first open source real-time PC power consumption monitor with a native per-application breakdown. Built entirely in Rust for near-zero overhead on Windows, macOS, and Linux, it helps users track their carbon footprint and reduce their electricity bills by making hidden energy usage visible.</p>
+            <div class="footer-inner">
+                <div class="footer-brand">
+                    <img src="icon.svg" alt="" width="24" height="24" aria-hidden="true">
+                    WattSeal
                 </div>
-                
-                <div class="footer-col">
-                    <h4>Project</h4>
-                    <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer">GitHub Repository</a>
+                <div class="footer-links">
+                    <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer">GitHub</a>
                     <a href="https://github.com/Daminoup88/WattSeal/releases" target="_blank" rel="noopener noreferrer">Releases</a>
-                </div>
-                
-                <div class="footer-col">
-                    <h4>Community & Legal</h4>
-                    <a href="https://github.com/Daminoup88/WattSeal/issues" target="_blank" rel="noopener noreferrer">Report an Issue</a>
+                    <a href="https://github.com/Daminoup88/WattSeal/issues" target="_blank" rel="noopener noreferrer">Report Issue</a>
                     <a href="https://github.com/Daminoup88/WattSeal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License (GPLv3)</a>
                 </div>
-            </div>
-            
-            <div class="footer-bottom">
-                &copy; <span id="year"></span> WattSeal Contributors. Open Source Software.
+                <div class="footer-copy">&copy; <span id="year"></span> WattSeal Contributors</div>
             </div>
         </div>
     </footer>
 
-    <!-- Scripts -->
     <script defer>
-        // Update Copyright Year
         document.getElementById('year').textContent = new Date().getFullYear();
 
-        // Custom Event Tracking Logic for Umami/Plausible
-        function trackClick(actionName) {
-            const platform = getOS();
-            const eventDetails = { detail: { action: actionName, platform: platform } };
-            window.dispatchEvent(new CustomEvent('cta_click', eventDetails));
-        }
-
-        // OS Detection and Dynamic Button Rendering
         function getOS() {
-            const userAgent = window.navigator.userAgent || window.navigator.vendor || window.opera;
-            if (/windows phone/i.test(userAgent) || /win/i.test(userAgent)) return "Windows";
-            if (/mac/i.test(userAgent)) return "macOS";
-            if (/linux/i.test(userAgent)) return "Linux";
-            return "Windows"; // Default fallback
+            var ua = navigator.userAgent || '';
+            if (/android/i.test(ua)) return 'Android';
+            if (/iphone|ipad|ipod/i.test(ua)) return 'iOS';
+            if (/windows phone/i.test(ua)) return 'Windows';
+            if (/win/i.test(ua)) return 'Windows';
+            if (/mac/i.test(ua)) return 'macOS';
+            if (/linux/i.test(ua)) return 'Linux';
+            return 'Windows';
         }
 
-        function setupOSSpecifics() {
-            const currentOS = getOS();
-            const container = document.getElementById('download-buttons');
-            const buttons = Array.from(container.children);
-            const heroBtn = document.getElementById('hero-download-btn');
-
-            let primaryBtn = buttons.find(btn => btn.getAttribute('data-os') === currentOS);
-            
-            if (primaryBtn) {
-                primaryBtn.classList.add('primary-os');
-                container.insertBefore(primaryBtn, container.firstChild);
-                
-                heroBtn.href = primaryBtn.href;
-                heroBtn.innerHTML = primaryBtn.innerHTML; 
-                
-                const textNode = Array.from(heroBtn.childNodes).find(node => node.nodeType === Node.TEXT_NODE && node.textContent.trim().length > 0);
-                if(textNode) {
-                   textNode.textContent = ` Download for ${currentOS}`;
-                }
+        function doShare(triggerEl) {
+            var url = 'https://wattseal.com';
+            if (navigator.share) {
+                navigator.share({ title: 'WattSeal', text: 'See your PC\u2019s real-time power consumption \u2014 free & open source.', url: url });
+            } else if (navigator.clipboard) {
+                navigator.clipboard.writeText(url).then(function(){
+                    var fb = document.getElementById('copy-feedback');
+                    if (fb) { var ot = fb.textContent; fb.textContent = '\u2713 Link copied!'; setTimeout(function(){ fb.textContent = ot; }, 2500); }
+                    if (triggerEl) { var oi = triggerEl.innerHTML; triggerEl.innerHTML = '\u2713 Copied!'; setTimeout(function(){ triggerEl.innerHTML = oi; }, 2500); }
+                });
             } else {
-                const winBtn = buttons.find(btn => btn.getAttribute('data-os') === 'Windows');
-                if(winBtn) winBtn.classList.add('primary-os');
+                window.location.href = '#download';
             }
         }
 
-        // Sticky Nav logic
-        let lastScrollY = window.scrollY;
-        const nav = document.getElementById('navbar');
-        
-        window.addEventListener('scroll', () => {
+        function setupOSSpecifics() {
+            var currentOS = getOS();
+            var container = document.getElementById('download-buttons');
+            if (!container) return;
+            var buttons = Array.from(container.querySelectorAll('.btn-os'));
+            var heroBtn = document.getElementById('hero-download-btn');
+            var mobileCta = document.getElementById('mobile-cta');
+            var isMobile = currentOS === 'Android' || currentOS === 'iOS';
+
+            if (isMobile) {
+                // Show share card above the desktop buttons (kept visible for testing)
+                if (mobileCta) {
+                    mobileCta.style.display = 'block';
+                    container.insertBefore(mobileCta, container.firstChild);
+                }
+                // Hero button — trigger share/copy immediately
+                if (heroBtn) {
+                    heroBtn.href = '#download';
+                    var existingImg = heroBtn.querySelector('img');
+                    if (existingImg) {
+                        var shareIcon = document.createElementNS('http://www.w3.org/2000/svg','svg');
+                        shareIcon.setAttribute('viewBox','0 0 24 24');
+                        shareIcon.setAttribute('width','20');
+                        shareIcon.setAttribute('height','20');
+                        shareIcon.setAttribute('fill','none');
+                        shareIcon.setAttribute('stroke','currentColor');
+                        shareIcon.setAttribute('stroke-width','2');
+                        shareIcon.setAttribute('stroke-linecap','round');
+                        shareIcon.setAttribute('stroke-linejoin','round');
+                        shareIcon.setAttribute('aria-hidden','true');
+                        shareIcon.innerHTML = '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>';
+                        existingImg.replaceWith(shareIcon);
+                    }
+                    var tNode = Array.from(heroBtn.childNodes).find(function(n){ return n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0; });
+                    if (tNode) tNode.textContent = ' Send to my PC';
+                    heroBtn.setAttribute('aria-label', 'Share WattSeal or copy link to your PC');
+                    heroBtn.addEventListener('click', function(e){ e.preventDefault(); doShare(heroBtn); });
+                }
+                // Nav Download button — also triggers share
+                var mobileNavBtn = document.getElementById('navDownload');
+                if (mobileNavBtn) {
+                    mobileNavBtn.addEventListener('click', function(e){ e.preventDefault(); doShare(null); });
+                }
+                return;
+            }
+
+            var primaryBtn = buttons.find(function(b){ return b.getAttribute('data-os') === currentOS; });
+            if (primaryBtn) {
+                primaryBtn.classList.add('primary-os');
+                container.insertBefore(primaryBtn, container.firstChild);
+                if (heroBtn) {
+                    heroBtn.href = primaryBtn.href;
+                    // copy icon if available
+                    var srcImg = primaryBtn.querySelector('img');
+                    if (srcImg) {
+                        var existing = heroBtn.querySelector('img');
+                        if (existing) {
+                            existing.src = srcImg.src;
+                            existing.alt = srcImg.alt;
+                        } else {
+                            heroBtn.insertBefore(srcImg.cloneNode(), heroBtn.firstChild);
+                        }
+                    }
+                    var textNode = Array.from(heroBtn.childNodes).find(function(n){ return n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0; });
+                    if (textNode) textNode.textContent = ' Download for ' + currentOS;
+                    heroBtn.setAttribute('aria-label','Download for ' + currentOS);
+                }
+            } else {
+                var winBtn = buttons.find(function(b){ return b.getAttribute('data-os') === 'Windows'; });
+                if (winBtn) winBtn.classList.add('primary-os');
+            }
+        }
+
+        var lastScrollY = window.scrollY;
+        var nav = document.getElementById('navbar');
+        window.addEventListener('scroll', function() {
             if (window.scrollY > lastScrollY && window.scrollY > 100) {
                 nav.classList.add('nav-hidden');
             } else {
@@ -971,21 +862,14 @@
             lastScrollY = window.scrollY;
         }, { passive: true });
 
-        // FAQ Accessibility Enhancements
-        const detailsElements = document.querySelectorAll('details');
-        detailsElements.forEach(detail => {
-            detail.addEventListener('toggle', (e) => {
-                const summary = detail.querySelector('summary');
-                if (detail.open) {
-                    summary.setAttribute('aria-expanded', 'true');
-                } else {
-                    summary.setAttribute('aria-expanded', 'false');
-                }
-            });
+        /* ------------------------------------------------------------------
+           INIT
+        ------------------------------------------------------------------ */
+        document.addEventListener('DOMContentLoaded', function(){
+            setupOSSpecifics();
+            renderFaq();
+            addFaqJsonLd();
         });
-
-        // Initialize OS logic on load
-        window.addEventListener('DOMContentLoaded', setupOSSpecifics);
     </script>
 </body>
 </html>
