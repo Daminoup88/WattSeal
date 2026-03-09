@@ -41,9 +41,9 @@
     <!-- Preconnect & Fonts — non-render-blocking -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=swap" rel="stylesheet"></noscript>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet"></noscript>
 
     <!-- Preload hero image -->
     <link rel="preload" as="image" href="dashboard.png" fetchpriority="high">
@@ -259,7 +259,7 @@
         .col-wattseal{background:rgba(0,204,230,0.05)}
         th.col-wattseal{color:var(--primary);border-top:2px solid var(--primary)}
         .icon-check{color:var(--green);font-weight:bold}
-        .icon-cross{color:rgba(230,242,255,0.3)}
+        .icon-cross{color:rgba(230,242,255,0.55)}
         .icon-partial{color:var(--yellow)}
 
         /* Advanced Features */
@@ -309,8 +309,8 @@
         .footer-links{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
         .footer-links a{color:rgba(230,242,255,0.6);font-size:.875rem;transition:color .2s}
         .footer-links a:hover{color:var(--primary)}
-        .footer-desc{color:rgba(230,242,255,0.5);font-size:.8125rem;line-height:1.5;margin:0}
-        .footer-copy{color:rgba(230,242,255,0.4);font-size:.8125rem}
+        .footer-desc{color:rgba(230,242,255,0.6);font-size:.8125rem;line-height:1.5;margin:0}
+        .footer-copy{color:rgba(230,242,255,0.6);font-size:.8125rem}
 
         @font-face {
             font-family: 'Outfit';
@@ -319,6 +319,15 @@
             size-adjust: 105%;
             ascent-override: 95%;
             descent-override: 20%;
+            line-gap-override: normal;
+        }
+        @font-face {
+            font-family: 'Inter';
+            src: local('Arial');
+            font-weight: 400 600;
+            size-adjust: 107%;
+            ascent-override: 90%;
+            descent-override: 22%;
             line-gap-override: normal;
         }
 
@@ -797,6 +806,7 @@
             var mobileCta = document.getElementById('mobile-cta');
             var isMobile = currentOS === 'Android' || currentOS === 'iOS';
 
+            requestAnimationFrame(function() {
             if (isMobile) {
                 // Show share card above the desktop buttons (kept visible for testing)
                 if (mobileCta) {
@@ -837,9 +847,7 @@
             var primaryBtn = buttons.find(function(b){ return b.getAttribute('data-os') === currentOS; });
             if (primaryBtn) {
                 primaryBtn.classList.add('primary-os');
-                requestAnimationFrame(function() {
-                    container.insertBefore(primaryBtn, container.firstChild);
-                });
+                container.insertBefore(primaryBtn, container.firstChild);
                 if (heroBtn) {
                     heroBtn.href = primaryBtn.href;
                     // copy icon if available
@@ -861,6 +869,7 @@
                 var winBtn = buttons.find(function(b){ return b.getAttribute('data-os') === 'Windows'; });
                 if (winBtn) winBtn.classList.add('primary-os');
             }
+            });
         }
 
         var lastScrollY = window.scrollY;
