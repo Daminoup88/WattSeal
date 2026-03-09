@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WattSeal — See Your PC's Real-Time Power Use, Electricity Cost & Carbon Footprint</title>
+    <title>WattSeal — Monitor Your PC's Real-Time Power Consumption</title>
     <meta name="description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source. AMD, Intel & NVIDIA supported.">
     <meta name="keywords" content="PC power consumption monitor, computer electricity usage tracker, PC carbon footprint software, how much electricity does my PC use, power usage per application Windows, real-time watt meter PC, reduce PC energy consumption, carbon footprint tracker, electricity cost calculator">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
@@ -14,7 +14,7 @@
     <!-- Open Graph / Facebook -->
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://wattseal.com/">
-    <meta property="og:title" content="WattSeal — See Your PC's Real-Time Power Use">
+    <meta property="og:title" content="WattSeal — Monitor Your PC's Real-Time Power Consumption">
     <meta property="og:description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source.">
     <meta property="og:image" content="https://wattseal.com/og-image.webp">
     <meta property="og:type" content="website">
@@ -25,7 +25,7 @@
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
     <meta property="twitter:url" content="https://wattseal.com/">
-    <meta property="twitter:title" content="WattSeal — See Your PC's Real-Time Power Use">
+    <meta property="twitter:title" content="WattSeal — Monitor Your PC's Real-Time Power Consumption">
     <meta property="twitter:description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source.">
     <meta property="twitter:image" content="https://wattseal.com/og-image.webp">
 
@@ -46,9 +46,8 @@
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet"></noscript>
 
     <!-- Preload hero image — per-breakpoint to match <picture> sources -->
-    <link rel="preload" as="image" href="dashboard-400.webp" media="(max-width: 768px)" fetchpriority="high">
-    <link rel="preload" as="image" href="dashboard-800.webp" media="(min-width: 769px) and (max-width: 1199px)" fetchpriority="high">
-    <link rel="preload" as="image" href="dashboard.png" media="(min-width: 1200px)" fetchpriority="high">
+    <link rel="preload" as="image" href="dashboard-800.webp" media="(max-width: 768px)" fetchpriority="high">
+    <link rel="preload" as="image" href="dashboard.png" media="(min-width: 769px)" fetchpriority="high">
 
     <!-- JSON-LD: SoftwareApplication -->
     <script type="application/ld+json">
@@ -397,9 +396,8 @@
 
                 <div class="hero-image-wrapper">
                     <picture>
-                        <source media="(max-width: 768px)" srcset="dashboard-400.webp" type="image/webp">
-                        <source media="(min-width: 769px) and (max-width: 1199px)" srcset="dashboard-800.webp" type="image/webp">
-                        <source media="(min-width: 1200px)" srcset="dashboard.png" type="image/png">
+                        <source media="(max-width: 768px)" srcset="dashboard-800.webp" type="image/webp">
+                        <source media="(min-width: 769px)" srcset="dashboard.png" type="image/png">
                         <img src="dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="1200" height="750" fetchpriority="high" style="width:100%;height:auto">
                     </picture>
                 </div>
@@ -792,7 +790,7 @@
         function doShare(triggerEl) {
             var url = 'https://wattseal.com';
             if (navigator.share) {
-                navigator.share({ title: 'WattSeal', text: 'See your PC\u2019s real-time power consumption \u2014 free & open source.', url: url });
+                navigator.share({ title: 'WattSeal', text: 'Monitor your PC\u2019s real-time power consumption \u2014 free & open source.', url: url });
             } else if (navigator.clipboard) {
                 navigator.clipboard.writeText(url).then(function(){
                     var fb = document.getElementById('copy-feedback');
