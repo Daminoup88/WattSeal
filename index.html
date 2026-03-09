@@ -1,14 +1,14 @@
 <!DOCTYPE html>
-<html lang="en" class="scroll-smooth">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>WattSeal — See Your PC's Real-Time Power Use, Electricity Cost & Carbon Footprint</title>
     <meta name="description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source. AMD, Intel & NVIDIA supported.">
-    <meta name="description" lang="fr" content="Découvrez exactement combien d'électricité votre PC consomme — par application, par composant, en temps réel. Suivez votre empreinte carbone, réduisez votre facture énergétique. Gratuit, open‑source. Prend en charge AMD, Intel et NVIDIA.">
     <meta name="keywords" content="PC power consumption monitor, computer electricity usage tracker, PC carbon footprint software, how much electricity does my PC use, power usage per application Windows, real-time watt meter PC, reduce PC energy consumption, carbon footprint tracker, electricity cost calculator">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">
-    <meta name="author" content="Damien PHILIPPE & Paul MALLARD">
+    <meta name="application-name" content="WattSeal">
+    <meta name="author" content="Damien PHILIPPE">
     <meta name="theme-color" content="#0d1221">
 
     <!-- Open Graph / Facebook -->
@@ -17,10 +17,9 @@
     <meta property="og:title" content="WattSeal — See Your PC's Real-Time Power Use">
     <meta property="og:description" content="Find out exactly how much electricity your PC consumes — by app, by component, in real time. Track your carbon footprint, cut your energy bill. Free, open-source.">
     <meta property="og:image" content="https://wattseal.com/og-image.webp">
-    <meta property="og:type" content="website" />
+    <meta property="og:type" content="website"/>
     <meta property="og:site_name" content="WattSeal">
     <meta property="og:locale" content="en_US">
-    <meta property="og:locale:alternate" content="fr_FR">
 
     <!-- Twitter -->
     <meta property="twitter:card" content="summary_large_image">
@@ -36,6 +35,7 @@
     <link rel="alternate" hreflang="x-default" href="https://wattseal.com/">
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary">
     <link rel="icon" href="icon.svg" type="image/svg+xml">
+    <link rel="me" href="https://github.com/Daminoup88">
 
     <!-- Preconnect & Fonts — non-render-blocking -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -62,16 +62,10 @@
       },
       "description": "The world's first real-time PC total power consumption monitor with per-component and per-application breakdown. Track carbon footprint and electricity cost natively. Available in English and French.",
       "url": "https://wattseal.com",
-      "softwareVersion": "1.0",
       "inLanguage": ["en", "fr"],
       "author": {
         "@type": "Person",
-        "name": "Damien PHILIPPE & Paul MALLARD"
-      },
-      "aggregateRating": {
-        "@type": "AggregateRating",
-        "ratingValue": "5",
-        "ratingCount": "50"
+        "name": "Damien PHILIPPE"
       }
     }
     </script>
@@ -159,7 +153,7 @@
             --font-m: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
         }
         *{margin:0;padding:0;box-sizing:border-box}
-        html{overflow-x:hidden}
+        html{scroll-behavior: smooth;overflow-x:hidden}
         body{font-family:var(--font-b);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
         h1,h2,h3,h4{font-family:var(--font-d);line-height:1.2}
         p{margin-bottom:1.5rem;color:rgba(230,242,255,0.85)}
@@ -307,12 +301,14 @@
 
         /* Footer — compact & symmetric */
         footer{padding:2.5rem 0 1.5rem;border-top:1px solid var(--card-b);background:rgba(0,0,0,0.15)}
-        .footer-inner{display:flex;justify-content:space-between;align-items:center;gap:2rem;flex-wrap:wrap}
+        .footer-inner{display:flex;flex-direction:column;gap:1rem}
+        .footer-top{display:flex;justify-content:space-between;align-items:center;gap:2rem;flex-wrap:wrap}
         .footer-brand{display:flex;align-items:center;gap:.5rem;font-family:var(--font-d);font-weight:700;font-size:1.125rem;color:var(--text)}
         .footer-brand svg{width:24px;height:24px;fill:var(--primary)}
         .footer-links{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
         .footer-links a{color:rgba(230,242,255,0.6);font-size:.875rem;transition:color .2s}
         .footer-links a:hover{color:var(--primary)}
+        .footer-desc{color:rgba(230,242,255,0.5);font-size:.8125rem;line-height:1.5;margin:0}
         .footer-copy{color:rgba(230,242,255,0.4);font-size:.8125rem}
 
         /* Responsive */
@@ -327,7 +323,7 @@
             .nav-actions .btn-secondary{display:none}
             section{padding:4rem 0}
             .trust-items{gap:1.5rem}
-            .footer-inner{flex-direction:column;text-align:center}
+            .footer-top{flex-direction:column;text-align:center}
             .footer-links{justify-content:center}
         }
     </style>
@@ -384,7 +380,7 @@
         </header>
 
         <!-- Trust Bar -->
-        <div class="trust-bar" aria-label="Trust indicators">
+        <div class="trust-bar" role="region" aria-label="Trust indicators">
             <div class="container">
                 <div class="trust-items">
                     <div class="trust-item" id="trust1">
@@ -653,17 +649,17 @@
                 </div>
                 
                 <div class="os-buttons" id="download-buttons">
-                    <a href="https://download-tracker.rien8894.workers.dev/download/windows" class="btn btn-os" data-os="Windows">
+                    <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-windows.exe" class="btn btn-os" data-os="Windows">
                         <img src="windows.svg" alt="" width="24" height="24" aria-hidden="true">
                         Download for Windows (.exe)
                     </a>
                     
-                    <a href="https://download-tracker.rien8894.workers.dev/download/mac" class="btn btn-os" data-os="macOS">
+                    <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-macos" class="btn btn-os" data-os="macOS">
                         <img src="apple.svg" alt="" width="24" height="24" aria-hidden="true">
                         Download for macOS (Apple Silicon)
                     </a>
                     
-                    <a href="https://download-tracker.rien8894.workers.dev/download/linux" class="btn btn-os" data-os="Linux">
+                    <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-linux" class="btn btn-os" data-os="Linux">
                         <img src="linux.svg" alt="" width="24" height="24" aria-hidden="true">
                         Download for Linux
                     </a>
@@ -734,22 +730,25 @@
     <footer>
         <div class="container">
             <div class="footer-inner">
-                <div class="footer-brand">
-                    <img src="icon.svg" alt="" width="24" height="24" aria-hidden="true">
-                    WattSeal
+                <div class="footer-top">
+                    <div class="footer-brand">
+                        <img src="icon.svg" alt="" width="24" height="24" aria-hidden="true">
+                        WattSeal
+                    </div>
+                    <div class="footer-links">
+                        <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer">GitHub</a>
+                        <a href="https://github.com/Daminoup88/WattSeal/releases" target="_blank" rel="noopener noreferrer">Releases</a>
+                        <a href="https://github.com/Daminoup88/WattSeal/issues" target="_blank" rel="noopener noreferrer">Report Issue</a>
+                        <a href="https://github.com/Daminoup88/WattSeal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License (GPLv3)</a>
+                    </div>
+                    <div class="footer-copy">&copy; <span id="year"></span> WattSeal Contributors</div>
                 </div>
-                <div class="footer-links">
-                    <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer">GitHub</a>
-                    <a href="https://github.com/Daminoup88/WattSeal/releases" target="_blank" rel="noopener noreferrer">Releases</a>
-                    <a href="https://github.com/Daminoup88/WattSeal/issues" target="_blank" rel="noopener noreferrer">Report Issue</a>
-                    <a href="https://github.com/Daminoup88/WattSeal/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License (GPLv3)</a>
-                </div>
-                <div class="footer-copy">&copy; <span id="year"></span> WattSeal Contributors</div>
+                <p class="footer-desc">WattSeal is the world's first open-source real-time PC power consumption monitor with per-application and per-component breakdown. Track your electricity cost and carbon footprint on Windows, macOS, and Linux — with AMD, Intel, and NVIDIA support.</p>
             </div>
         </div>
     </footer>
 
-    <script defer>
+    <script>
         document.getElementById('year').textContent = new Date().getFullYear();
 
         function getOS() {
@@ -867,8 +866,6 @@
         ------------------------------------------------------------------ */
         document.addEventListener('DOMContentLoaded', function(){
             setupOSSpecifics();
-            renderFaq();
-            addFaqJsonLd();
         });
     </script>
 </body>
