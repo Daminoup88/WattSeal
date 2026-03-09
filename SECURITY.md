@@ -8,11 +8,7 @@ Make sure to always use the latest version of WattSeal, as it includes the most 
 
 If you discover a security vulnerability in WattSeal, **please do not open a public issue**, share it to other users, or take advantage of it.
 
-Instead, email us at **damien.philippe@edu.esiee.fr** with:
-
-- A description of the vulnerability
-- Steps to reproduce it
-- Any potential impact you've identified
+Instead, use the [vulnerabilities reporting](https://github.com/Daminoup88/WattSeal/security/advisories/new) feature and fill the form with any relevant information that you have.
 
 We'll acknowledge your report within 48 hours and work with you to understand and address the issue. Once a fix is released, we'll credit you in the release notes (unless you prefer to stay anonymous).
 

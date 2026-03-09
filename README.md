@@ -4,6 +4,8 @@
 
 WattSeal shows you a live breakdown of power consumption of your PC, by component and by app. Monitor which hardware is drawing the most energy, which apps are the biggest energy hogs, and how your usage changes over time.
 
+Available in English and French.
+
 [![Windows](https://img.shields.io/badge/Windows-x86__64-0078D4?style=flat-square&logo=windows)](https://github.com/daminoup88/wattseal/releases)
 [![Linux](https://img.shields.io/badge/Linux-x86__64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/daminoup88/wattseal/releases)
 [![macOS](https://img.shields.io/badge/macOS-aarch64-000000?style=flat-square&logo=apple)](https://github.com/daminoup88/wattseal/releases)
