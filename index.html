@@ -45,8 +45,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet" media="print" onload="this.media='all'">
     <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet"></noscript>
 
-    <!-- Preload hero image -->
-    <link rel="preload" as="image" href="dashboard.png" imagesrcset="dashboard-400.webp 400w, dashboard-800.webp 800w, dashboard.png 1200w" imagesizes="(max-width: 768px) calc(100vw - 3rem), 1170px" fetchpriority="high">
+    <!-- Preload hero image — per-breakpoint to match <picture> sources -->
+    <link rel="preload" as="image" href="dashboard-400.webp" media="(max-width: 768px)" fetchpriority="high">
+    <link rel="preload" as="image" href="dashboard-800.webp" media="(min-width: 769px) and (max-width: 1199px)" fetchpriority="high">
+    <link rel="preload" as="image" href="dashboard.png" media="(min-width: 1200px)" fetchpriority="high">
 
     <!-- JSON-LD: SoftwareApplication -->
     <script type="application/ld+json">
@@ -149,7 +151,7 @@
             --yellow: #d9ff4d;
             --card-bg: rgba(230,242,255,0.03);
             --card-b: rgba(230,242,255,0.08);
-            --font-d: 'Outfit',system-ui,sans-serif;
+            --font-d: 'Outfit','Outfit Fallback',system-ui,sans-serif;
             --font-b: 'Inter',system-ui,sans-serif;
             --font-m: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
         }
@@ -313,12 +315,11 @@
         .footer-copy{color:rgba(230,242,255,0.6);font-size:.8125rem}
 
         @font-face {
-            font-family: 'Outfit';
+            font-family: 'Outfit Fallback';
             src: local('Arial');
-            font-weight: 400 800;
-            size-adjust: 105%;
-            ascent-override: 95%;
-            descent-override: 20%;
+            size-adjust: 103%;
+            ascent-override: 94%;
+            descent-override: 22%;
             line-gap-override: normal;
         }
         @font-face {
@@ -394,7 +395,12 @@
                 </div>
 
                 <div class="hero-image-wrapper">
-                    <img src="dashboard.png" srcset="dashboard-400.webp 400w, dashboard-800.webp 800w, dashboard.png 1200w" sizes="(max-width: 768px) calc(100vw - 3rem), 1170px" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="1200" height="750" fetchpriority="high" style="width:100%;height:auto">
+                    <picture>
+                        <source media="(max-width: 768px)" srcset="dashboard-400.webp" type="image/webp">
+                        <source media="(min-width: 769px) and (max-width: 1199px)" srcset="dashboard-800.webp" type="image/webp">
+                        <source media="(min-width: 1200px)" srcset="dashboard.png" type="image/png">
+                        <img src="dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="1200" height="750" fetchpriority="high" style="width:100%;height:auto">
+                    </picture>
                 </div>
             </div>
         </header>
