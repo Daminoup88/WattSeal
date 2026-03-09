@@ -189,7 +189,7 @@
 
         /* Hero */
         .hero{padding:10rem 0 5rem;text-align:center;position:relative}
-        .hero::before{content:'';position:absolute;top:-20%;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(0,204,230,0.1) 0%,rgba(13,18,33,0) 70%);z-index:-1;pointer-events:none}
+        .hero::before{content:'';position:fixed;top:0;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(0,204,230,0.1) 0%,rgba(13,18,33,0) 70%);z-index:-1;pointer-events:none}
         .hero h1{font-size:clamp(2.5rem,5vw,4.5rem);margin-bottom:1.5rem;letter-spacing:-.02em}
         .hero h1 span{color:var(--primary)}
         .hero p.subhead{font-size:1.25rem;max-width:700px;margin:0 auto 2.5rem;color:rgba(230,242,255,0.9)}
@@ -252,6 +252,7 @@
 
         /* Table */
         .table-wrapper{overflow-x:auto;background:var(--card-bg);border:1px solid var(--card-b);border-radius:12px;margin-top:3rem}
+        #features,#why,#compare,#technical,#faq{content-visibility:auto;contain-intrinsic-size:0 600px}
         table{width:100%;border-collapse:collapse;text-align:left}
         th,td{padding:1.25rem 1.5rem;border-bottom:1px solid var(--card-b)}
         th{font-family:var(--font-d);font-weight:600;background:rgba(13,18,33,0.5);color:rgba(230,242,255,0.9);white-space:nowrap}
@@ -562,7 +563,7 @@
                     <h2>The Most Comprehensive Monitor</h2>
                     <p>See how WattSeal compares to standard system utilities and hardware monitors.</p>
                 </div>
-                <div class="table-wrapper">
+                <div class="table-wrapper" style="content-visibility:auto;contain-intrinsic-size:0 400px">
                     <table aria-label="Feature comparison between WattSeal and other PC monitoring tools">
                         <thead>
                             <tr>
@@ -805,14 +806,13 @@
 
         function setupOSSpecifics() {
             var currentOS = getOS();
+            requestAnimationFrame(function() {
             var container = document.getElementById('download-buttons');
             if (!container) return;
             var buttons = Array.from(container.querySelectorAll('.btn-os'));
             var heroBtn = document.getElementById('hero-download-btn');
             var mobileCta = document.getElementById('mobile-cta');
             var isMobile = currentOS === 'Android' || currentOS === 'iOS';
-
-            requestAnimationFrame(function() {
             if (isMobile) {
                 // Show share card above the desktop buttons (kept visible for testing)
                 if (mobileCta) {
