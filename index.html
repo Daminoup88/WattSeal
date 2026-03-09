@@ -192,7 +192,7 @@
         .hero h1 span{color:var(--primary)}
         .hero p.subhead{font-size:1.25rem;max-width:700px;margin:0 auto 2.5rem;color:rgba(230,242,255,0.9)}
         .hero-ctas{display:flex;justify-content:center;align-items:center;gap:1.5rem;margin-bottom:2rem;flex-wrap:wrap}
-        .hero-proof{font-size:.875rem;color:rgba(230,242,255,0.6);display:flex;justify-content:center;align-items:center;gap:.5rem;flex-wrap:wrap}
+        .hero-proof{font-size:.875rem;color:rgba(230,242,255,0.75);display:flex;justify-content:center;align-items:center;gap:.5rem;flex-wrap:wrap}
         .hero-image-wrapper{margin-top:3rem;position:relative;border-radius:12px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);border:1px solid var(--card-b)}
 
         /* Trust Bar */
@@ -311,6 +311,16 @@
         .footer-links a:hover{color:var(--primary)}
         .footer-desc{color:rgba(230,242,255,0.5);font-size:.8125rem;line-height:1.5;margin:0}
         .footer-copy{color:rgba(230,242,255,0.4);font-size:.8125rem}
+
+        @font-face {
+            font-family: 'Outfit';
+            src: local('Arial');
+            font-weight: 400 800;
+            size-adjust: 105%;
+            ascent-override: 95%;
+            descent-override: 20%;
+            line-gap-override: normal;
+        }
 
         /* Responsive */
         @media(max-width:1024px){
@@ -827,7 +837,9 @@
             var primaryBtn = buttons.find(function(b){ return b.getAttribute('data-os') === currentOS; });
             if (primaryBtn) {
                 primaryBtn.classList.add('primary-os');
-                container.insertBefore(primaryBtn, container.firstChild);
+                requestAnimationFrame(function() {
+                    container.insertBefore(primaryBtn, container.firstChild);
+                });
                 if (heroBtn) {
                     heroBtn.href = primaryBtn.href;
                     // copy icon if available
