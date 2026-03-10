@@ -368,7 +368,7 @@
             <div class="nav-actions">
                 <a href="https://github.com/Daminoup88/WattSeal" target="_blank" rel="noopener noreferrer" id="navStar" class="btn btn-secondary btn-sm" aria-label="Star Daminoup88/WattSeal on GitHub">
                     <img src="github.svg" alt="GitHub" width="20" height="20" aria-hidden="true" style="filter:invert(100%) sepia(100%) grayscale(100%) brightness(150%)">
-                    Star
+                    GitHub
                 </a>
                 <a href="#download" id="navDownload" class="btn btn-primary btn-sm" aria-label="Scroll to download section">Download</a>
             </div>
@@ -701,7 +701,12 @@
                         <p>WattSeal is a desktop app</p>
                         <p>It monitors your PC's power consumption in real time. You'll need a Windows, macOS, or Linux computer to run it.</p>
                         <button class="btn btn-primary" onclick="doShare(this)">
-                            📤 Send to my PC
+                            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                                <polyline points="16 6 12 2 8 6"/>
+                                <line x1="12" y1="2" x2="12" y2="15"/>
+                            </svg>
+                            Send to my PC
                         </button>
                         <p class="mobile-cta-hint" id="copy-feedback">Opens your share sheet, or copies the link to your clipboard.</p>
                     </div>
@@ -830,18 +835,13 @@
                     heroBtn.href = '#download';
                     var existingImg = heroBtn.querySelector('img');
                     if (existingImg) {
-                        var shareIcon = document.createElementNS('https://www.w3.org/2000/svg','svg');
-                        shareIcon.setAttribute('viewBox','0 0 24 24');
-                        shareIcon.setAttribute('width','20');
-                        shareIcon.setAttribute('height','20');
-                        shareIcon.setAttribute('fill','none');
-                        shareIcon.setAttribute('stroke','currentColor');
-                        shareIcon.setAttribute('stroke-width','2');
-                        shareIcon.setAttribute('stroke-linecap','round');
-                        shareIcon.setAttribute('stroke-linejoin','round');
-                        shareIcon.setAttribute('aria-hidden','true');
-                        shareIcon.innerHTML = '<path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>';
-                        existingImg.replaceWith(shareIcon);
+                        var sourceSvg = document.querySelector('#mobile-cta button svg');
+                        if (sourceSvg) {
+                            var shareIcon = sourceSvg.cloneNode(true);
+                            shareIcon.setAttribute('width','20');
+                            shareIcon.setAttribute('height','20');
+                            existingImg.replaceWith(shareIcon);
+                        }
                     }
                     var tNode = Array.from(heroBtn.childNodes).find(function(n){ return n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0; });
                     if (tNode) tNode.textContent = ' Send to my PC';
