@@ -39,7 +39,7 @@ chrono = "0.4.44"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
-winit = "0.30.12"
+winit = "0.30.13"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
