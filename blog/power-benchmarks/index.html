@@ -1,0 +1,34 @@
+---
+layout: base
+title: "PC Power Benchmarks — WattSeal"
+description: "Measured GPU, CPU and full-system watt-draw benchmarks captured with WattSeal. Real numbers from real hardware, no estimates."
+keywords: "GPU power consumption benchmark, CPU watt draw test, PC power usage benchmark, RTX power draw, Ryzen power consumption, WattSeal benchmark"
+blog_section: power-benchmarks
+blog_section_label: "Power Benchmarks"
+---
+
+<section style="padding-top:10rem">
+    <div class="container">
+        <div class="section-header">
+            <span class="badge">Power Benchmarks</span>
+            <h1>PC Power Benchmarks</h1>
+            <p>Real-world watt-draw measurements of popular GPUs, CPUs, and full PC builds — captured live with WattSeal. No synthetic estimates, no smart plugs required.</p>
+        </div>
+
+        <div class="blog-list">
+            {% for item in site.benchmarks %}
+            <article class="blog-card">
+                {% if item.date %}<time datetime="{{ item.date | date_to_xmlschema }}">{{ item.date | date: "%B %d, %Y" }}</time>{% endif %}
+                <h2><a href="{{ item.url }}">{{ item.title }}</a></h2>
+                <p>{{ item.excerpt | strip_html | truncatewords: 40 }}</p>
+                <a href="{{ item.url }}" class="btn btn-ghost btn-sm">View benchmark &rarr;</a>
+            </article>
+            {% endfor %}
+            {% if site.benchmarks.size == 0 %}
+            <p style="color:rgba(230,242,255,0.6)">No benchmarks yet. Check back soon!</p>
+            {% endif %}
+        </div>
+    </div>
+</section>
+
+{% include cta.html %}

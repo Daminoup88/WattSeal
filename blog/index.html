@@ -1,0 +1,51 @@
+---
+layout: base
+title: "PC Power Monitoring Blog — WattSeal"
+description: "PC power consumption benchmarks with real measured numbers from WattSeal. Compare apps, workloads, and energy cost without guesswork."
+keywords: "video call power consumption, Teams power usage, Discord power usage, Google Meet electricity consumption, PC power benchmark"
+---
+
+<section style="padding-top:10rem">
+    <div class="container">
+        <div class="section-header">
+            <span class="badge">Blog</span>
+            <h1>WattSeal Blog</h1>
+            <p>Real PC power consumption benchmarks with real numbers. Fast to read, easy to compare, and measured directly with WattSeal.</p>
+        </div>
+
+        <div class="bento-grid" style="margin-bottom:4rem">
+            <a href="/blog/power-benchmarks/" class="bento-card span-12" style="text-decoration:none">
+                <div class="bento-icon icon-amber">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+                </div>
+                <h2 style="font-size:1.5rem;margin-bottom:.75rem">Power Benchmarks</h2>
+                <p>Measured GPU, CPU, and system watt-draw data captured live with WattSeal.</p>
+                <span class="btn btn-ghost btn-sm" style="margin-top:1rem;pointer-events:none">Browse benchmarks &rarr;</span>
+            </a>
+        </div>
+
+        <!-- Latest Benchmarks -->
+        <div style="margin-bottom:4rem">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.5rem;flex-wrap:wrap;gap:1rem">
+                <h2 style="font-size:1.75rem;color:var(--text)">Latest Benchmarks</h2>
+                <a href="/blog/power-benchmarks/" class="btn btn-ghost btn-sm">View all &rarr;</a>
+            </div>
+            <div class="blog-list">
+                {% for item in site.benchmarks limit:3 %}
+                <article class="blog-card">
+                    {% if item.date %}<time datetime="{{ item.date | date_to_xmlschema }}">{{ item.date | date: "%B %d, %Y" }}</time>{% endif %}
+                    <h2><a href="{{ item.url }}">{{ item.title }}</a></h2>
+                    <p>{{ item.excerpt | strip_html | truncatewords: 40 }}</p>
+                    <a href="{{ item.url }}" class="btn btn-ghost btn-sm">View benchmark &rarr;</a>
+                </article>
+                {% endfor %}
+                {% if site.benchmarks.size == 0 %}
+                <p style="color:rgba(230,242,255,0.6)">No benchmarks yet. Check back soon!</p>
+                {% endif %}
+            </div>
+        </div>
+
+    </div>
+</section>
+
+{% include cta.html %}

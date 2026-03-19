@@ -1,0 +1,62 @@
+# Site metadata
+title: WattSeal
+description: "Real-time PC power consumption monitor — track watts, cost, and carbon footprint per app."
+url: "https://wattseal.com"
+baseurl: ""
+lang: en
+keywords: "PC power consumption monitor, computer electricity usage tracker, per-app power monitor, video call app power usage, reduce PC electricity bill, software power benchmark"
+social_image: "/og-image.webp"
+
+# Jekyll collections — each maps to a _<name>/ folder in the repo root
+# benchmarks → /blog/power-benchmarks/:title/   (GPU/CPU power draw measurements)
+# how-to     → /blog/guides/:title/             (step-by-step instruction articles)
+collections:
+  benchmarks:
+    output: true
+    permalink: /blog/power-benchmarks/:title/
+  how-to:
+    output: true
+    permalink: /blog/guides/:title/
+
+# Markdown renderer
+markdown: kramdown
+kramdown:
+  input: GFM
+
+# Build plugins enabled in GitHub Pages and local Jekyll preview
+plugins:
+  - jekyll-sitemap
+
+# Default front matter — apply layouts automatically so individual files stay clean
+defaults:
+  # Power benchmark articles
+  - scope:
+      path: ""
+      type: "benchmarks"
+    values:
+      layout: post
+      og_type: article
+      blog_section: power-benchmarks
+      blog_section_label: "Power Benchmarks"
+      sitemap:
+        changefreq: weekly
+        priority: 0.8
+  # How-to guides
+  - scope:
+      path: ""
+      type: "how-to"
+    values:
+      layout: post
+      og_type: article
+      blog_section: guides
+      blog_section_label: "Guides"
+      sitemap:
+        changefreq: weekly
+        priority: 0.8
+
+# Files and folders Jekyll should not copy to _site/
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - README.md
+  - vendor

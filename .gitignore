@@ -1,3 +1,17 @@
 *.log
 *.db*
 target/
+# Jekyll build output (GitHub builds this itself)
+_site/
+
+# Jekyll cache
+.jekyll-cache/
+.jekyll-metadata
+
+# Bundler and lock files
+.bundle/
+*.lock
+
+# OS junk
+.DS_Store
+Thumbs.db

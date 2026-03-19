@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="{{ page.lang | default: site.lang | default: 'en' }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  {% assign meta_title = page.title | default: site.title %}
+  {% assign meta_image = page.image | default: site.social_image | default: '/og-image.webp' %}
+  {% assign meta_keywords = page.keywords | default: site.keywords %}
+  {% if meta_title contains site.title %}
+  <title>{{ meta_title }}</title>
+  {% else %}
+  <title>{{ meta_title }} | {{ site.title }}</title>
+  {% endif %}
+  <meta name="description" content="{{ page.description | default: site.description | strip_newlines | escape }}">
+  <meta name="keywords" content="{{ meta_keywords | strip_newlines | escape }}">
+  <meta name="robots" content="{{ page.robots | default: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' }}">
+  <meta name="googlebot" content="{{ page.robots | default: 'index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1' }}">
+    <meta name="application-name" content="WattSeal">
+    <meta name="author" content="Damien PHILIPPE & Paul MALLARD">
+    <meta name="theme-color" content="#0d1221">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="format-detection" content="telephone=no">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="{{ page.og_type | default: 'website' }}">
+    <meta property="og:url" content="{{ page.url | absolute_url }}">
+    <meta property="og:title" content="{{ meta_title | escape }}">
+    <meta property="og:description" content="{{ page.description | default: site.description | strip_newlines | escape }}">
+    <meta property="og:image" content="{{ meta_image | absolute_url }}">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:type" content="image/webp">
+    <meta property="og:image:alt" content="{{ page.image_alt | default: meta_title | escape }}">
+    <meta property="og:site_name" content="WattSeal">
+    <meta property="og:locale" content="en_US">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="{{ page.url | absolute_url }}">
+    <meta property="twitter:title" content="{{ meta_title | escape }}">
+    <meta property="twitter:description" content="{{ page.description | default: site.description | strip_newlines | escape }}">
+    <meta property="twitter:image" content="{{ meta_image | absolute_url }}">
+    <meta property="twitter:image:alt" content="{{ page.image_alt | default: meta_title | escape }}">
+
+    {% if page.og_type == 'article' %}
+    <!-- Open Graph: Article timestamps (required for Google News & Discover) -->
+    <meta property="article:published_time" content="{{ page.date | date_to_xmlschema }}">
+    {% if page.author %}<meta property="article:author" content="{{ page.author }}">{% endif %}
+    {% for tag in page.tags %}<meta property="article:tag" content="{{ tag | escape }}">{% endfor %}
+    {% endif %}
+
+    <!-- Canonical & hreflang -->
+    <link rel="canonical" href="{{ page.url | absolute_url }}">
+    <link rel="alternate" hreflang="en" href="{{ page.url | absolute_url }}">
+    <link rel="alternate" hreflang="x-default" href="{{ page.url | absolute_url }}">
+    <link rel="sitemap" type="application/xml" title="Sitemap" href="{{ '/sitemap.xml' | absolute_url }}">
+    <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM summary">
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96">
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <link rel="shortcut icon" href="/favicon.ico">
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+    <meta name="apple-mobile-web-app-title" content="WattSeal">
+    <link rel="manifest" href="/site.webmanifest">
+    <link rel="me" href="https://github.com/Daminoup88">
+    <link rel="dns-prefetch" href="https://fonts.googleapis.com">
+    <link rel="dns-prefetch" href="https://fonts.gstatic.com">
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "WattSeal",
+      "url": "https://wattseal.com",
+      "logo": "https://wattseal.com/icon.svg",
+      "sameAs": [
+        "https://github.com/Daminoup88/WattSeal"
+      ]
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "WattSeal",
+      "url": "https://wattseal.com",
+      "inLanguage": "en"
+    }
+    </script>
+
+    <!-- Preconnect & Fonts — non-render-blocking -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet" media="print" onload="this.media='all'">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Outfit:wght@400;600;700;800&display=optional" rel="stylesheet"></noscript>
+
+    {% if page.is_home %}
+    <!-- Preload hero image — per-breakpoint to match <picture> sources -->
+    <link rel="preload" as="image" href="/dashboard-400.webp" media="(max-width: 768px)" fetchpriority="high">
+    <link rel="preload" as="image" href="/dashboard.png" media="(min-width: 769px)" fetchpriority="high">
+
+    <!-- JSON-LD: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "WattSeal",
+      "applicationCategory": "UtilitiesApplication",
+      "operatingSystem": "Windows, macOS, Linux",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "USD"
+      },
+      "description": "The world's first real-time PC total power consumption monitor with per-component and per-application breakdown. Track carbon footprint and electricity cost natively. Available in English and French.",
+      "url": "https://wattseal.com",
+      "inLanguage": ["en", "fr"],
+      "author": {
+        "@type": "Person",
+        "name": "Damien PHILIPPE & Paul MALLARD"
+      }
+    }
+    </script>
+
+    <!-- JSON-LD: FAQPage -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "FAQPage",
+      "mainEntity": [
+        {
+          "@type": "Question",
+          "name": "How much electricity does an average PC use per year?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "A typical desktop PC consumes between 80W and 400W depending on usage. Over a year of daily use, that equals roughly 200 to 1000 kWh, which costs between €30 and €180 in electricity in Europe."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "How does WattSeal measure power consumption per application?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WattSeal runs a lightweight background process that reads hardware telemetry directly via RAPL and NVML interfaces. It then uses kernel-level process accounting to accurately attribute the measured power draw to individual running applications in real time."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Can WattSeal show me my carbon footprint from using my PC?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes. WattSeal includes a native carbon footprint tracker that automatically converts your physical power consumption into CO₂ equivalents based on the carbon intensity of your local electricity grid. You can customize the carbon intensity for your specific region."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Does WattSeal work with AMD CPUs and NVIDIA GPUs at the same time?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, WattSeal is entirely cross-vendor compatible. It natively supports hardware from AMD, Intel, and NVIDIA simultaneously, reading the appropriate sensor data regardless of your system configuration."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Will WattSeal itself use significant power or slow my PC down?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "No. WattSeal is engineered in Rust specifically to be extremely lightweight. It operates with near-zero overhead, ensuring that the monitoring tool itself does not contribute to your system's power consumption or degrade performance."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "Is WattSeal free and open source?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "Yes, WattSeal is 100% free and open-source software built by the community. You can review the entire source code on GitHub, and your local telemetry data never leaves your machine."
+          }
+        },
+        {
+          "@type": "Question",
+          "name": "What languages does WattSeal support?",
+          "acceptedAnswer": {
+            "@type": "Answer",
+            "text": "WattSeal currently supports English and French, with more languages planned. The entire UI adapts to your language preference."
+          }
+        }
+      ]
+    }
+    </script>
+    {% endif %}
+
+    {% if page.og_type == 'article' %}
+    <!-- JSON-LD: BlogPosting -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BlogPosting",
+      "mainEntityOfPage": { "@type": "WebPage", "@id": "{{ page.url | absolute_url }}" },
+      "headline": "{{ page.title | xml_escape }}",
+      "description": "{{ page.description | default: page.excerpt | strip_html | truncatewords: 30 | xml_escape }}",
+      "image": "{{ meta_image | absolute_url }}",
+      "datePublished": "{{ page.date | date_to_xmlschema }}",
+      "dateModified": "{{ page.last_modified_at | default: page.date | date_to_xmlschema }}",
+      "keywords": "{{ page.keywords | default: page.tags | join: ', ' | xml_escape }}",
+      "author": { "@type": "Person", "name": "{{ page.author | default: 'WattSeal Team' | xml_escape }}" },
+      "publisher": { "@type": "Organization", "name": "WattSeal", "url": "https://wattseal.com" }
+    }
+    </script>
+    {% endif %}
+
+    <!-- JSON-LD: BreadcrumbList — emitted on every non-homepage page -->
+    {% unless page.is_home %}
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "BreadcrumbList",
+      "itemListElement": [
+        { "@type": "ListItem", "position": 1, "name": "Home", "item": "https://wattseal.com/" },
+        { "@type": "ListItem", "position": 2, "name": "Blog", "item": "https://wattseal.com/blog/" }{% if page.blog_section %},
+        { "@type": "ListItem", "position": 3, "name": "{{ page.blog_section_label }}", "item": "https://wattseal.com/blog/{{ page.blog_section }}/" }{% if page.collection %},
+        { "@type": "ListItem", "position": 4, "name": "{{ page.title | xml_escape }}", "item": "{{ page.url | absolute_url }}" }{% endif %}{% endif %}
+      ]
+    }
+    </script>
+    {% endunless %}
+
+    <style>
+        /* Critical CSS — inline for fast FCP */
+        :root {
+            --bg: #0d1221;
+            --text: #e6f2ff;
+            --primary: #00cce6;
+            --primary-h: #00aacc;
+            --green: #8cff66;
+            --amber: #e6b300;
+            --yellow: #d9ff4d;
+            --card-bg: rgba(230,242,255,0.03);
+            --card-b: rgba(230,242,255,0.08);
+            --font-d: 'Outfit','Outfit Fallback',system-ui,sans-serif;
+            --font-b: 'Inter',system-ui,sans-serif;
+            --font-m: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
+        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        html{scroll-behavior: smooth;overflow-x:hidden}
+        body{font-family:var(--font-b);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        h1,h2,h3,h4{font-family:var(--font-d);line-height:1.2}
+        p{margin-bottom:1.5rem;color:rgba(230,242,255,0.85)}
+        a{color:var(--primary);text-decoration:none;transition:color .2s}
+        a:hover{color:var(--text)}
+        img{max-width:100%;height:auto}
+        .container{width:100%;max-width:1200px;margin:0 auto;padding:0 1.5rem}
+        *:focus-visible{outline:2px solid var(--primary);outline-offset:4px;border-radius:4px}
+
+        /* Buttons */
+        .btn{display:inline-flex;align-items:center;justify-content:center;padding:.875rem 1.75rem;border-radius:8px;font-family:var(--font-d);font-weight:600;font-size:1.125rem;cursor:pointer;transition:all .2s ease;text-decoration:none;border:none;gap:.75rem}
+        .btn-sm{padding:.5rem 1.25rem;font-size:.9375rem;border-radius:6px;gap:.5rem}
+        .btn-sm svg{width:18px;height:18px}
+        .btn-primary{background:var(--primary);color:var(--bg);box-shadow:0 4px 14px rgba(0,204,230,0.2)}
+        .btn-primary:hover{background:var(--primary-h);transform:translateY(-2px);box-shadow:0 6px 20px rgba(0,204,230,0.3);color:var(--bg)}
+        .btn-secondary{background:transparent;color:var(--text);border:1px solid var(--card-b)}
+        .btn-secondary:hover{background:var(--card-bg);border-color:var(--primary);transform:translateY(-2px)}
+        .btn-ghost{background:transparent;color:var(--primary);border:1px solid var(--primary);padding:.75rem 1.5rem}
+        .btn-ghost:hover{background:rgba(0,204,230,0.1);transform:translateY(-2px)}
+
+        /* Nav */
+        nav{position:fixed;top:0;left:0;right:0;background:rgba(13,18,33,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--card-b);z-index:100;padding:1rem 0;transition:transform .3s ease}
+        nav.nav-hidden{transform:translateY(-100%)}
+        .nav-inner{display:flex;justify-content:space-between;align-items:center;gap:1rem}
+        .logo{font-family:var(--font-d);font-weight:700;font-size:1.5rem;display:flex;align-items:center;gap:.75rem;color:var(--text)}
+        .logo svg,
+        .logo img{width:32px;height:32px;fill:var(--primary)}
+        .footer-brand img{width:24px;height:24px;fill:var(--primary)}
+        .nav-center{flex:1;display:flex;justify-content:center;align-items:center}
+        .nav-center-link{color:#ffffff;font-family:var(--font-d);font-size:1rem;font-weight:700;text-decoration:none;line-height:1}
+        .nav-center-link:hover{color:#ffffff;opacity:.85}
+        .nav-center-link:visited{color:#ffffff}
+        .nav-actions{display:flex;align-items:center;gap:1rem}
+
+        /* Hero */
+        .hero{padding:10rem 0 5rem;text-align:center;position:relative}
+        .hero::before{content:'';position:fixed;top:0;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(0,204,230,0.1) 0%,rgba(13,18,33,0) 70%);z-index:-1;pointer-events:none}
+        .hero h1{font-size:clamp(2.5rem,5vw,4.5rem);margin-bottom:1.5rem;letter-spacing:-.02em}
+        .hero h1 span{color:var(--primary)}
+        .hero p.subhead{font-size:1.25rem;max-width:700px;margin:0 auto 2.5rem;color:rgba(230,242,255,0.9)}
+        .hero-ctas{display:flex;justify-content:center;align-items:center;gap:1.5rem;margin-bottom:2rem;flex-wrap:wrap}
+        .hero-proof{font-size:.875rem;color:rgba(230,242,255,0.75);display:flex;justify-content:center;align-items:center;gap:.5rem;flex-wrap:wrap}
+        .hero-image-wrapper{margin-top:3rem;position:relative;border-radius:12px;overflow:hidden;box-shadow:0 25px 50px -12px rgba(0,0,0,0.5);border:1px solid var(--card-b)}
+
+        /* Trust Bar */
+        .trust-bar{padding:3rem 0;border-bottom:1px solid var(--card-b)}
+        .trust-items{display:flex;justify-content:center;align-items:center;gap:3rem;flex-wrap:wrap}
+        .trust-item{display:flex;align-items:center;gap:.75rem;color:rgba(230,242,255,0.7);font-size:.9375rem;font-weight:500}
+        .trust-item svg{width:20px;height:20px;color:var(--primary);flex-shrink:0}
+
+        /* Sections */
+        section{padding:6rem 0}
+        .section-header{text-align:center;margin-bottom:3rem;max-width:800px;margin-left:auto;margin-right:auto}
+        .section-header h2{font-size:2.5rem;margin-bottom:1rem}
+        .section-header .badge{display:inline-block;padding:.375rem 1rem;border-radius:100px;font-size:.8125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem;background:rgba(0,204,230,0.1);color:var(--primary);border:1px solid rgba(0,204,230,0.2)}
+
+        /* Hook — 2-col */
+        .hook-content{display:grid;grid-template-columns:1fr 1fr;gap:4rem;align-items:center}
+        .hook-text p{font-size:1.125rem}
+        .hook-stats{display:flex;flex-direction:column;gap:2rem;background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;padding:3rem}
+        .stat-item{text-align:left}
+        .stat-value{font-family:var(--font-d);font-size:3.5rem;font-weight:700;line-height:1;margin-bottom:.5rem}
+        .stat-value.watts{color:var(--primary)}
+        .stat-value.cost{color:var(--amber)}
+        .stat-value.co2{color:var(--green)}
+        .stat-label{font-size:1rem;color:rgba(230,242,255,0.7)}
+
+        /* Bento Grid — non-linear layout */
+        .bento-grid{display:grid;grid-template-columns:repeat(12,1fr);gap:1.5rem}
+        .bento-card{background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;padding:2.5rem;transition:transform .2s,border-color .2s;position:relative;overflow:hidden}
+        .bento-card:hover{transform:translateY(-4px);border-color:rgba(0,204,230,0.3)}
+        .bento-card.span-8{grid-column:span 8}
+        .bento-card.span-7{grid-column:span 7}
+        .bento-card.span-6{grid-column:span 6}
+        .bento-card.span-5{grid-column:span 5}
+        .bento-card.span-4{grid-column:span 4}
+        .bento-card.span-12{grid-column:span 12}
+        .bento-icon{width:48px;height:48px;border-radius:12px;background:rgba(0,204,230,0.1);display:flex;align-items:center;justify-content:center;margin-bottom:1.5rem;color:var(--primary)}
+        .bento-icon svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+        .bento-icon.icon-green{background:rgba(140,255,102,0.1);color:var(--green)}
+        .bento-icon.icon-amber{background:rgba(230,179,0,0.1);color:var(--amber)}
+        .bento-icon.icon-yellow{background:rgba(217,255,77,0.1);color:var(--yellow)}
+        .bento-card h3{font-size:1.5rem;margin-bottom:1rem}
+        .bento-card p{margin-bottom:0;font-size:1rem;color:rgba(230,242,255,0.7)}
+
+        /* carbon intensity examples */
+        .carbon-levels{display:flex;flex-direction:column;gap:.75rem;margin-top:1.5rem}
+        .carbon-level{display:flex;align-items:center;gap:1rem;padding:.75rem 1rem;border-radius:8px;font-size:.9375rem;background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04)}
+        .carbon-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0}
+        .carbon-dot.low{background:var(--green)}
+        .carbon-dot.med{background:var(--amber)}
+        .carbon-dot.high{background:#ff5c5c}
+
+        /* Prose */
+        .prose-section{max-width:800px;margin:0 auto}
+        .prose-section p{font-size:1.125rem;margin-bottom:1.5rem}
+
+        /* Table */
+        .table-wrapper{overflow-x:auto;background:var(--card-bg);border:1px solid var(--card-b);border-radius:12px;margin-top:3rem}
+        #features,#why,#compare,#technical,#faq{content-visibility:auto;contain-intrinsic-size:0 600px}
+        table{width:100%;border-collapse:collapse;text-align:left}
+        th,td{padding:1.25rem 1.5rem;border-bottom:1px solid var(--card-b)}
+        th{font-family:var(--font-d);font-weight:600;background:rgba(13,18,33,0.5);color:rgba(230,242,255,0.9);white-space:nowrap}
+        tr:last-child td{border-bottom:none}
+        tr:nth-child(even){background:rgba(255,255,255,0.01)}
+        td:first-child{font-weight:500}
+        .col-wattseal{background:rgba(0,204,230,0.05)}
+        th.col-wattseal{color:var(--primary);border-top:2px solid var(--primary)}
+        .icon-check{color:var(--green);font-weight:bold}
+        .icon-cross{color:rgba(230,242,255,0.55)}
+        .icon-partial{color:var(--yellow)}
+
+        /* Advanced Features */
+        .features-advanced{margin-top:5rem}
+        .features-advanced h3.tier-title{text-align:center;margin-bottom:3rem;font-size:2rem;color:rgba(230,242,255,0.9)}
+        .features-advanced-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:1.5rem}
+        .feature-card-advanced{padding:1.5rem;border-radius:12px;border:1px solid rgba(230,242,255,0.05);background:transparent}
+        .feature-card-advanced h4{font-family:var(--font-m);font-size:1rem;color:var(--yellow);margin-bottom:.75rem;display:flex;align-items:center;gap:.5rem}
+
+        /* CTA Banner */
+        .cta-banner{padding:5rem 0;text-align:center;background:linear-gradient(135deg,rgba(0,204,230,0.08) 0%,rgba(99,102,241,0.06) 100%);border-top:1px solid var(--card-b);border-bottom:1px solid var(--card-b);position:relative}
+        .cta-banner h2{font-size:2.5rem;margin-bottom:1rem}
+        .cta-banner p{font-size:1.125rem;max-width:600px;margin:0 auto 2rem;color:rgba(230,242,255,0.8)}
+        .cta-banner .cta-urgency{display:inline-block;padding:.5rem 1.25rem;border-radius:100px;font-size:.8125rem;font-weight:600;background:rgba(140,255,102,0.1);color:var(--green);border:1px solid rgba(140,255,102,0.2);margin-bottom:1.5rem}
+
+        /* Download */
+        .download-section{background:linear-gradient(180deg,var(--bg) 0%,rgba(0,204,230,0.05) 100%);border-top:1px solid var(--card-b);border-bottom:1px solid var(--card-b);text-align:center}
+        .os-buttons{display:flex;flex-direction:column;gap:1rem;max-width:400px;margin:0 auto 2rem}
+        .btn-os{width:100%;justify-content:flex-start;padding:1rem 1.5rem;background:var(--card-bg);border:1px solid var(--card-b);color:var(--text)}
+        .btn-os:hover{background:rgba(0,204,230,0.1);border-color:var(--primary);transform:translateY(-2px)}
+        .btn-os.primary-os{background:var(--primary);color:var(--bg);border:none;font-weight:700}
+        .btn-os.primary-os:hover{background:var(--primary-h)}
+        .btn-os svg{width:24px;height:24px;fill:currentColor}
+        .btn-os img{width:24px;height:24px;filter:brightness(0) invert(1)}
+        .btn-os.primary-os img{filter:none}
+        .download-promise{font-size:.875rem;color:rgba(230,242,255,0.6)}
+        .mobile-cta{max-width:500px;margin:0 auto 2rem;padding:2.5rem;background:var(--card-bg);border:1px solid var(--card-b);border-radius:16px;text-align:center}
+        .mobile-cta p:first-child{font-family:var(--font-d);font-size:1.5rem;font-weight:700;color:var(--text)}
+        .mobile-cta .btn{margin-top:1rem}
+        .mobile-cta-hint{font-size:.875rem;color:rgba(230,242,255,0.5);margin-top:1rem}
+
+        /* FAQ */
+        .faq-list{max-width:800px;margin:0 auto}
+        details{background:var(--card-bg);border:1px solid var(--card-b);border-radius:8px;margin-bottom:1rem;overflow:hidden}
+        summary{padding:1.5rem;font-family:var(--font-d);font-weight:600;font-size:1.125rem;cursor:pointer;list-style:none;display:flex;justify-content:space-between;align-items:center}
+        summary::-webkit-details-marker{display:none}
+        summary::after{content:'+';color:var(--primary);font-size:1.5rem;transition:transform .2s}
+        details[open] summary::after{content:'−'}
+        details p{padding:0 1.5rem 1.5rem;margin:0;color:rgba(230,242,255,0.8)}
+
+        /* Footer — compact & symmetric */
+        footer{padding:2.5rem 0 1.5rem;border-top:1px solid var(--card-b);background:rgba(0,0,0,0.15)}
+        .footer-inner{display:flex;flex-direction:column;gap:1rem}
+        .footer-top{display:flex;justify-content:space-between;align-items:center;gap:2rem;flex-wrap:wrap}
+        .footer-brand{display:flex;align-items:center;gap:.5rem;font-family:var(--font-d);font-weight:700;font-size:1.125rem;color:var(--text)}
+        .footer-brand svg{width:24px;height:24px;fill:var(--primary)}
+        .footer-links{display:flex;align-items:center;gap:1.5rem;flex-wrap:wrap}
+        .footer-links a{color:rgba(230,242,255,0.6);font-size:.875rem;transition:color .2s}
+        .footer-links a:hover{color:var(--primary)}
+        .footer-desc{color:rgba(230,242,255,0.6);font-size:.8125rem;line-height:1.5;margin:0}
+        .footer-copy{color:rgba(230,242,255,0.6);font-size:.8125rem}
+
+        /* Blog */
+        .blog-list{display:flex;flex-direction:column;gap:1.5rem;max-width:800px;margin:0 auto}
+        .blog-card{background:var(--card-bg);border:1px solid var(--card-b);border-radius:12px;padding:2rem;transition:transform .2s,border-color .2s}
+        .blog-card:hover{transform:translateY(-4px);border-color:rgba(0,204,230,0.3)}
+        .blog-card time{font-size:.875rem;color:rgba(230,242,255,0.5)}
+        .blog-card h2{font-size:1.5rem;margin:.5rem 0 .75rem}
+        .blog-card h2 a{color:var(--text);text-decoration:none}
+        .blog-card h2 a:hover{color:var(--primary)}
+        .blog-card>p{color:rgba(230,242,255,0.7);margin-bottom:1rem}
+        /* Breadcrumb nav */
+        .post-breadcrumb{padding:1rem 0 .5rem}
+        .post-breadcrumb ol{list-style:none;display:flex;flex-wrap:wrap;align-items:center;gap:.25rem;padding:0;margin:0}
+        .post-breadcrumb li{font-size:.875rem;color:rgba(230,242,255,0.5);display:flex;align-items:center}
+        .post-breadcrumb li:not(:last-child)::after{content:'/';margin:0 .375rem;color:rgba(230,242,255,0.25)}
+        .post-breadcrumb li a{color:rgba(230,242,255,0.55);text-decoration:none;transition:color .2s}
+        .post-breadcrumb li a:hover{color:var(--primary)}
+        .post-breadcrumb li:last-child{color:rgba(230,242,255,0.85)}
+        .post-header{margin-bottom:3rem;text-align:center}
+        .post-header h1{font-size:clamp(2rem,4vw,3rem);margin-top:1rem}
+        .post-header time{font-size:.9375rem;color:rgba(230,242,255,0.5)}
+        .post-author{font-size:.9375rem;color:rgba(230,242,255,0.5);margin-left:.25rem}
+        .post-content{max-width:800px;margin:0 auto}
+        .post-content h2{font-size:1.75rem;margin:2.5rem 0 1rem;color:var(--text)}
+        .post-content h3{font-size:1.375rem;margin:2rem 0 .75rem;color:var(--text)}
+        .post-content p{font-size:1.125rem;margin-bottom:1.5rem;color:rgba(230,242,255,0.85)}
+        .post-content ul,.post-content ol{margin-bottom:1.5rem;padding-left:1.5rem;color:rgba(230,242,255,0.85)}
+        .post-content li{margin-bottom:.5rem;font-size:1.125rem}
+        .post-content a{color:var(--primary);text-decoration:underline}
+        .post-content a:hover{color:var(--text)}
+        .post-content code{font-family:var(--font-m);background:rgba(230,242,255,0.05);padding:.125rem .375rem;border-radius:4px;font-size:.9375rem}
+        .post-content pre{background:rgba(230,242,255,0.03);border:1px solid var(--card-b);border-radius:8px;padding:1.5rem;overflow-x:auto;margin-bottom:1.5rem}
+        .post-content pre code{background:transparent;padding:0}
+        .post-content blockquote{border-left:3px solid var(--primary);padding-left:1.5rem;margin:1.5rem 0;color:rgba(230,242,255,0.7);font-style:italic}
+        .post-content img{border-radius:8px;margin:1.5rem 0}
+
+        @font-face {
+            font-family: 'Outfit Fallback';
+            src: local('Arial');
+            size-adjust: 103%;
+            ascent-override: 94%;
+            descent-override: 22%;
+            line-gap-override: normal;
+        }
+        @font-face {
+            font-family: 'Inter';
+            src: local('Arial');
+            font-weight: 400 600;
+            size-adjust: 107%;
+            ascent-override: 90%;
+            descent-override: 22%;
+            line-gap-override: normal;
+        }
+
+        /* Responsive */
+        @media(max-width:1024px){
+            .bento-card.span-8,.bento-card.span-7,.bento-card.span-6,.bento-card.span-5,.bento-card.span-4{grid-column:span 6}
+            .bento-card.span-12{grid-column:span 12}
+        }
+        @media(max-width:768px){
+            .hook-content{grid-template-columns:1fr;gap:2rem}
+            .bento-grid{display:flex;flex-direction:column}
+            .hero h1{font-size:2.5rem}
+            .nav-center{display:none} /* Hide center link on mobile */
+            .nav-actions .btn-secondary{display:none}
+            section{padding:4rem 0}
+            .trust-items{gap:1.5rem}
+            .footer-top{flex-direction:column;text-align:center}
+            .footer-links{justify-content:center}
+        }
+        
+        /* UI Fixes & Responsive Tables */
+        .post-content table {
+            display: block;
+            width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            border-collapse: collapse;
+            margin-bottom: 2rem;
+        }
+        .post-content th, .post-content td {
+            text-align: left;
+            padding: 0.75rem 1rem;
+            border: 1px solid var(--card-b);
+            white-space: nowrap; 
+        }
+        .post-content th {
+            background-color: var(--card-bg);
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        /* Center the blog link exactly */
+        @media (min-width: 769px) {
+            .nav-inner { position: relative; }
+            .nav-center {
+                position: absolute;
+                left: 50%;
+                transform: translateX(-50%);
+                width: auto;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    {% include header.html %}
+
+    <main>
+        {{ content }}
+    </main>
+
+    {% include footer.html %}
+
+    <script>
+        document.getElementById('year').textContent = new Date().getFullYear();
+
+        function getOS() {
+            var ua = navigator.userAgent || '';
+            if (/android/i.test(ua)) return 'Android';
+            if (/iphone|ipad|ipod/i.test(ua)) return 'iOS';
+            if (/windows phone/i.test(ua)) return 'Windows';
+            if (/win/i.test(ua)) return 'Windows';
+            if (/mac/i.test(ua)) return 'macOS';
+            if (/linux/i.test(ua)) return 'Linux';
+            return 'Windows';
+        }
+
+        function doShare(triggerEl) {
+            var url = 'https://wattseal.com';
+            if (navigator.share) {
+                navigator.share({ title: 'WattSeal', text: 'Monitor your PC\u2019s real-time power consumption \u2014 free & open source.', url: url });
+            } else if (navigator.clipboard) {
+                navigator.clipboard.writeText(url).then(function(){
+                    var fb = document.getElementById('copy-feedback');
+                    if (fb) { var ot = fb.textContent; fb.textContent = '\u2713 Link copied!'; setTimeout(function(){ fb.textContent = ot; }, 2500); }
+                    if (triggerEl) { var oi = triggerEl.innerHTML; triggerEl.innerHTML = '\u2713 Copied!'; setTimeout(function(){ triggerEl.innerHTML = oi; }, 2500); }
+                });
+            } else {
+                window.location.href = '#download';
+            }
+        }
+
+        function setupOSSpecifics() {
+            var currentOS = getOS();
+            requestAnimationFrame(function() {
+            var container = document.getElementById('download-buttons');
+            if (!container) return;
+            var buttons = Array.from(container.querySelectorAll('.btn-os'));
+            var heroBtn = document.getElementById('hero-download-btn');
+            var mobileCta = document.getElementById('mobile-cta');
+            var isMobile = currentOS === 'Android' || currentOS === 'iOS';
+            if (isMobile) {
+                if (mobileCta) {
+                    mobileCta.style.display = 'block';
+                    container.insertBefore(mobileCta, container.firstChild);
+                }
+                if (heroBtn) {
+                    heroBtn.href = '#download';
+                    var existingImg = heroBtn.querySelector('img');
+                    if (existingImg) {
+                        var sourceSvg = document.querySelector('#mobile-cta button svg');
+                        if (sourceSvg) {
+                            var shareIcon = sourceSvg.cloneNode(true);
+                            shareIcon.setAttribute('width','20');
+                            shareIcon.setAttribute('height','20');
+                            existingImg.replaceWith(shareIcon);
+                        }
+                    }
+                    var tNode = Array.from(heroBtn.childNodes).find(function(n){ return n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0; });
+                    if (tNode) tNode.textContent = ' Send to my PC';
+                    heroBtn.setAttribute('aria-label', 'Share WattSeal or copy link to your PC');
+                    heroBtn.addEventListener('click', function(e){ e.preventDefault(); doShare(heroBtn); });
+                }
+                var mobileNavBtn = document.getElementById('navDownload');
+                if (mobileNavBtn) {
+                    mobileNavBtn.addEventListener('click', function(e){ e.preventDefault(); doShare(null); });
+                }
+                return;
+            }
+
+            var primaryBtn = buttons.find(function(b){ return b.getAttribute('data-os') === currentOS; });
+            if (primaryBtn) {
+                primaryBtn.classList.add('primary-os');
+                container.insertBefore(primaryBtn, container.firstChild);
+                if (heroBtn) {
+                    heroBtn.href = primaryBtn.href;
+                    var srcImg = primaryBtn.querySelector('img');
+                    if (srcImg) {
+                        var existing = heroBtn.querySelector('img');
+                        if (existing) {
+                            existing.src = srcImg.src;
+                            existing.alt = srcImg.alt;
+                        } else {
+                            heroBtn.insertBefore(srcImg.cloneNode(), heroBtn.firstChild);
+                        }
+                    }
+                    var textNode = Array.from(heroBtn.childNodes).find(function(n){ return n.nodeType === Node.TEXT_NODE && n.textContent.trim().length > 0; });
+                    if (textNode) textNode.textContent = ' Download for ' + currentOS;
+                    heroBtn.setAttribute('aria-label','Download for ' + currentOS);
+                }
+            } else {
+                var winBtn = buttons.find(function(b){ return b.getAttribute('data-os') === 'Windows'; });
+                if (winBtn) winBtn.classList.add('primary-os');
+            }
+            });
+        }
+
+        var lastScrollY = window.scrollY;
+        var nav = document.getElementById('navbar');
+        window.addEventListener('scroll', function() {
+            if (window.scrollY > lastScrollY && window.scrollY > 100) {
+                nav.classList.add('nav-hidden');
+            } else {
+                nav.classList.remove('nav-hidden');
+            }
+            lastScrollY = window.scrollY;
+        }, { passive: true });
+
+        document.addEventListener('DOMContentLoaded', function(){
+            setupOSSpecifics();
+        });
+    </script>
+</body>
+</html>

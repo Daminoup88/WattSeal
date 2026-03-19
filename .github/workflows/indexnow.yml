@@ -1,0 +1,21 @@
+name: Notify IndexNow
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - gh-pages
+    paths:
+      - "_benchmarks/**"
+      - "_how-to/**"
+      - "blog/**"
+      - "_config.yml"
+      - "index.html"
+
+jobs:
+  ping-indexnow:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping IndexNow
+        run: |
+            curl "https://api.indexnow.org/indexnow?url=https://wattseal.com&key=eba5e676-c73b-49f2-b0fe-f4f05542d864"

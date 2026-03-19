@@ -1,0 +1,41 @@
+<section id="download" class="download-section">
+    <div class="container">
+        <div class="section-header">
+            <h2 id="downloadTitle">Get WattSeal Free</h2>
+            <p id="downloadIntro">Start monitoring your PC's power consumption today.</p>
+        </div>
+        
+        <div class="os-buttons" id="download-buttons">
+            <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-windows.exe" class="btn btn-os" data-os="Windows">
+                <img src="/windows.svg" alt="Windows" width="24" height="24" aria-hidden="true">
+                Download for Windows (.exe)
+            </a>
+            
+            <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-macos" class="btn btn-os" data-os="macOS">
+                <img src="/apple.svg" alt="Apple" width="24" height="24" aria-hidden="true">
+                Download for macOS (Apple Silicon)
+            </a>
+            
+            <a href="https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-linux" class="btn btn-os" data-os="Linux">
+                <img src="/linux.svg" alt="Linux" width="24" height="24" aria-hidden="true">
+                Download for Linux
+            </a>
+
+            <div id="mobile-cta" class="mobile-cta" style="display:none">
+                <p>WattSeal is a desktop app</p>
+                <p>It monitors your PC's power consumption in real time. You'll need a Windows, macOS, or Linux computer to run it.</p>
+                <button class="btn btn-primary" onclick="doShare(this)">
+                    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                        <polyline points="16 6 12 2 8 6"/>
+                        <line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                    Send to my PC
+                </button>
+                <p class="mobile-cta-hint" id="copy-feedback">Opens your share sheet, or copies the link to your clipboard.</p>
+            </div>
+        </div>
+        
+        <p class="download-promise">Always free. Always open source. No telemetry. Your data stays on your machine.</p>
+    </div>
+</section>
