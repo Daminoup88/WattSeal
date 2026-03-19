@@ -1,7 +1,7 @@
 ---
 layout: post
-title: "Which Video Call App Kills Your Battery Fastest? We Measured Them All."
-description: "Real 1-hour power measurements of Teams, Google Meet, Discord, and Slack on Windows — ranked in watts, with the one setting that makes a bigger difference than switching apps."
+title: "Which Video Call App Kills Your Battery Fastest?"
+description: "Real 1-hour power measurements of Teams, Google Meet, Discord, and Slack on Windows — ranked in watts, with the one game changer setting."
 date: 2026-03-19
 author: "Damien PHILIPPE"
 tags: [power-consumption, teams, discord, google-meet, slack, electricity, benchmark, windows, video-call]
@@ -92,6 +92,8 @@ breadcrumbs: false
 </style>
 
 Your laptop is on video calls for hours every day. Have you ever wondered what that's actually costing in electricity, and whether switching apps would make any difference?
+
+This benchmark answers the core question: which video call app kills your battery fastest and by how many watts.
 
 <div class="jump-wrap">
   <a href="#results" class="jump-link">⚡ Jump straight to the results</a>
