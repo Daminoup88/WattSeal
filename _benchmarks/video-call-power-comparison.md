@@ -245,17 +245,178 @@ Raw data, benchmark procedures, and full per-process breakdowns are in the [Watt
 
 ## Frequently asked questions
 
-### Does browser choice affect Google Meet's consumption?
-No. We tested Meet in multiple browsers and saw consistently high consumption across all of them. The overhead is in Google's video pipeline, not the browser.
+<details>
+  <summary>Does switching video call apps really save battery?</summary>
+  <p>Sometimes — but settings usually matter more than the app name. In this benchmark, the spread between the best and worst default setups was about <strong>19 W</strong>, and one toggle alone changed Google Meet by roughly <strong>9 W</strong>.</p>
+</details>
 
-### Why does the idle baseline show only 5.72 W?
-That number is the attributed power of Firefox itself at idle — the portion of system draw caused by the browser being open with no tabs. The machine's total draw at idle is higher (including GPU display output, RAM, storage, and OS services), but those components run regardless of what app is open, so we exclude them from the comparison.
+<details>
+  <summary>Browser vs desktop: which one is better for battery?</summary>
+  <p>It’s usually closer than people expect. In this test, Discord Desktop and Discord Web were identical at <strong>32.64 W</strong>, while Teams Desktop used <strong>30.85 W</strong> and Teams Web used <strong>31.50 W</strong>. Hardware acceleration and compositing matter more than the wrapper.</p>
+</details>
 
-### Are these results applicable to other machines?
-The absolute watt values will differ — a thin-and-light with integrated graphics will draw less overall. The relative ranking between apps should hold: the same architectural choices drive the same trade-offs across hardware generations.
+<details>
+  <summary>Do screen sharing and HD video drain more battery?</summary>
+  <p>Yes. Video and screen sharing increase encode/decode and GPU work, so they drain more than audio-only calls. In our 1-on-1 runs, the apps clustered around <strong>31–33 W</strong> once the call was active, which is far above the idle browser baseline of <strong>5.72 W</strong>.</p>
+</details>
 
-### What about noise suppression and virtual backgrounds?
-These add significant overhead on top of what you see above. All tests used default settings with those features off. Expect higher numbers if you use them.
-
-### Will you add multi-participant tests?
-Yes. That is where server routing kicks in and differences between apps tend to grow. We will publish those numbers when ready.
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "FAQPage",
+  "mainEntity": [
+    {
+      "@type": "Question",
+      "name": "Which video call app uses the least battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "In this benchmark, Teams Desktop used the least battery at 30.85 W. Teams Web (31.50 W) and Zoom Desktop (31.23 W) were close behind."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Which video call app uses the most battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Google Meet with default settings used the most battery at 50 W. Turning off auto-framing reduced it to 41 W."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Why does Google Meet drain my laptop battery so fast?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Google Meet measured 50 W with default settings, about 9 W higher than the same call with auto-framing off. The main difference is the default AI video feature plus the browser-based pipeline."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Browser vs desktop: which one is better for battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Desktop is slightly better in this group. The gap is usually small because the bigger factor is how the app uses hardware acceleration and system compositing rather than whether it is wrapped as a browser or a desktop client."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Discord vs Slack: which drains more battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Discord is the better choice here. Slack tends to trigger more Windows compositing work, so it usually comes out slightly heavier."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Teams vs Slack: which uses less battery on a laptop?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Teams is the better choice. It stays closer to the efficiency floor, while Slack tends to do a bit more work through the Windows compositor."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Teams vs Zoom: which is better for battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Teams is slightly better here. Both are efficient, but Teams stays a bit closer to the lowest-power end of the group."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Teams vs Google Meet: which drains more battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Teams is clearly better. Google Meet is the heavier option because its default video pipeline and AI features add a lot more overhead."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Zoom vs Google Meet: which drains more battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Zoom is the better choice. Google Meet is much heavier because of its default pipeline and AI video features."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Discord vs Teams: which uses less battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Teams is the better pick. Discord is close, but Teams stays slightly lower because it does less work in the background."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Slack vs Zoom: which uses less battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Zoom is the better choice. Slack generally ends up a bit heavier because of the extra compositing load it creates."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Discord vs Zoom: which drains more battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Neither has a huge advantage here. The result usually comes down to effects, resolution, and whether hardware acceleration is working well."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Slack vs Google Meet: which drains more battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Google Meet is the heavier option. Default AI features and pipeline overhead make it more expensive than Slack in most setups."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Discord Desktop vs Discord Web: which uses less battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "They are effectively tied. Discord’s desktop and web versions behave almost the same because the heavy lifting is the same video pipeline."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Teams Desktop vs Teams Web: which uses less battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Teams Desktop is the better choice. The desktop app sits a bit lower because it handles the call stack more efficiently."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How can I reduce battery drain during video calls?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Turn off background blur, virtual backgrounds, auto-framing, and heavy noise suppression. Lower camera resolution if you can, close extra tabs or apps, and keep hardware acceleration enabled. In this benchmark, one AI feature changed power use by about 9 W."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "How to save my battery during video calls?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "The fastest wins are disabling AI video effects, keeping hardware acceleration on, reducing camera or screen-share quality when possible, and avoiding unnecessary multitasking during calls."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Does screen sharing drain battery?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Yes. Screen sharing increases encode work and often keeps the GPU and display compositor busy. Expect higher power draw than a camera-only call."
+      }
+    },
+    {
+      "@type": "Question",
+      "name": "Do big video calls consume more power?",
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": "Usually yes. More participants means more incoming video streams to decode, more UI work, and often higher network activity. Power draw usually rises compared with a 1-on-1 call."
+      }
+    }
+  ]
+}
+</script>

@@ -242,8 +242,9 @@
             --font-m: ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;
         }
         *{margin:0;padding:0;box-sizing:border-box}
-        html{scroll-behavior: smooth;overflow-x:hidden}
-        body{font-family:var(--font-b);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        html{scroll-behavior: smooth;overflow-x:hidden;min-height:100%}
+        body{display:flex;flex-direction:column;min-height:100vh;font-family:var(--font-b);background:var(--bg);color:var(--text);line-height:1.6;overflow-x:hidden}
+        main{flex:1}
         h1,h2,h3,h4{font-family:var(--font-d);line-height:1.2}
         p{margin-bottom:1.5rem;color:rgba(230,242,255,0.85)}
         a{color:var(--primary);text-decoration:none;transition:color .2s}
@@ -295,6 +296,7 @@
 
         /* Sections */
         section{padding:6rem 0}
+        section[id]{scroll-margin-top:clamp(4rem, 10vw, 6rem)}
         .section-header{text-align:center;margin-bottom:3rem;max-width:800px;margin-left:auto;margin-right:auto}
         .section-header h2{font-size:2.5rem;margin-bottom:1rem}
         .section-header .badge{display:inline-block;padding:.375rem 1rem;border-radius:100px;font-size:.8125rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;margin-bottom:1rem;background:rgba(0,204,230,0.1);color:var(--primary);border:1px solid rgba(0,204,230,0.2)}
