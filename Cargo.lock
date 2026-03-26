@@ -1083,9 +1083,9 @@ dependencies = [
 
 [[package]]
 name = "display-info"
-version = "0.5.8"
+version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5bce305c30b9819766d4cb345932806d98bc8f142fce5269eb3cbc41f6e3e375"
+checksum = "9e0aca670967c2528799e316f9f97913efcc034867614d55681dd41a1c2f7830"
 dependencies = [
  "fxhash",
  "log",
