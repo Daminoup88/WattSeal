@@ -183,6 +183,7 @@ mod amd_gpu {
     use crate::database::{GPUData, SensorData};
 
     pub struct AmdGPUSensor {
+        _helper: AdlxHelper,
         gpu_metrics: GpuMetrics,
     }
 
@@ -200,7 +201,10 @@ mod amd_gpu {
                 .current_gpu_metrics(&gpu)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
-            Ok(AmdGPUSensor { gpu_metrics })
+            Ok(AmdGPUSensor {
+                _helper: helper,
+                gpu_metrics,
+            })
         }
     }
 
