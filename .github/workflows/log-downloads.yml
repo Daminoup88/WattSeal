@@ -1,0 +1,89 @@
+name: Log Downloads
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout gh-pages
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+
+      - name: Fetch release stats and append log
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATE: ${{ env.DATE }}
+        run: |
+          DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          # Fetch releases from the API
+          curl -s \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/releases \
+            > /tmp/releases.json
+
+          # Build a JSON log entry: { date, releases: [ { version, assets: [ { name, platform, downloads } ] } ] }
+          python3 - <<'EOF'
+          import json, os
+
+          with open('/tmp/releases.json') as f:
+              raw = json.load(f)
+
+          date = os.environ['DATE']
+
+          def platform(name):
+              n = name.lower()
+              if 'windows' in n: return 'windows'
+              if 'macos'   in n: return 'macos'
+              return 'linux'
+
+          entry = {
+              'date': date,
+              'releases': [
+                  {
+                      'version': r['tag_name'],
+                      'total': sum(a['download_count'] for a in r['assets']),
+                      'assets': [
+                          {
+                              'name':      a['name'],
+                              'platform':  platform(a['name']),
+                              'downloads': a['download_count'],
+                          }
+                          for a in r['assets']
+                      ]
+                  }
+                  for r in raw
+              ]
+          }
+
+          log_path = 'download-log.json'
+          try:
+              with open(log_path) as f:
+                  log = json.load(f)
+          except FileNotFoundError:
+              log = []
+
+          log.append(entry)
+
+          with open(log_path, 'w') as f:
+              json.dump(log, f, indent=2)
+
+          print(f"Appended entry for {date}, total entries: {len(log)}")
+          EOF
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add download-log.json
+          git diff --cached --quiet || git commit -m "chore: log downloads $(date -u +%Y-%m-%d)"
+          git push
