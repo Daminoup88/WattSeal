@@ -60,3 +60,4 @@ exclude:
   - Gemfile.lock
   - README.md
   - vendor
+  - log_downloads.py
