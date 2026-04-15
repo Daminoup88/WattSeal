@@ -11,8 +11,8 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use crate::{
     AllTimeData,
     types::{
-        CPUData, DiskData, Event, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData, RamData, SensorData,
-        TotalData,
+        BatteryHealthRecord, CPUData, DiskData, Event, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData,
+        RamData, SensorData, TotalData,
     },
 };
 
@@ -458,6 +458,79 @@ impl Database {
             }
         }
         Ok(records)
+    }
+
+    /// Creates the battery_health table if it does not exist.
+    pub fn create_battery_health_table(&self) -> Result<(), DatabaseError> {
+        self.conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS battery_health (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                timestamp INTEGER NOT NULL,
+                health_percent REAL NOT NULL,
+                discharge_rate_watts REAL,
+                cycle_count INTEGER,
+                time_since_full_charge_seconds INTEGER
+            )",
+        )?;
+        Ok(())
+    }
+
+    /// Inserts a battery health record.
+    pub fn insert_battery_health(&self, record: &BatteryHealthRecord) -> Result<(), DatabaseError> {
+        self.conn.execute(
+            "INSERT INTO battery_health (timestamp, health_percent, discharge_rate_watts, cycle_count, time_since_full_charge_seconds) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
+            params![
+                record.timestamp,
+                record.health_percent,
+                record.discharge_rate_watts,
+                record.cycle_count.map(|c| c as i64),
+                record.time_since_full_charge_seconds,
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Returns battery health records in the given time range.
+    pub fn select_battery_health(
+        &self,
+        start_millis: i64,
+        end_millis: i64,
+    ) -> Result<Vec<BatteryHealthRecord>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, health_percent, discharge_rate_watts, cycle_count, time_since_full_charge_seconds \
+             FROM battery_health WHERE timestamp >= ?1 AND timestamp <= ?2 ORDER BY timestamp ASC",
+        )?;
+        let rows = stmt.query_map(params![start_millis, end_millis], |row| {
+            Ok(BatteryHealthRecord {
+                timestamp: row.get(0)?,
+                health_percent: row.get(1)?,
+                discharge_rate_watts: row.get(2)?,
+                cycle_count: row.get::<_, Option<i64>>(3)?.map(|c| c as u32),
+                time_since_full_charge_seconds: row.get(4)?,
+            })
+        })?;
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
+    /// Returns the most recent battery health record.
+    pub fn select_latest_battery_health(&self) -> Result<Option<BatteryHealthRecord>, DatabaseError> {
+        let mut stmt = self.conn.prepare(
+            "SELECT timestamp, health_percent, discharge_rate_watts, cycle_count, time_since_full_charge_seconds \
+             FROM battery_health ORDER BY timestamp DESC LIMIT 1",
+        )?;
+        let result = stmt
+            .query_row([], |row| {
+                Ok(BatteryHealthRecord {
+                    timestamp: row.get(0)?,
+                    health_percent: row.get(1)?,
+                    discharge_rate_watts: row.get(2)?,
+                    cycle_count: row.get::<_, Option<i64>>(3)?.map(|c| c as u32),
+                    time_since_full_charge_seconds: row.get(4)?,
+                })
+            })
+            .optional()?;
+        Ok(result)
     }
 
     /// Loads cumulative energy totals for all components.

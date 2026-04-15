@@ -1,0 +1,11 @@
+[package]
+name = "api"
+version.workspace = true
+edition = "2024"
+
+[dependencies]
+common = { path = "../common" }
+axum = "0.8"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

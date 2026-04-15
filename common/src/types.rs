@@ -651,3 +651,13 @@ impl Default for TotalData {
         }
     }
 }
+
+/// Battery health snapshot recorded periodically.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BatteryHealthRecord {
+    pub timestamp: i64,
+    pub health_percent: f64,
+    pub discharge_rate_watts: Option<f64>,
+    pub cycle_count: Option<u32>,
+    pub time_since_full_charge_seconds: Option<i64>,
+}
