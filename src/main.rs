@@ -8,7 +8,7 @@ use std::{
 };
 
 use collector::CollectorApp;
-use common::WINDOW_ICON_BYTES;
+use common::{AppConfig, WINDOW_ICON_BYTES};
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -144,6 +144,7 @@ fn main() {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let is_ui_mode = args.iter().any(|a| a == "--ui");
     let is_background_mode = args.iter().any(|a| a == "--background");
+    let is_headless_mode = args.iter().any(|a| a == "--headless");
 
     #[cfg(target_os = "windows")]
     if !is_ui_mode && !is_admin::is_admin() {
@@ -206,6 +207,15 @@ fn main() {
             common::clog!("✗ Collector thread ended before signaling readiness: {}", e);
             return;
         }
+    }
+
+    // Headless API mode: start HTTP server and block (no UI, no tray).
+    if is_headless_mode {
+        let config = AppConfig::load();
+        let api_config = config.api;
+        let rt = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
+        rt.block_on(api::run_server(api_config));
+        return;
     }
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));

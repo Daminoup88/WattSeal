@@ -15,7 +15,7 @@ use iced::{
 use crate::{
     components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
     message::Message,
-    pages::{Page, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
+    pages::{Page, battery::BatteryPage, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
     styles::{
         button::ButtonStyle,
         container::ContainerStyle,
@@ -45,6 +45,7 @@ pub struct App {
     hardware_info: HardwareInfo,
     dashboard_page: DashboardPage,
     info_page: InfoPage,
+    battery_page: BatteryPage,
     settings_page: SettingsPage,
     settings_open: bool,
     info_modal_open: Option<String>,
@@ -111,6 +112,7 @@ impl App {
             .collect();
         let hardware_info = database.get_hardware_info().unwrap_or_default();
         let dashboard_page = DashboardPage;
+        let battery_page = BatteryPage::new();
         let all_time_data = database.get_all_time_data().unwrap_or_default();
         let task = Task::done(Message::FetchAllChartsData(TimeRange::default()));
 
@@ -122,6 +124,7 @@ impl App {
                 header: Header::new(Page::all(), current_page),
                 footer: Footer,
                 info_page: InfoPage::new(),
+                battery_page,
                 settings_page: SettingsPage::new(),
                 settings_open: false,
                 info_modal_open: None,
@@ -396,6 +399,7 @@ impl App {
                 self.electricity_cost.usd_per_kwh,
             ),
             Page::Info => self.info_page.view(&self.hardware_info, self.theme, self.language),
+            Page::Battery => self.battery_page.view(self.language),
         };
 
         let content: Element<'_, Message, AppTheme> = Column::new()

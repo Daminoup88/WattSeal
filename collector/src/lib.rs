@@ -8,9 +8,11 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+use battery::Manager;
+
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
-use common::{clog, database::purge::averaging_and_purging_data};
+use common::{BatteryHealthRecord, clog, database::purge::averaging_and_purging_data};
 use database::Database;
 use sensors::{SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
 use sysinfo::System;
@@ -42,6 +44,60 @@ impl CollectorApp {
             #[cfg(debug_assertions)]
             iteration: 0,
         })
+    }
+
+    fn record_battery_health(&self) {
+        let manager = match Manager::new() {
+            Ok(m) => m,
+            Err(_) => return,
+        };
+        let mut batteries = match manager.batteries() {
+            Ok(b) => b,
+            Err(_) => return,
+        };
+        let battery = match batteries.next() {
+            Some(Ok(b)) => b,
+            _ => return,
+        };
+
+        let design_capacity = battery.energy_full_design().get::<battery::units::energy::watt_hour>();
+        let full_charge_capacity = battery.energy_full().get::<battery::units::energy::watt_hour>();
+        if design_capacity <= 0.0 {
+            return;
+        }
+
+        let health_percent = (full_charge_capacity as f64 / design_capacity as f64) * 100.0;
+        let discharge_rate = match battery.state() {
+            battery::State::Discharging => {
+                Some(battery.energy_rate().get::<battery::units::power::watt>() as f64)
+            }
+            _ => None,
+        };
+        let cycle_count = battery.cycle_count();
+        let time_to_full = battery.time_to_full();
+        let time_since_full_charge = if time_to_full.is_none() && battery.state() != battery::State::Charging {
+            // Battery is full or discharging; no direct "time since full" available from crate.
+            None
+        } else {
+            None
+        };
+
+        let now_millis = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_millis() as i64;
+
+        let record = BatteryHealthRecord {
+            timestamp: now_millis,
+            health_percent,
+            discharge_rate_watts: discharge_rate,
+            cycle_count,
+            time_since_full_charge_seconds: time_since_full_charge,
+        };
+
+        if let Err(e) = self.database.insert_battery_health(&record) {
+            clog!("✗ Failed to insert battery health: {}", e);
+        }
     }
 
     fn purge_and_average(&mut self) {
@@ -100,6 +156,12 @@ impl CollectorApp {
             .map_err(|e| format!("Failed to create database tables: {e}"))?;
         clog!("✓ Database initialized");
 
+        // Battery health table
+        match self.database.create_battery_health_table() {
+            Ok(_) => clog!("✓ Battery health table ready"),
+            Err(e) => clog!("✗ Failed to create battery health table: {e}"),
+        }
+
         // Hardware info
         clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
         let info = get_hardware_info(&self.sensors);
@@ -152,6 +214,8 @@ impl CollectorApp {
             let _ = self
                 .database
                 .insert_event_and_update_energy(&event, since_last_update_secs);
+
+            self.record_battery_health();
 
             #[cfg(debug_assertions)]
             for sensor_data in event.data() {

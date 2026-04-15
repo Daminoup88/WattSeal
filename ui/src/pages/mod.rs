@@ -1,3 +1,4 @@
+pub mod battery;
 pub mod dashboard;
 pub mod info;
 pub mod settings;
@@ -30,7 +31,7 @@ macro_rules! define_pages {
     };
 }
 
-define_pages!(Dashboard, Info);
+define_pages!(Dashboard, Info, Battery);
 
 impl Page {
     /// Returns the translated page name for the given language.
@@ -38,6 +39,7 @@ impl Page {
         match self {
             Page::Dashboard => page_dashboard(language),
             Page::Info => page_info(language),
+            Page::Battery => "Battery",
         }
     }
 }
