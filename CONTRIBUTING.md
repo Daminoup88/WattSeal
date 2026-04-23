@@ -25,6 +25,11 @@ Got an idea? [Open a feature request](https://github.com/Daminoup88/WattSeal/iss
 4. **Test** that the project builds: `cargo build`
 5. **Open a Pull Request** with a clear description of what you changed and why
 
+### Contributor License Agreement
+
+By submitting a pull request or any other contribution to this repository,
+you agree to the terms of the [Contributor License Agreement](CLA.md).
+
 ### Development Setup
 
 ```bash
