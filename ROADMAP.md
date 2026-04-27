@@ -7,7 +7,7 @@
 - [ ] Run as a service ([#18](https://github.com/Daminoup88/WattSeal/issues/18))
 - [ ] Configurable sensors polling frequency with no regression on purge / UI averages ([46](https://github.com/Daminoup88/WattSeal/issues/46))
 - [ ] Improved estimation of energy consumption on machines with Apple Silicon processors ([46](https://github.com/Daminoup88/WattSeal/issues/46))
-- [ ] Add the possibility to run only sensors by implementing a headless mode ([46](https://github.com/Daminoup88/WattSeal/issues/46))
+- [x] Add the possibility to run only sensors by implementing a headless mode ([52](https://github.com/Daminoup88/WattSeal/issues/52))
 
 ### Security
 
