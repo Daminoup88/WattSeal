@@ -40,6 +40,11 @@ of data transmission to a broker using MQTT.
 
 ![](resources/svg/possible_arch_after_mqtt_implem.svg)
 
+### Components architecture
 
+This diagram represents a preliminary architectural design for adding data
+transmission to an MQTT broker, as well as integration with software that
+captures data from Apple devices equipped with Apple Silicon processors.
 
+![](resources/svg/components_arch_hecaton_project.svg)
 
