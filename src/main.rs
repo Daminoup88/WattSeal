@@ -34,7 +34,9 @@ fn options() -> OptionParser<Options> {
     let ui_mode = long("ui")
         .help("Launch Wattseal with the graphical user interface.")
         .flag(true, false);
-    let background_mode = long("bg")
+
+    let background_mode = short('b')
+        .long("background")
         .help(
             "Runs Wattseal in the background. It's possible to return to the
             UI mode from the tray icons",
