@@ -30,3 +30,16 @@
 - [ ] Indirect network power usage by domain ([#23](https://github.com/Daminoup88/WattSeal/issues/23))
 - [ ] Power usage breakdown by browser tab ([#24](https://github.com/Daminoup88/WattSeal/issues/24))
 - [ ] Auto-update electricity prices and carbon emissions on build ([#25](https://github.com/Daminoup88/WattSeal/issues/25))
+
+## Architecture Diagrams 
+
+### Possible architectural goal
+
+This diagram represents possible architectural approach after the implementation
+of data transmission to a broker using MQTT.
+
+![](resources/svg/possible_arch_after_mqtt_implem.svg)
+
+
+
+
