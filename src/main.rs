@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use bpaf::*;
 use collector::CollectorApp;
 use common::WINDOW_ICON_BYTES;
 use tray_icon::{
@@ -20,6 +21,32 @@ use winit::{
     event_loop::{ActiveEventLoop, ControlFlow, EventLoop},
     window::WindowId,
 };
+
+/// Configuration options for the application.
+#[derive(Debug, Clone)]
+struct Options {
+    ui_mode: bool,
+    background_mode: bool,
+}
+
+/// Returns options parser to run
+fn options() -> OptionParser<Options> {
+    let ui_mode = long("ui")
+        .help("Launch Wattseal with the graphical user interface.")
+        .flag(true, false);
+    let background_mode = long("bg")
+        .help(
+            "Runs Wattseal in the background. It's possible to return to the
+            UI mode from the tray icons",
+        )
+        .flag(true, false);
+
+    construct!(Options {
+        ui_mode,
+        background_mode,
+    })
+    .to_options()
+}
 
 /// Spawns the UI subprocess if not already running.
 fn spawn_ui(ui_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
@@ -141,12 +168,10 @@ fn main() {
         common::clog!("⚠ Failed to set working directory to executable directory: {}", e);
     }
 
-    let args: Vec<String> = std::env::args().skip(1).collect();
-    let is_ui_mode = args.iter().any(|a| a == "--ui");
-    let is_background_mode = args.iter().any(|a| a == "--background");
+    let options = options().run();
 
     #[cfg(target_os = "windows")]
-    if !is_ui_mode && !is_admin::is_admin() {
+    if !options.ui_mode && !is_admin::is_admin() {
         let exe = std::env::current_exe();
         if let Ok(exe) = exe {
             let relaunched = runas::Command::new(&exe).args(&args).gui(true).status();
@@ -157,7 +182,7 @@ fn main() {
         }
     }
 
-    if is_ui_mode {
+    if options.ui_mode {
         if let Err(err) = ui::run() {
             common::clog!("✗ UI failed to start: {err}");
         }
@@ -209,7 +234,7 @@ fn main() {
     }
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-    if !is_background_mode {
+    if !options.background_mode {
         spawn_ui(&ui_child).ok();
     }
 
