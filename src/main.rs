@@ -27,6 +27,7 @@ use winit::{
 struct Options {
     ui_mode: bool,
     background_mode: bool,
+    headless_mode: bool,
 }
 
 /// Returns options parser to run
@@ -43,9 +44,15 @@ fn options() -> OptionParser<Options> {
         )
         .flag(true, false);
 
+    let headless_mode = short('h')
+        .long("headless")
+        .help("Runs only Wattseal sensors, without UI and tray icon.")
+        .flag(true, false);
+
     construct!(Options {
         ui_mode,
         background_mode,
+        headless_mode,
     })
     .to_options()
 }
@@ -185,6 +192,12 @@ fn main() {
         }
     }
 
+    if options.headless_mode && (options.ui_mode || options.background_mode) {
+        let msg = format!("Impossible to run headless mode if UI or background mode is enabled");
+        common::clog!("✗ {msg}");
+        return;
+    }
+
     if options.ui_mode {
         if let Err(err) = ui::run() {
             common::clog!("✗ UI failed to start: {err}");
@@ -234,6 +247,10 @@ fn main() {
             common::clog!("✗ Collector thread ended before signaling readiness: {}", e);
             return;
         }
+    }
+
+    if options.headless_mode {
+        loop {}
     }
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
