@@ -174,6 +174,7 @@ fn main() {
     if !options.ui_mode && !is_admin::is_admin() {
         let exe = std::env::current_exe();
         if let Ok(exe) = exe {
+            let args: Vec<String> = std::env::args().skip(1).collect();
             let relaunched = runas::Command::new(&exe).args(&args).gui(true).status();
             match relaunched {
                 Ok(status) if status.success() => return,
