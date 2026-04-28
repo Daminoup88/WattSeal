@@ -40,7 +40,7 @@ pub struct AllTimeData {
 }
 
 /// CPU power and usage readings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct CPUData {
     pub total_power_watts: Option<f64>,
     pub pp0_power_watts: Option<f64>,
@@ -50,7 +50,7 @@ pub struct CPUData {
 }
 
 /// GPU power and usage readings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct GPUData {
     pub total_power_watts: Option<f64>,
     pub usage_percent: Option<f64>,
@@ -58,14 +58,14 @@ pub struct GPUData {
 }
 
 /// RAM power and usage readings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct RamData {
     pub total_power_watts: Option<f64>,
     pub usage_percent: Option<f64>,
 }
 
 /// Disk power and I/O throughput readings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct DiskData {
     pub total_power_watts: Option<f64>,
     pub read_usage_mb_s: f64,
@@ -73,7 +73,7 @@ pub struct DiskData {
 }
 
 /// Network power and throughput readings.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NetworkData {
     pub total_power_watts: Option<f64>,
     pub download_speed_mb_s: f64,
@@ -81,7 +81,7 @@ pub struct NetworkData {
 }
 
 /// Raw RGBA icon pixel data.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct IconData {
     pub width: u32,
     pub height: u32,
@@ -89,7 +89,7 @@ pub struct IconData {
 }
 
 /// Per-application resource usage snapshot.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct ProcessData {
     pub app_name: String,
     pub process_exe_path: Option<String>,
@@ -104,7 +104,7 @@ pub struct ProcessData {
 }
 
 /// Tagged union of all sensor reading types.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub enum SensorData {
     CPU(CPUData),
     GPU(GPUData),
@@ -116,7 +116,7 @@ pub enum SensorData {
 }
 
 /// Aggregated total power across all components.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
 pub struct TotalData {
     pub total_power_watts: f64,
     pub period_type: String,
