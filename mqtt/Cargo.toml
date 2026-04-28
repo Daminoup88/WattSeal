@@ -1,0 +1,17 @@
+[package]
+name = "mqtt"
+version.workspace = true
+authors.workspace = true
+readme.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+edition.workspace = true
+description.workspace = true
+
+[dependencies]
+rumqttc = "0.25.1"
+serde = "1.0.228"
+serde_json = "1.0.149"
+tokio = "1.52.1"
