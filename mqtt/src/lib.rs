@@ -25,7 +25,7 @@ impl fmt::Display for MQTTPublisherError {
 }
 
 impl MQTTPublisher {
-    pub fn new(addr : &SocketAddr) -> Self {
+    pub fn new(addr: &SocketAddr) -> Self {
         let host = addr.ip().to_string().to_string();
         let port = addr.port();
 

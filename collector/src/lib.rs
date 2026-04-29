@@ -3,17 +3,20 @@ pub mod sensors;
 
 use std::{
     cell::RefCell,
+    net::SocketAddr,
     rc::Rc,
     thread,
     time::{Duration, Instant, SystemTime},
-    net::SocketAddr,
 };
 
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
 use common::{clog, database::purge::averaging_and_purging_data};
 use database::Database;
-use mqtt::{MQTTPublisher, topics::sensor_data_to_topic, topics::hardware_info_topic};
+use mqtt::{
+    MQTTPublisher,
+    topics::{hardware_info_topic, sensor_data_to_topic},
+};
 use sensors::{SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
 use sysinfo::System;
 
@@ -39,7 +42,10 @@ pub struct CollectorApp {
 impl MQTTInfos {
     pub fn new(id: &str, addr: &SocketAddr) -> Self {
         let publisher = MQTTPublisher::new(addr);
-        MQTTInfos { id: id.to_string(), publisher }
+        MQTTInfos {
+            id: id.to_string(),
+            publisher,
+        }
     }
 }
 
@@ -126,7 +132,7 @@ impl CollectorApp {
         // Hardware info
         clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
         let info = get_hardware_info(&self.sensors);
-        
+
         if let Some(database) = &mut self.database {
             match database.insert_hardware_info(&info) {
                 Ok(_) => clog!("✓ Hardware info saved"),
@@ -190,7 +196,7 @@ impl CollectorApp {
                     #[cfg(debug_assertions)]
                     match mqtt_infos.publisher.publish(&topic, sensor_data) {
                         Ok(_) => println!("✓ Sensor data published on topic {}", topic),
-                        Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e)
+                        Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e),
                     }
 
                     #[cfg(not(debug_assertions))]

@@ -1,6 +1,6 @@
 use common::types::SensorData;
 
-pub fn sensor_data_to_topic(id : &str, sensor_data : &SensorData) -> String {
+pub fn sensor_data_to_topic(id: &str, sensor_data: &SensorData) -> String {
     let topic = "sensor_data";
     match sensor_data {
         SensorData::CPU(_) => format!("{}/{}/cpu", id, topic),
@@ -13,8 +13,7 @@ pub fn sensor_data_to_topic(id : &str, sensor_data : &SensorData) -> String {
     }
 }
 
-pub fn hardware_info_topic(id : &str) -> String {
+pub fn hardware_info_topic(id: &str) -> String {
     let topic = "hardware_info";
     format!("{}/{}", id, topic)
 }
-
