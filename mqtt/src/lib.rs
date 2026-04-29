@@ -1,6 +1,6 @@
 pub mod topics;
 
-use std::{net::SocketAddr, time::Duration};
+use std::{fmt, net::SocketAddr, time::Duration};
 
 use rumqttc::{Client, MqttOptions, QoS};
 use serde::ser::Serialize;
@@ -13,6 +13,15 @@ pub struct MQTTPublisher {
 pub enum MQTTPublisherError {
     SerializationError,
     PublishError,
+}
+
+impl fmt::Display for MQTTPublisherError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            MQTTPublisherError::SerializationError => write!(f, "Failed to serialize data to JSON"),
+            MQTTPublisherError::PublishError => write!(f, "Failed to publish message to MQTT broker"),
+        }
+    }
 }
 
 impl MQTTPublisher {

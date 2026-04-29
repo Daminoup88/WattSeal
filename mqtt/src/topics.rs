@@ -12,3 +12,9 @@ pub fn sensor_data_to_topic(id : &str, sensor_data : &SensorData) -> String {
         SensorData::Process(_) => format!("{}/{}/process", id, topic),
     }
 }
+
+pub fn hardware_info_topic(id : &str) -> String {
+    let topic = "hardware_info";
+    format!("{}/{}", id, topic)
+}
+

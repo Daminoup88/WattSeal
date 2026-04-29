@@ -13,7 +13,7 @@ use std::{
 use common::logging::start_log_session;
 use common::{clog, database::purge::averaging_and_purging_data};
 use database::Database;
-use mqtt::{MQTTPublisher, topics::sensor_data_to_topic};
+use mqtt::{MQTTPublisher, topics::sensor_data_to_topic, topics::hardware_info_topic};
 use sensors::{SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
 use sysinfo::System;
 
@@ -121,13 +121,23 @@ impl CollectorApp {
                 .create_tables_if_not_exists(&table_names)
                 .map_err(|e| format!("Failed to create database tables: {e}"))?;
             clog!("✓ Database initialized");
+        }
 
-            // Hardware info
-            clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
-            let info = get_hardware_info(&self.sensors);
+        // Hardware info
+        clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+        let info = get_hardware_info(&self.sensors);
+        
+        if let Some(database) = &mut self.database {
             match database.insert_hardware_info(&info) {
                 Ok(_) => clog!("✓ Hardware info saved"),
                 Err(e) => clog!("✗ Failed to save hardware info: {e}"),
+            }
+        }
+        if let Some(mqtt_infos) = &self.mqtt_infos {
+            let topic = hardware_info_topic(&mqtt_infos.id);
+            match mqtt_infos.publisher.publish(&topic, &info.hardware_info_serialized) {
+                Ok(_) => clog!("✓ Hardware info published on broker"),
+                Err(e) => clog!("✗ Failed to publish hardware info: {e}"),
             }
         }
         clog!("Initialization complete");
