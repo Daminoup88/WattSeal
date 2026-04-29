@@ -9,9 +9,8 @@ use std::{
 };
 
 use bpaf::{OptionParser, Parser, construct, long, short};
-use collector::CollectorApp;
+use collector::{CollectorApp, MQTTInfos};
 use common::WINDOW_ICON_BYTES;
-use mqtt::MQTTPublisher;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -30,7 +29,8 @@ struct Options {
     ui_mode: bool,
     background_mode: bool,
     headless_mode: bool,
-    mqtt_broker: Option<SocketAddr>,
+    mqtt_id: Option<String>,
+    mqtt_addr: Option<SocketAddr>,
     local_storage_mode: bool,
 }
 
@@ -53,8 +53,13 @@ fn options() -> OptionParser<Options> {
         .help("Runs only Wattseal sensors, without UI and tray icon.")
         .switch();
 
-    let mqtt_broker = long("mqtt")
-        .help("Specify MQTT broker IP to send sensors data.")
+    let mqtt_id = long("mqtt-id")
+        .help("Identifier used as the root of MQTT topics (e.g. my-machine/cpu, my-machine/ram). Requires --mqtt-addr to be set. Defaults to \"wattseal_collector\".")
+        .argument::<String>("ID")
+        .optional();
+
+    let mqtt_addr = long("mqtt-addr")
+        .help("Specify MQTT broker address to send sensors data.")
         .argument::<SocketAddr>("ADDRESS")
         .optional();
 
@@ -66,7 +71,8 @@ fn options() -> OptionParser<Options> {
         ui_mode,
         background_mode,
         headless_mode,
-        mqtt_broker,
+        mqtt_id,
+        mqtt_addr,
         local_storage_mode,
     })
     .to_options()
@@ -189,8 +195,8 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector(enable_local_storage: bool, mqtt_broker: Option<MQTTPublisher>) -> Result<CollectorApp, String> {
-    let mut app = CollectorApp::new(enable_local_storage, mqtt_broker)
+fn start_collector(enable_local_storage: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
+    let mut app = CollectorApp::new(enable_local_storage, mqtt_infos)
         .map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
         .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
@@ -217,8 +223,14 @@ fn main() {
         }
     }
 
-    if !options.local_storage_mode && options.mqtt_broker.is_none() {
+    if !options.local_storage_mode && options.mqtt_addr.is_none() {
         let msg = format!("Impossible to run without both local data storage and an MQTT broker.");
+        common::clog!("✗ {msg}");
+        return;
+    }
+
+    if options.mqtt_addr.is_none() && options.mqtt_id.is_some() {
+        let msg = format!("An MQTT broker address must be entered in order to specify the collector's MQTT topic.");
         common::clog!("✗ {msg}");
         return;
     }
@@ -245,18 +257,15 @@ fn main() {
         }
     };
 
-    let mqtt_publisher = match options.mqtt_broker {
-        Some(b) => {
-            let name = "mqtt_broker";
-            let host = b.ip().to_string().to_string();
-            let port = b.port();
-            Some(MQTTPublisher::new(name, &host, port))
-        },
-        None => None
+    let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
+        let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
+        Some(MQTTInfos::new(&id, &mqtt_addr))
+    } else {
+        None
     };
 
     if options.headless_mode {
-        match start_collector(options.local_storage_mode, mqtt_publisher) {
+        match start_collector(options.local_storage_mode, mqtt_infos) {
             Ok(mut app) => app.run(),
             Err(e) => common::clog!("✗ {e}"),
         }
@@ -267,7 +276,7 @@ fn main() {
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
     thread::spawn(move || {
-        let mut app = match start_collector(options.local_storage_mode, mqtt_publisher) {
+        let mut app = match start_collector(options.local_storage_mode, mqtt_infos) {
             Ok(app) => app,
             Err(e) => {
                 common::clog!("✗ {e}");

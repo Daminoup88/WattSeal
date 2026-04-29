@@ -1,6 +1,6 @@
 pub mod topics;
 
-use std::time::Duration;
+use std::{net::SocketAddr, time::Duration};
 
 use rumqttc::{Client, MqttOptions, QoS};
 use serde::ser::Serialize;
@@ -16,8 +16,11 @@ pub enum MQTTPublisherError {
 }
 
 impl MQTTPublisher {
-    pub fn new(name: &str, host: &str, port: u16) -> Self {
-        let mut options = MqttOptions::new(name, host, port);
+    pub fn new(addr : &SocketAddr) -> Self {
+        let host = addr.ip().to_string().to_string();
+        let port = addr.port();
+
+        let mut options = MqttOptions::new("mqtt_broker", host, port);
         options.set_keep_alive(Duration::from_secs(5));
 
         let (client, mut connection) = Client::new(options, 10);

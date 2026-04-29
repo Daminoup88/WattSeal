@@ -6,6 +6,7 @@ use std::{
     rc::Rc,
     thread,
     time::{Duration, Instant, SystemTime},
+    net::SocketAddr,
 };
 
 #[cfg(not(debug_assertions))]
@@ -18,11 +19,15 @@ use sysinfo::System;
 
 use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
+pub struct MQTTInfos {
+    id: String,
+    publisher: MQTTPublisher,
+}
+
 /// Background sensor-collection application.
 pub struct CollectorApp {
-    id: String,
     database: Option<Database>,
-    mqtt_publisher: Option<MQTTPublisher>,
+    mqtt_infos: Option<MQTTInfos>,
     sensors: Vec<SensorType>,
     system: Rc<RefCell<System>>,
     last_update: Instant,
@@ -31,9 +36,16 @@ pub struct CollectorApp {
     iteration: u64,
 }
 
+impl MQTTInfos {
+    pub fn new(id: &str, addr: &SocketAddr) -> Self {
+        let publisher = MQTTPublisher::new(addr);
+        MQTTInfos { id: id.to_string(), publisher }
+    }
+}
+
 impl CollectorApp {
     /// Creates a new collector with a database connection.
-    pub fn new(enable_local_storage: bool, mqtt_publisher: Option<MQTTPublisher>) -> Result<Self, String> {
+    pub fn new(enable_local_storage: bool, mqtt_infos: Option<MQTTInfos>) -> Result<Self, String> {
         let database;
         if enable_local_storage {
             database = Some(Database::new().map_err(|e| format!("Failed to create database: {e}"))?);
@@ -41,11 +53,9 @@ impl CollectorApp {
             database = None
         }
         let s = System::new_all();
-        let id = "wattseal_collector".to_string();
         Ok(CollectorApp {
-            id,
             database,
-            mqtt_publisher,
+            mqtt_infos,
             sensors: Vec::new(),
             system: Rc::new(RefCell::new(s)),
             last_update: Instant::now(),
@@ -163,18 +173,18 @@ impl CollectorApp {
                 let _ = database.insert_event_and_update_energy(&event, since_last_update_secs);
             }
 
-            if let Some(mqtt_publisher) = &self.mqtt_publisher {
+            if let Some(mqtt_infos) = &self.mqtt_infos {
                 for sensor_data in event.data() {
-                    let topic = sensor_data_to_topic(&self.id, &sensor_data);
+                    let topic = sensor_data_to_topic(&mqtt_infos.id, &sensor_data);
 
                     #[cfg(debug_assertions)]
-                    match mqtt_publisher.publish(&topic, sensor_data) {
+                    match mqtt_infos.publisher.publish(&topic, sensor_data) {
                         Ok(_) => println!("✓ Sensor data published on topic {}", topic),
                         Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e)
                     }
 
                     #[cfg(not(debug_assertions))]
-                    let _ = mqtt_publisher.publish(&topic, sensor_data);
+                    let _ = mqtt_infos.publisher.publish(&topic, sensor_data);
                 }
             }
 
