@@ -1,10 +1,10 @@
 use std::time::Duration;
 
-use rumqttc::{AsyncClient, MqttOptions, QoS};
+use rumqttc::{Client, MqttOptions, QoS};
 use serde::ser::Serialize;
 
 pub struct MQTTPublisher {
-    client: AsyncClient,
+    client: Client,
 }
 
 #[derive(Debug)]
@@ -14,17 +14,16 @@ pub enum MQTTPublisherError {
 }
 
 impl MQTTPublisher {
-    pub async fn new(name: &str, host: &str, port: u16) -> Self {
+    pub fn new(name: &str, host: &str, port: u16) -> Self {
         let mut options = MqttOptions::new(name, host, port);
         options.set_keep_alive(Duration::from_secs(5));
 
-        let (client, mut eventloop) = AsyncClient::new(options, 10);
+        let (client, mut connection) = Client::new(options, 10);
 
-        tokio::spawn(async move {
-            loop {
-                match eventloop.poll().await {
-                    Ok(_) => {}
-                    Err(e) => eprintln!("Failed to poll event from mqtt client: {}", e),
+        std::thread::spawn(move || {
+            for event in connection.iter() {
+                if let Err(e) = event {
+                    eprintln!("MQTT Publishier initialization creation error: {}", e);
                 }
             }
         });
@@ -32,11 +31,10 @@ impl MQTTPublisher {
         Self { client }
     }
 
-    pub async fn publish(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTPublisherError> {
+    pub fn publish(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTPublisherError> {
         let payload = serde_json::to_vec(data).map_err(|_| MQTTPublisherError::SerializationError)?;
         self.client
             .publish(topic, QoS::AtLeastOnce, false, payload)
-            .await
             .map_err(|_| MQTTPublisherError::PublishError)
     }
 }

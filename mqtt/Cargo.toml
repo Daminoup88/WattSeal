@@ -14,4 +14,3 @@ description.workspace = true
 rumqttc = "0.25.1"
 serde = "1.0.228"
 serde_json = "1.0.149"
-tokio = "1.52.1"
