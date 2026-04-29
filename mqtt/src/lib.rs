@@ -23,7 +23,8 @@ impl MQTTPublisher {
         std::thread::spawn(move || {
             for event in connection.iter() {
                 if let Err(e) = event {
-                    eprintln!("MQTT Publishier initialization creation error: {}", e);
+                    eprintln!("MQTT Publisher connection error: {}", e);
+                    std::thread::sleep(Duration::from_secs(5));
                 }
             }
         });
