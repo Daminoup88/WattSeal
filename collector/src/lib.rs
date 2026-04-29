@@ -12,6 +12,7 @@ use std::{
 use common::logging::start_log_session;
 use common::{clog, database::purge::averaging_and_purging_data};
 use database::Database;
+use mqtt::MQTTPublisher;
 use sensors::{SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
 use sysinfo::System;
 
@@ -19,7 +20,8 @@ use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
 /// Background sensor-collection application.
 pub struct CollectorApp {
-    database: Database,
+    database: Option<Database>,
+    mqtt_broker: Option<MQTTPublisher>,
     sensors: Vec<SensorType>,
     system: Rc<RefCell<System>>,
     last_update: Instant,
@@ -30,11 +32,17 @@ pub struct CollectorApp {
 
 impl CollectorApp {
     /// Creates a new collector with a database connection.
-    pub fn new() -> Result<Self, String> {
-        let database = Database::new().map_err(|e| format!("Failed to create database: {e}"))?;
+    pub fn new(enable_local_storage: bool, mqtt_broker: Option<MQTTPublisher>) -> Result<Self, String> {
+        let database;
+        if enable_local_storage {
+            database = Some(Database::new().map_err(|e| format!("Failed to create database: {e}"))?);
+        } else {
+            database = None
+        }
         let s = System::new_all();
         Ok(CollectorApp {
             database,
+            mqtt_broker,
             sensors: Vec::new(),
             system: Rc::new(RefCell::new(s)),
             last_update: Instant::now(),
@@ -92,22 +100,23 @@ impl CollectorApp {
         self.sensors.push(SensorType::Total);
         self.sensors.push(SensorType::Process);
 
-        // Database
-        clog!("\n========== SETTING UP DATABASE ==========");
-        let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
-        self.database
-            .create_tables_if_not_exists(&table_names)
-            .map_err(|e| format!("Failed to create database tables: {e}"))?;
-        clog!("✓ Database initialized");
+        if let Some(database) = &mut self.database {
+            // Database
+            clog!("\n========== SETTING UP DATABASE ==========");
+            let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
+            database
+                .create_tables_if_not_exists(&table_names)
+                .map_err(|e| format!("Failed to create database tables: {e}"))?;
+            clog!("✓ Database initialized");
 
-        // Hardware info
-        clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
-        let info = get_hardware_info(&self.sensors);
-        match self.database.insert_hardware_info(&info) {
-            Ok(_) => clog!("✓ Hardware info saved"),
-            Err(e) => clog!("✗ Failed to save hardware info: {e}"),
+            // Hardware info
+            clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+            let info = get_hardware_info(&self.sensors);
+            match database.insert_hardware_info(&info) {
+                Ok(_) => clog!("✓ Hardware info saved"),
+                Err(e) => clog!("✗ Failed to save hardware info: {e}"),
+            }
         }
-
         clog!("Initialization complete");
         Ok(())
     }
@@ -135,23 +144,21 @@ impl CollectorApp {
 
             let event = create_event_from_sensors(&self.sensors, self.system.clone());
 
-            #[cfg(debug_assertions)]
-            {
-                let start = Instant::now();
-                let result = self
-                    .database
-                    .insert_event_and_update_energy(&event, since_last_update_secs);
-                let duration = start.elapsed();
-                match result {
-                    Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
-                    Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
+            if let Some(database) = &mut self.database {
+                #[cfg(debug_assertions)]
+                {
+                    let start = Instant::now();
+                    let result = database.insert_event_and_update_energy(&event, since_last_update_secs);
+                    let duration = start.elapsed();
+                    match result {
+                        Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
+                        Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
+                    }
                 }
-            }
 
-            #[cfg(not(debug_assertions))]
-            let _ = self
-                .database
-                .insert_event_and_update_energy(&event, since_last_update_secs);
+                #[cfg(not(debug_assertions))]
+                let _ = database.insert_event_and_update_energy(&event, since_last_update_secs);
+            }
 
             #[cfg(debug_assertions)]
             for sensor_data in event.data() {

@@ -58,7 +58,7 @@ fn options() -> OptionParser<Options> {
         .argument::<SocketAddr>("ADDRESS")
         .optional();
 
-    let local_storage_mode = long("no-save-locally")
+    let local_storage_mode = long("no-local-save")
         .help("Do not save sensors metrics locally")
         .flag(false, true);
 

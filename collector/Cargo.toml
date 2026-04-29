@@ -23,6 +23,7 @@ nvml-wrapper = "0.12.1"
 
 [dependencies]
 common = { path = "../common" }
+mqtt = { path = "../mqtt" }
 display-info = "0.5.9"
 chrono = "0.4.44"
 sysinfo = "0.38.4"
