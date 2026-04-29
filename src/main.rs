@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 use std::{
+    net::SocketAddr,
     process::{Child, Command},
     sync::{Arc, Mutex, mpsc},
     thread,
@@ -10,6 +11,7 @@ use std::{
 use bpaf::{OptionParser, Parser, construct, long, short};
 use collector::CollectorApp;
 use common::WINDOW_ICON_BYTES;
+use mqtt::MQTTPublisher;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -28,6 +30,8 @@ struct Options {
     ui_mode: bool,
     background_mode: bool,
     headless_mode: bool,
+    mqtt_broker: Option<SocketAddr>,
+    local_storage_mode: bool,
 }
 
 /// Returns options parser to run
@@ -49,10 +53,21 @@ fn options() -> OptionParser<Options> {
         .help("Runs only Wattseal sensors, without UI and tray icon.")
         .switch();
 
+    let mqtt_broker = long("mqtt")
+        .help("Specify MQTT broker IP to send sensors data.")
+        .argument::<SocketAddr>("ADDRESS")
+        .optional();
+
+    let local_storage_mode = long("no-save-locally")
+        .help("Do not save sensors metrics locally")
+        .flag(false, true);
+
     construct!(Options {
         ui_mode,
         background_mode,
         headless_mode,
+        mqtt_broker,
+        local_storage_mode,
     })
     .to_options()
     .descr("WattSeal - Per-app power monitoring tool")
@@ -174,8 +189,9 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector() -> Result<CollectorApp, String> {
-    let mut app = CollectorApp::new().map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
+fn start_collector(enable_local_storage: bool, mqtt_broker: Option<MQTTPublisher>) -> Result<CollectorApp, String> {
+    let mut app = CollectorApp::new(enable_local_storage, mqtt_broker)
+        .map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
         .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
     Ok(app)
@@ -201,6 +217,12 @@ fn main() {
         }
     }
 
+    if !options.local_storage_mode && options.mqtt_broker.is_none() {
+        let msg = format!("Impossible to run without both local data storage and an MQTT broker.");
+        common::clog!("✗ {msg}");
+        return;
+    }
+
     if options.headless_mode && (options.ui_mode || options.background_mode) {
         let msg = format!("Impossible to run headless mode if UI or background mode is enabled");
         common::clog!("✗ {msg}");
@@ -223,8 +245,18 @@ fn main() {
         }
     };
 
+    let mqtt_publisher = match options.mqtt_broker {
+        Some(b) => {
+            let name = "mqtt_broker";
+            let host = b.ip().to_string().to_string();
+            let port = b.port();
+            Some(MQTTPublisher::new(name, &host, port))
+        },
+        None => None
+    };
+
     if options.headless_mode {
-        match start_collector() {
+        match start_collector(options.local_storage_mode, mqtt_publisher) {
             Ok(mut app) => app.run(),
             Err(e) => common::clog!("✗ {e}"),
         }
@@ -235,7 +267,7 @@ fn main() {
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
     thread::spawn(move || {
-        let mut app = match start_collector() {
+        let mut app = match start_collector(options.local_storage_mode, mqtt_publisher) {
             Ok(app) => app,
             Err(e) => {
                 common::clog!("✗ {e}");
