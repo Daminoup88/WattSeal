@@ -1,3 +1,5 @@
+pub mod topics;
+
 use std::time::Duration;
 
 use rumqttc::{Client, MqttOptions, QoS};
