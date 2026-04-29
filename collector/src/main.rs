@@ -11,7 +11,7 @@ fn main() {
         }
     };
 
-    let mut app = match CollectorApp::new() {
+    let mut app = match CollectorApp::new(true, None) {
         Ok(app) => app,
         Err(e) => {
             eprintln!("Failed to create CollectorApp: {}", e);
