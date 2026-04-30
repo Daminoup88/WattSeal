@@ -31,7 +31,7 @@ struct Options {
     headless_mode: bool,
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
-    local_storage_mode: bool,
+    db_mode: bool,
 }
 
 /// Returns options parser to run
@@ -63,8 +63,8 @@ fn options() -> OptionParser<Options> {
         .argument::<SocketAddr>("ADDRESS")
         .optional();
 
-    let local_storage_mode = long("no-local-save")
-        .help("Do not save sensors metrics locally")
+    let db_mode = long("no-db")
+        .help("Do not save sensors metrics in local database.")
         .flag(false, true);
 
     construct!(Options {
@@ -73,7 +73,7 @@ fn options() -> OptionParser<Options> {
         headless_mode,
         mqtt_id,
         mqtt_addr,
-        local_storage_mode,
+        db_mode,
     })
     .to_options()
     .descr("WattSeal - Per-app power monitoring tool")
@@ -195,8 +195,8 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector(enable_local_storage: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
-    let mut app = CollectorApp::new(enable_local_storage, mqtt_infos)
+fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
+    let mut app = CollectorApp::new(enable_save_db, mqtt_infos)
         .map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
         .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
@@ -223,7 +223,7 @@ fn main() {
         }
     }
 
-    if !options.local_storage_mode && options.mqtt_addr.is_none() {
+    if !options.db_mode && options.mqtt_addr.is_none() {
         let msg = format!("Impossible to run without both local data storage and an MQTT broker.");
         common::clog!("✗ {msg}");
         return;
@@ -265,7 +265,7 @@ fn main() {
     };
 
     if options.headless_mode {
-        match start_collector(options.local_storage_mode, mqtt_infos) {
+        match start_collector(options.db_mode, mqtt_infos) {
             Ok(mut app) => app.run(),
             Err(e) => common::clog!("✗ {e}"),
         }
@@ -276,7 +276,7 @@ fn main() {
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
     thread::spawn(move || {
-        let mut app = match start_collector(options.local_storage_mode, mqtt_infos) {
+        let mut app = match start_collector(options.db_mode, mqtt_infos) {
             Ok(app) => app,
             Err(e) => {
                 common::clog!("✗ {e}");

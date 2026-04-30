@@ -51,9 +51,9 @@ impl MQTTInfos {
 
 impl CollectorApp {
     /// Creates a new collector with a database connection.
-    pub fn new(enable_local_storage: bool, mqtt_infos: Option<MQTTInfos>) -> Result<Self, String> {
+    pub fn new(enable_save_db: bool, mqtt_infos: Option<MQTTInfos>) -> Result<Self, String> {
         let database;
-        if enable_local_storage {
+        if enable_save_db {
             database = Some(Database::new().map_err(|e| format!("Failed to create database: {e}"))?);
         } else {
             database = None
