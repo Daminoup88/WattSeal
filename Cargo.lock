@@ -779,6 +779,7 @@ dependencies = [
  "is-admin",
  "mqtt",
  "nvml-wrapper",
+ "rumqttc",
  "sysinfo",
  "win-kernel-driver",
  "win_ring0",

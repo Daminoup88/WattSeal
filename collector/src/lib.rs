@@ -24,7 +24,7 @@ use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
 pub struct MQTTInfos {
     id: String,
-    publisher: MQTTPublisher,
+    publisher: MQTTPublisher<rumqttc::Client>,
 }
 
 /// Background sensor-collection application.
