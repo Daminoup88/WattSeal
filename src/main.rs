@@ -196,8 +196,8 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 
 /// Initializes the collector
 fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
-    let mut app = CollectorApp::new(enable_save_db, mqtt_infos)
-        .map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
+    let mut app =
+        CollectorApp::new(enable_save_db, mqtt_infos).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
         .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
     Ok(app)
