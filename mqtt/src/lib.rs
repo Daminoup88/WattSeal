@@ -51,7 +51,7 @@ impl<T: MQTTClient> MQTTPublisher<T> {
     }
 }
 
-impl MQTTPublisher<Client>
+impl MQTTPublisher<Client> {
     /// Create a new MQTT publisher of rumqttc client from a broker address
     pub fn new_from_addr(addr: &SocketAddr) -> Self {
         let host = addr.ip().to_string();
