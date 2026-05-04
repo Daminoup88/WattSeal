@@ -41,7 +41,7 @@ pub struct CollectorApp {
 
 impl MQTTInfos {
     pub fn new(id: &str, addr: &SocketAddr) -> Self {
-        let publisher = MQTTPublisher::new(addr);
+        let publisher = MQTTPublisher::new_from_addr(addr);
         MQTTInfos {
             id: id.to_string(),
             publisher,

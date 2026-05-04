@@ -36,6 +36,10 @@ pub struct MQTTPublisher<T: MQTTClient> {
 }
 
 impl<T: MQTTClient> MQTTPublisher<T> {
+    pub fn new(client: T) -> Self {
+        Self { client }
+    }
+
     pub fn publish(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTError> {
         let payload = serde_json::to_vec(data).map_err(|_| MQTTError::SerializationError)?;
         self.client.publish(topic, payload)
@@ -43,8 +47,8 @@ impl<T: MQTTClient> MQTTPublisher<T> {
 }
 
 impl MQTTPublisher<Client> {
-    pub fn new(addr: &SocketAddr) -> Self {
-        let host = addr.ip().to_string().to_string();
+    pub fn new_from_addr(addr: &SocketAddr) -> Self {
+        let host = addr.ip().to_string();
         let port = addr.port();
 
         let mut options = MqttOptions::new("mqtt_broker", host, port);
