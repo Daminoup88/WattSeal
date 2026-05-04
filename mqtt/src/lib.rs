@@ -23,6 +23,7 @@ impl fmt::Display for MQTTError {
 
 #[automock]
 pub trait MQTTClient {
+    /// Publish `payload` to the self client `topic`
     fn publish(&self, topic: &str, payload: Vec<u8>) -> Result<(), MQTTError>;
 }
 
@@ -38,17 +39,20 @@ pub struct MQTTPublisher<T: MQTTClient> {
 }
 
 impl<T: MQTTClient> MQTTPublisher<T> {
+    /// Create a new MQTT publisher from a client
     pub fn new(client: T) -> Self {
         Self { client }
     }
 
+    /// Publish `data` to the self client `topic`
     pub fn publish(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTError> {
         let payload = serde_json::to_vec(data).map_err(|_| MQTTError::SerializationError)?;
         self.client.publish(topic, payload)
     }
 }
 
-impl MQTTPublisher<Client> {
+impl MQTTPublisher<Client>
+    /// Create a new MQTT publisher of rumqttc client from a broker address
     pub fn new_from_addr(addr: &SocketAddr) -> Self {
         let host = addr.ip().to_string();
         let port = addr.port();

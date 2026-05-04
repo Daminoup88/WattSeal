@@ -22,6 +22,7 @@ use sysinfo::System;
 
 use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
+/// MQTT information to interact with a MQTT client
 pub struct MQTTInfos {
     id: String,
     publisher: MQTTPublisher<rumqttc::Client>,
