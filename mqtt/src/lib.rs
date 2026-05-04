@@ -2,6 +2,7 @@ pub mod topics;
 
 use std::{fmt, net::SocketAddr, time::Duration};
 
+use mockall::automock;
 use rumqttc::{Client, MqttOptions, QoS};
 use serde::ser::Serialize;
 
@@ -20,6 +21,7 @@ impl fmt::Display for MQTTError {
     }
 }
 
+#[automock]
 pub trait MQTTClient {
     fn publish(&self, topic: &str, payload: Vec<u8>) -> Result<(), MQTTError>;
 }
@@ -66,5 +68,67 @@ impl MQTTPublisher<Client> {
         });
 
         Self { client }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_valid_publish() {
+        let test_topic = "wattseal_collector/CPU";
+        let mut mock = MockMQTTClient::new();
+
+        mock.expect_publish()
+            .withf(move |topic, _| topic == test_topic)
+            .times(1)
+            .returning(|_, _| Ok(()));
+
+        let publisher = MQTTPublisher::new(mock);
+        let data = serde_json::json!({"test_value": 6});
+
+        let result = publisher.publish(test_topic, &data);
+
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_publish_not_serializable() {
+        struct NotSerializable;
+        impl serde::Serialize for NotSerializable {
+            fn serialize<S: serde::Serializer>(&self, _: S) -> Result<S::Ok, S::Error> {
+                Err(serde::ser::Error::custom("Forced serialization error"))
+            }
+        }
+
+        let test_topic = "error_collector/not_serializable";
+        let mut mock = MockMQTTClient::new();
+
+        mock.expect_publish().times(0);
+
+        let publisher = MQTTPublisher::new(mock);
+
+        let result = publisher.publish(test_topic, &NotSerializable);
+
+        assert!(matches!(result, Err(MQTTError::SerializationError)))
+    }
+
+    #[test]
+    fn test_publish_send_error() {
+        let test_topic = "error_collector/public_error";
+        let mut mock = MockMQTTClient::new();
+
+        mock.expect_publish()
+            .withf(move |topic, _| topic == test_topic)
+            .times(1)
+            .returning(|_, _| Err(MQTTError::PublishError));
+
+        let publisher = MQTTPublisher::new(mock);
+        let data = serde_json::json!({"test_value": 6});
+
+        let result = publisher.publish(test_topic, &data);
+
+        assert!(matches!(result, Err(MQTTError::PublishError)));
     }
 }
