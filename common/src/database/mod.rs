@@ -5,7 +5,7 @@ use core::time;
 use std::{collections::HashMap, time::SystemTime};
 
 pub use entries::DatabaseEntry;
-pub use purge::averaging_and_purging_data;
+pub use purge::summing_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::{
@@ -174,7 +174,7 @@ impl Database {
     }
 
     /// Insert an event and update component energy totals in a single transaction.
-    pub fn insert_event_and_update_energy(&mut self, event: &Event, since_last_secs: f64) -> Result<(), DatabaseError> {
+    pub fn insert_event_and_update_energy(&mut self, event: &Event) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO timestamp (timestamp, period_type) VALUES (?1, ?2)",
@@ -189,8 +189,8 @@ impl Database {
         }
         // Batch energy updates in the same transaction
         for sensor_data in event.data() {
-            if let Some(power) = sensor_data.total_power_watts() {
-                let energy_wh = power * since_last_secs / 3600.0;
+            if let Some(power) = sensor_data.total_energy_uj() {
+                let energy_wh = power / 3_600_000_000.0;
                 tx.execute(
                     "INSERT INTO component_all_time_data (component_name, total_energy_wh) VALUES (?1, ?2) \
                      ON CONFLICT(component_name) DO UPDATE SET total_energy_wh = total_energy_wh + ?2",
@@ -604,7 +604,7 @@ impl Database {
     ) -> Result<Vec<(i64, SensorData)>, DatabaseError> {
         let second_query = "SELECT
                 (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start,
-                SUM(COALESCE(d.total_power_watts, 0.0)) / ?2 AS total_power_watts,
+                SUM(COALESCE(d.total_energy_uj, 0.0)) AS total_energy_uj,
                 'second' AS period_type
              FROM timestamp t
              JOIN total_data d ON t.id = d.timestamp_id
@@ -616,7 +616,7 @@ impl Database {
 
         let hour_query = "SELECT
                 (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start,
-                AVG(COALESCE(d.total_power_watts, 0.0)) AS total_power_watts,
+                SUM(COALESCE(d.total_energy_uj, 0.0)) AS total_energy_uj,
                 'hour' AS period_type
              FROM timestamp t
              JOIN total_data d ON t.id = d.timestamp_id
@@ -657,7 +657,7 @@ impl Database {
                 hour_data
             } else {
                 SensorData::Total(TotalData {
-                    total_power_watts: 0.0,
+                    total_energy_uj: 0.0,
                     period_type: if window_seconds >= 3600 {
                         "hour".to_string()
                     } else {
@@ -688,7 +688,7 @@ impl Database {
         let start = now_ms - n_seconds * 1000;
 
         let query = if energy_mode {
-            // Energy mode: combine second-level and hour-level data.
+            // Energy mode: combine second-level and hour-level data and convert uj into Wh.
             // Second rows: each row = 1 s → power/3600 = Wh contribution.
             // Hour rows:   each row = 1 h of averaged power → value IS Wh.
             // CPU/GPU/RAM/disk are "unfolded" so the final AVG = time-weighted avg
@@ -697,7 +697,7 @@ impl Database {
                 ?2 AS timestamp,
                 combined.app_name AS app_name,
                 MAX(combined.process_exe_path) AS process_exe_path,
-                SUM(combined.energy_wh) AS process_power_watts,
+                SUM(combined.energy_wh) AS process_energy_uj,
                 SUM(combined.cpu_contrib) / ?4 AS process_cpu_usage,
                 SUM(combined.gpu_contrib) / ?4 AS process_gpu_usage,
                 SUM(combined.mem_contrib) / ?4 AS process_mem_usage,
@@ -708,7 +708,7 @@ impl Database {
                  SELECT
                      p.app_name,
                      p.process_exe_path,
-                     COALESCE(p.process_power_watts, 0.0) / 3600.0 AS energy_wh,
+                     COALESCE(p.process_energy_uj, 0.0) / 3600000000.0 AS energy_wh,
                      COALESCE(p.process_cpu_usage, 0.0) AS cpu_contrib,
                      COALESCE(p.process_gpu_usage, 0.0) AS gpu_contrib,
                      COALESCE(p.process_mem_usage, 0.0) AS mem_contrib,
@@ -723,7 +723,7 @@ impl Database {
                  SELECT
                      p.app_name,
                      p.process_exe_path,
-                     COALESCE(p.process_power_watts, 0.0) AS energy_wh,
+                     COALESCE(p.process_energy_uj, 0.0) / 3600000000.0 AS energy_wh,
                      COALESCE(p.process_cpu_usage, 0.0) * 3600.0 AS cpu_contrib,
                      COALESCE(p.process_gpu_usage, 0.0) * 3600.0 AS gpu_contrib,
                      COALESCE(p.process_mem_usage, 0.0) * 3600.0 AS mem_contrib,
@@ -736,7 +736,7 @@ impl Database {
                    AND t.timestamp >= ?1 AND t.timestamp < ?2
              ) combined
              GROUP BY combined.app_name
-             ORDER BY process_power_watts DESC
+             ORDER BY process_energy_uj DESC
              LIMIT ?3"
                 .to_string()
         } else {
@@ -745,7 +745,7 @@ impl Database {
                 ?2 AS timestamp,
                 p.app_name AS app_name,
                 MAX(p.process_exe_path) AS process_exe_path,
-                SUM(COALESCE(p.process_power_watts, 0.0)) / ?4 AS process_power_watts,
+                SUM(COALESCE(p.process_energy_uj, 0.0)) / (?4 * 1000000) AS process_energy_uj,
                 SUM(COALESCE(p.process_cpu_usage, 0.0)) / ?4 AS process_cpu_usage,
                 SUM(COALESCE(p.process_gpu_usage, 0.0)) / ?4 AS process_gpu_usage,
                 SUM(COALESCE(p.process_mem_usage, 0.0)) / ?4 AS process_mem_usage,
@@ -757,7 +757,7 @@ impl Database {
              WHERE t.period_type = 1
                AND t.timestamp >= ?1 AND t.timestamp < ?2
              GROUP BY p.app_name
-             ORDER BY process_power_watts DESC
+             ORDER BY process_energy_uj DESC
              LIMIT ?3"
                 .to_string()
         };

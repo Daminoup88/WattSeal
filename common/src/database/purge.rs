@@ -9,19 +9,19 @@ use crate::database::Database;
 const HOUR_MS: i64 = 3600 * 1000;
 
 /// Aggregates old data into hourly buckets and purges raw records.
-pub fn averaging_and_purging_data(
+pub fn summing_and_purging_data(
     database: &mut Database,
-    average_until_time: i64,
+    sum_until_time: i64,
     purge_until_time: i64,
 ) -> Result<(), String> {
     #[cfg(debug_assertions)]
     let start = Instant::now();
-    let _ = averaging_total_data(database, average_until_time);
+    let _ = sum_total_data(database, sum_until_time);
     #[cfg(debug_assertions)]
     println!("Averaging total data took {} millis", start.elapsed().as_millis());
     #[cfg(debug_assertions)]
     let start = Instant::now();
-    let _ = averaging_process_data(database, average_until_time);
+    let _ = sum_process_data(database, sum_until_time);
     #[cfg(debug_assertions)]
     println!("Averaging process data took {} millis", start.elapsed().as_millis());
     #[cfg(debug_assertions)]
@@ -32,8 +32,8 @@ pub fn averaging_and_purging_data(
     Ok(())
 }
 
-// Insert records of TotalData with average values every hour until the duration specified (ex: 24h ago)
-fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
+// Insert records of TotalData with sum values every hour until the duration specified (ex: 24h ago)
+fn sum_total_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
     let cutoff_end_timestamp = get_timestamp_oclock() - duration_in_hours * HOUR_MS;
 
     let first_timestamp: Option<i64> = database
@@ -64,8 +64,7 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
                     WHEN t.timestamp < ?3 THEN ?1
                     ELSE (t.timestamp / ?4) * ?4
                 END AS bucket_start,
-                AVG(d.total_power_watts) AS avg_power,
-                COUNT(d.total_power_watts) AS value_count
+                SUM(d.total_energy_uj) AS sum_energy,
              FROM timestamp t
              JOIN total_data d ON t.id = d.timestamp_id
              WHERE t.timestamp >= ?1
@@ -79,11 +78,11 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
     let rows = stmt
         .query_map(
             params![first_timestamp, cutoff_end_timestamp, first_bucket_end, HOUR_MS],
-            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?, row.get::<_, i64>(2)?)),
+            |row| Ok((row.get::<_, i64>(0)?, row.get::<_, f64>(1)?)),
         )
         .map_err(|e| format!("Failed to execute query: {}", e))?;
 
-    let mut aggregated = Vec::<(i64, f64, i64)>::new();
+    let mut aggregated = Vec::<(i64, f64)>::new();
     for row in rows {
         aggregated.push(row.map_err(|e| format!("Failed to read query row: {}", e))?);
     }
@@ -103,16 +102,10 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
         .map_err(|e| format!("Failed to prepare timestamp insert: {}", e))?;
 
     let mut insert_total_stmt = tx
-        .prepare("INSERT INTO total_data (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2, 'hour')")
+        .prepare("INSERT INTO total_data (timestamp_id, total_energy_uj, period_type) VALUES (?1, ?2, 'hour')")
         .map_err(|e| format!("Failed to prepare total_data insert: {}", e))?;
 
-    for (bucket_start, avg_power, value_count) in aggregated {
-        let mut power = avg_power;
-        if value_count > 0 {
-            power = avg_power * (value_count as f64) / 3600.0;
-            // We assume missing values = 0W
-        }
-
+    for (bucket_start, sum_energy) in aggregated {
         let event_timestamp = if bucket_start == first_timestamp {
             bucket_start - (bucket_start % HOUR_MS)
         } else {
@@ -125,7 +118,7 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
         let timestamp_id = tx.last_insert_rowid();
 
         insert_total_stmt
-            .execute(params![timestamp_id, power])
+            .execute(params![timestamp_id, sum_energy])
             .map_err(|e| format!("Failed to insert averaged event: {}", e))?;
     }
 
@@ -140,7 +133,7 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
 
 /// Aggregate top-N process data into hourly buckets so that process history
 /// survives the raw-data purge and can be queried over weeks / months.
-fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
+fn sum_process_data(database: &mut Database, duration_in_hours: i64) -> Result<(), String> {
     let cutoff_end_timestamp = get_timestamp_oclock() - duration_in_hours * HOUR_MS;
 
     // Check whether there are any un-averaged process rows to aggregate
@@ -167,7 +160,7 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
                 (t.timestamp / ?2) * ?2 AS bucket_start,
                 p.app_name,
                 MAX(p.process_exe_path)              AS process_exe_path,
-                SUM(COALESCE(p.process_power_watts, 0.0)) / MAX(1, COUNT(*)) AS process_power_watts,
+                SUM(COALESCE(p.process_energy_uj, 0.0))   / MAX(1, COUNT(*)) AS process_energy_uj,
                 SUM(COALESCE(p.process_cpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_cpu_usage,
                 SUM(COALESCE(p.process_gpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_gpu_usage,
                 SUM(COALESCE(p.process_mem_usage, 0.0))   / MAX(1, COUNT(*)) AS process_mem_usage,
@@ -179,9 +172,9 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
              WHERE t.period_type = 1
                AND t.timestamp < ?1
              GROUP BY bucket_start, p.app_name
-             ORDER BY bucket_start, process_power_watts DESC",
+             ORDER BY bucket_start, process_energy_uj DESC",
         )
-        .map_err(|e| format!("prepare process avg: {}", e))?;
+        .map_err(|e| format!("prepare process sum: {}", e))?;
 
     // Collect rows grouped by bucket
     let rows = stmt
@@ -227,7 +220,7 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
     let mut insert_proc = tx
         .prepare(
             "INSERT INTO process_data (timestamp_id, app_name, process_exe_path, \
-             process_power_watts, process_cpu_usage, process_gpu_usage, \
+             process_energy_uj, process_cpu_usage, process_gpu_usage, \
              process_mem_usage, read_bytes_per_sec, written_bytes_per_sec, \
              subprocess_count) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
         )

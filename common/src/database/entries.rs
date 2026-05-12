@@ -74,30 +74,30 @@ impl DatabaseEntry for CPUData {
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
             timestamp_id,
-            &self.total_power_watts,
-            &self.pp0_power_watts,
-            &self.pp1_power_watts,
-            &self.dram_power_watts,
+            &self.total_energy_uj,
+            &self.pp0_energy_uj,
+            &self.pp1_energy_uj,
+            &self.dram_energy_uj,
             &self.usage_percent,
         ]
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
-            ("pp0_power_watts", "REAL"),
-            ("pp1_power_watts", "REAL"),
-            ("dram_power_watts", "REAL"),
+            ("total_energy_uj", "REAL"),
+            ("pp0_energy_uj", "REAL"),
+            ("pp1_energy_uj", "REAL"),
+            ("dram_energy_uj", "REAL"),
             ("usage_percent", "REAL"),
         ]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(CPUData {
-            total_power_watts: row.get("total_power_watts")?,
-            pp0_power_watts: row.get("pp0_power_watts")?,
-            pp1_power_watts: row.get("pp1_power_watts")?,
-            dram_power_watts: row.get("dram_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
+            pp0_energy_uj: row.get("pp0_energy_uj")?,
+            pp1_energy_uj: row.get("pp1_energy_uj")?,
+            dram_energy_uj: row.get("dram_energy_uj")?,
             usage_percent: row.get("usage_percent")?,
         })
     }
@@ -115,7 +115,7 @@ impl DatabaseEntry for GPUData {
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
             timestamp_id,
-            &self.total_power_watts,
+            &self.total_energy_uj,
             &self.usage_percent,
             &self.vram_usage_percent,
         ]
@@ -123,7 +123,7 @@ impl DatabaseEntry for GPUData {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_energy_uj", "REAL"),
             ("usage_percent", "REAL"),
             ("vram_usage_percent", "REAL"),
         ]
@@ -131,7 +131,7 @@ impl DatabaseEntry for GPUData {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(GPUData {
-            total_power_watts: row.get("total_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
             usage_percent: row.get("usage_percent")?,
             vram_usage_percent: row.get("vram_usage_percent")?,
         })
@@ -150,7 +150,7 @@ impl DatabaseEntry for DiskData {
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
             timestamp_id,
-            &self.total_power_watts,
+            &self.total_energy_uj,
             &self.read_usage_mb_s,
             &self.write_usage_mb_s,
         ]
@@ -158,7 +158,7 @@ impl DatabaseEntry for DiskData {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_energy_uj", "REAL"),
             ("read_usage_mb_s", "REAL"),
             ("write_usage_mb_s", "REAL"),
         ]
@@ -166,7 +166,7 @@ impl DatabaseEntry for DiskData {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(DiskData {
-            total_power_watts: row.get("total_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
             read_usage_mb_s: row.get("read_usage_mb_s")?,
             write_usage_mb_s: row.get("write_usage_mb_s")?,
         })
@@ -183,16 +183,16 @@ impl DatabaseEntry for RamData {
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![timestamp_id, &self.total_power_watts, &self.usage_percent]
+        vec![timestamp_id, &self.total_energy_uj, &self.usage_percent]
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_power_watts", "REAL"), ("usage_percent", "REAL")]
+        &[("total_energy_uj", "REAL"), ("usage_percent", "REAL")]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(RamData {
-            total_power_watts: row.get("total_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
             usage_percent: row.get("usage_percent")?,
         })
     }
@@ -210,7 +210,7 @@ impl DatabaseEntry for NetworkData {
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
             timestamp_id,
-            &self.total_power_watts,
+            &self.total_energy_uj,
             &self.download_speed_mb_s,
             &self.upload_speed_mb_s,
         ]
@@ -218,7 +218,7 @@ impl DatabaseEntry for NetworkData {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_energy_uj", "REAL"),
             ("download_speed_mb_s", "REAL"),
             ("upload_speed_mb_s", "REAL"),
         ]
@@ -226,7 +226,7 @@ impl DatabaseEntry for NetworkData {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(NetworkData {
-            total_power_watts: row.get("total_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
             download_speed_mb_s: row.get("download_speed_mb_s")?,
             upload_speed_mb_s: row.get("upload_speed_mb_s")?,
         })
@@ -243,16 +243,16 @@ impl DatabaseEntry for TotalData {
     }
 
     fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![timestamp_id, &self.total_power_watts, &self.period_type]
+        vec![timestamp_id, &self.total_energy_uj, &self.period_type]
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_power_watts", "REAL"), ("period_type", "TEXT NOT NULL")]
+        &[("total_energy_uj", "REAL"), ("period_type", "TEXT NOT NULL")]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(TotalData {
-            total_power_watts: row.get("total_power_watts")?,
+            total_energy_uj: row.get("total_energy_uj")?,
             period_type: row.get("period_type")?,
         })
     }
@@ -272,7 +272,7 @@ impl DatabaseEntry for ProcessData {
             timestamp_id,
             &self.app_name,
             &self.process_exe_path,
-            &self.process_power_watts,
+            &self.process_energy_uj,
             &self.process_cpu_usage,
             &self.process_gpu_usage,
             &self.process_mem_usage,
@@ -286,7 +286,7 @@ impl DatabaseEntry for ProcessData {
         &[
             ("app_name", "TEXT NOT NULL"),
             ("process_exe_path", "TEXT"),
-            ("process_power_watts", "REAL"),
+            ("process_energy_uj", "REAL"),
             ("process_cpu_usage", "REAL"),
             ("process_gpu_usage", "REAL"),
             ("process_mem_usage", "REAL"),
@@ -300,7 +300,7 @@ impl DatabaseEntry for ProcessData {
         Ok(ProcessData {
             app_name: row.get("app_name")?,
             process_exe_path: row.get("process_exe_path")?,
-            process_power_watts: row.get("process_power_watts")?,
+            process_energy_uj: row.get("process_energy_uj")?,
             process_cpu_usage: row.get("process_cpu_usage")?,
             process_gpu_usage: row.get("process_gpu_usage")?,
             process_mem_usage: row.get("process_mem_usage")?,
@@ -349,10 +349,10 @@ mod tests {
         // CPU
         match CPUData::zero() {
             SensorData::CPU(cpu) => {
-                assert_eq!(cpu.total_power_watts, Some(0.0));
-                assert_eq!(cpu.pp0_power_watts, Some(0.0));
-                assert_eq!(cpu.pp1_power_watts, Some(0.0));
-                assert_eq!(cpu.dram_power_watts, Some(0.0));
+                assert_eq!(cpu.total_energy_uj, Some(0.0));
+                assert_eq!(cpu.pp0_energy_uj, Some(0.0));
+                assert_eq!(cpu.pp1_energy_uj, Some(0.0));
+                assert_eq!(cpu.dram_energy_uj, Some(0.0));
                 assert_eq!(cpu.usage_percent, Some(0.0));
             }
             _ => panic!("CPUData::zero() returned wrong SensorData variant"),
@@ -361,7 +361,7 @@ mod tests {
         // GPU
         match GPUData::zero() {
             SensorData::GPU(gpu) => {
-                assert_eq!(gpu.total_power_watts, Some(0.0));
+                assert_eq!(gpu.total_energy_uj, Some(0.0));
                 assert_eq!(gpu.usage_percent, Some(0.0));
                 assert_eq!(gpu.vram_usage_percent, Some(0.0));
             }
@@ -371,7 +371,7 @@ mod tests {
         // RAM
         match RamData::zero() {
             SensorData::Ram(ram) => {
-                assert_eq!(ram.total_power_watts, Some(0.0));
+                assert_eq!(ram.total_energy_uj, Some(0.0));
                 assert_eq!(ram.usage_percent, Some(0.0));
             }
             _ => panic!("RamData::zero() returned wrong SensorData variant"),
@@ -380,7 +380,7 @@ mod tests {
         // Disk
         match DiskData::zero() {
             SensorData::Disk(disk) => {
-                assert_eq!(disk.total_power_watts, Some(0.0));
+                assert_eq!(disk.total_energy_uj, Some(0.0));
                 assert_eq!(disk.read_usage_mb_s, 0.0);
                 assert_eq!(disk.write_usage_mb_s, 0.0);
             }
@@ -390,7 +390,7 @@ mod tests {
         // Network
         match NetworkData::zero() {
             SensorData::Network(net) => {
-                assert_eq!(net.total_power_watts, Some(0.0));
+                assert_eq!(net.total_energy_uj, Some(0.0));
                 assert_eq!(net.download_speed_mb_s, 0.0);
                 assert_eq!(net.upload_speed_mb_s, 0.0);
             }
@@ -400,7 +400,7 @@ mod tests {
         // Total
         match TotalData::zero() {
             SensorData::Total(total) => {
-                assert_eq!(total.total_power_watts, 0.0);
+                assert_eq!(total.total_energy_uj, 0.0);
                 assert_eq!(total.period_type, "second");
             }
             _ => panic!("TotalData::zero() returned wrong SensorData variant"),
