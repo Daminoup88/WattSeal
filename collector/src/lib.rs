@@ -83,8 +83,6 @@ impl CollectorApp {
 
     /// Detects hardware sensors, creates database tables, and saves hardware info.
     pub fn initialize(&mut self) -> Result<(), String> {
-        let is_admin = is_admin();
-
         #[cfg(not(debug_assertions))]
         start_log_session();
 
@@ -92,8 +90,12 @@ impl CollectorApp {
 
         // CPU sensor
         clog!("Initializing sensors...");
-        match sensors::cpu::get_cpu_power_sensor(self.system.clone(), 0, is_admin) {
+        match sensors::cpu::get_cpu_power_sensor(self.system.clone(), 0) {
             Ok(sensor) => {
+                if let SensorType::CPU(cpu_sensor) = &sensor {
+                    let (os_label, mode_label) = cpu_sensor.power_mode_labels();
+                    clog!("CPU power mode: {os_label}/{mode_label}");
+                }
                 clog!("✓ CPU Power Sensor initialized successfully");
                 self.sensors.push(sensor);
             }
@@ -228,36 +230,5 @@ impl CollectorApp {
                 thread::sleep(Duration::from_millis(1000 - now_sub_ms as u64));
             }
         }
-    }
-}
-
-/// Returns whether the current process has elevated/RAPL privileges.
-fn is_admin() -> bool {
-    #[cfg(target_os = "windows")]
-    {
-        let admin = is_admin::is_admin();
-        #[cfg(debug_assertions)]
-        if !admin {
-            eprintln!("\u{26a0} Running without Administrator privileges. CPU power readings will use estimation.");
-        }
-        admin
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let rapl_accessible = std::fs::read_to_string("/sys/class/powercap/intel-rapl:0/energy_uj").is_ok();
-        #[cfg(debug_assertions)]
-        if !rapl_accessible {
-            eprintln!("\u{26a0} RAPL not accessible. CPU power readings will use estimation.");
-            eprintln!("  Tip: run as root or grant read access to /sys/class/powercap/");
-        }
-        rapl_accessible
-    }
-
-    #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-    {
-        #[cfg(debug_assertions)]
-        eprintln!("\u{26a0} No privileged power-reading support on this platform. Using estimation.");
-        false
     }
 }

@@ -49,18 +49,16 @@ WattSeal is a single executable file — no installation needed. Just download i
 
 ### Step 2 — Run it
 
-WattSeal doesn't need administrative privileges to run, but it does need them for precise CPU power measurements. If you skip the admin step, you'll still get power estimates based on CPU usage, but they won't be as accurate.
+WattSeal doesn't need administrative privileges to run, but Windows needs a one-time admin step to install the CPU MSR driver for precise power measurements. If you skip that step, you'll still get power estimates based on CPU usage, but they won't be as accurate.
 
 <details>
 <summary><strong>🪟 Windows</strong></summary>
 
 1. Double-click the downloaded `WattSeal-windows-x86_64.exe` file
 2. If prompted by Windows Defender SmartScreen, click "More info" and then "Run anyway" to launch the app. This is a standard warning for new apps that haven't yet built up reputation on Windows.
-3. If prompted by User Account Control (UAC), and you want the most accurate CPU power readings, click "Yes" to allow it to run with administrator privileges. If you click "No", it will still work but with less precise CPU power estimates.
+3. If prompted by User Account Control (UAC) to install the CPU MSR driver, click "Yes" to install it (this is a one-time step). If you click "No", WattSeal will still run but CPU power readings will be estimated.
 
 The app will launch in the system tray in the taskbar and the dashboard will open in a new window. If you close the dashboard, WattSeal will keep running in the background and you can reopen it by clicking the tray icon.
-
-If the app, or more especifically the WinRing0 kernel driver it uses for CPU measurements, is flagged by Windows Defender, it's your responsibility to allow it to run. The app will run without admin privileges, but CPU power readings will be estimates based on usage rather than direct hardware counters. For more info on the security implications of WinRing0, see the [Security](SECURITY.md#winring0-kernel-driver-windows) section of the documentation.
 
 </details>
 
@@ -120,7 +118,7 @@ With admin privileges, WattSeal provides the most comprehensive power monitoring
 | AMD GPU | ✅ | ❌ | ❌ |
 | Intel GPU | ✅ | ❌ | ❌ |
 | Other sensors (usage, I/O) | ✅ | ✅ | ✅ |
-| Auto admin elevation | ✅ UAC | Manual (`sudo`) | Manual |
+| Auto admin elevation | ✅ UAC (one time) | Manual (`sudo`) | Manual |
 
 <details>
 <summary><strong>Support without admin privileges</strong></summary>
@@ -128,7 +126,7 @@ With admin privileges, WattSeal provides the most comprehensive power monitoring
 |  | Windows | Linux | macOS |
 |---|:---:|:---:|:---:|
 | Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | Estimated | Estimated | Estimated |
+| CPU energy counters | ✅ (after driver install) | Estimated | Estimated |
 | NVIDIA GPU | ✅ | ✅ | ❌ |
 | AMD GPU | ✅ | ❌ | ❌ |
 | Intel GPU | ✅ | ❌ | ❌ |
@@ -209,8 +207,8 @@ Release build:
 cargo build --release
 ```
 
-> ⚠️ **Elevated privileges are required** to access hardware energy counters.
-> Run with administrator rights on Windows (you will be prompted to elevate), or use `sudo` on Linux.
+> ⚠️ **Elevated privileges are required** only to install the Windows CPU MSR driver once.
+> Run with administrator rights on Windows (you will be prompted to elevate for driver setup), or use `sudo` on Linux for RAPL access.
 
 ---
 

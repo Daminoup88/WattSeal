@@ -10,7 +10,7 @@ mod estimation;
 #[cfg(target_os = "linux")]
 mod linux_cpu;
 #[cfg(target_os = "windows")]
-mod windows_cpu;
+pub mod windows_cpu;
 
 use estimation::EstimationCPUSensor;
 pub use estimation::estimate_igpu_power;
@@ -22,9 +22,9 @@ use windows_cpu::WindowsCPUSensor;
 /// Platform-specific CPU power source.
 pub enum CPUOS {
     #[cfg(target_os = "windows")]
-    Windows(WindowsCPUSensor),
+    WindowsRAPL(WindowsCPUSensor),
     #[cfg(target_os = "linux")]
-    Linux(LinuxCPUSensor),
+    LinuxRAPL(LinuxCPUSensor),
     Estimation(EstimationCPUSensor),
 }
 
@@ -32,6 +32,18 @@ pub enum CPUOS {
 pub struct CPUSensor {
     sensor: CPUOS,
     system: Rc<RefCell<System>>,
+}
+
+impl CPUSensor {
+    pub fn power_mode_labels(&self) -> (&'static str, &'static str) {
+        match &self.sensor {
+            #[cfg(target_os = "windows")]
+            CPUOS::WindowsRAPL(_) => ("windows", "scaphandre"),
+            #[cfg(target_os = "linux")]
+            CPUOS::LinuxRAPL(_) => ("linux", "rapl"),
+            CPUOS::Estimation(_) => ("estimation", "tdp"),
+        }
+    }
 }
 
 impl Sensor for CPUSensor {
@@ -48,9 +60,9 @@ impl Sensor for CPUSensor {
 
         let mut power_data = match &self.sensor {
             #[cfg(target_os = "windows")]
-            CPUOS::Windows(sensor) => sensor.read_full_data()?,
+            CPUOS::WindowsRAPL(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "linux")]
-            CPUOS::Linux(sensor) => sensor.read_full_data()?,
+            CPUOS::LinuxRAPL(sensor) => sensor.read_full_data()?,
             CPUOS::Estimation(sensor) => SensorData::CPU(CPUData {
                 total_power_watts: Some(sensor.estimate(usage_percent)),
                 pp0_power_watts: None,
@@ -148,11 +160,7 @@ pub fn get_cpu_list(system: Rc<RefCell<System>>) -> Result<Vec<String>, String> 
 }
 
 /// Creates the best available CPU power sensor, falling back to TDP estimation.
-pub fn get_cpu_power_sensor(
-    system: Rc<RefCell<System>>,
-    index: usize,
-    #[cfg_attr(not(target_os = "windows"), allow(unused_variables))] is_admin: bool,
-) -> Result<SensorType, SensorError> {
+pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result<SensorType, SensorError> {
     let s = system
         .try_borrow_mut()
         .map_err(|e| SensorError::ReadError(format!("Failed to borrow system: {}", e)))?;
@@ -164,26 +172,22 @@ pub fn get_cpu_power_sensor(
 
     // Try platform-specific sensor first, fall back to TDP estimation
     #[cfg(target_os = "windows")]
-    if is_admin {
-        match WindowsCPUSensor::new(&vendor_id) {
-            Ok(sensor) => {
-                println!("✓ MSR sensor initialized successfully for vendor: {}", vendor_id);
-                return Ok(SensorType::CPU(CPUSensor {
-                    sensor: CPUOS::Windows(sensor),
-                    system: system.clone(),
-                }));
-            }
-            Err(e) => eprintln!("\u{26a0} MSR sensor unavailable ({:?}), falling back to estimation", e),
+    match WindowsCPUSensor::new(&vendor_id) {
+        Ok(sensor) => {
+            println!("✓ MSR sensor initialized successfully for vendor: {}", vendor_id);
+            return Ok(SensorType::CPU(CPUSensor {
+                sensor: CPUOS::WindowsRAPL(sensor),
+                system: system.clone(),
+            }));
         }
-    } else {
-        eprintln!("\u{26a0} Not running as Administrator, skipping MSR sensor (WinRing0 requires admin)");
+        Err(e) => eprintln!("\u{26a0} MSR sensor unavailable ({:?}), falling back to estimation", e),
     }
 
     #[cfg(target_os = "linux")]
     match LinuxCPUSensor::new() {
         Ok(sensor) => {
             return Ok(SensorType::CPU(CPUSensor {
-                sensor: CPUOS::Linux(sensor),
+                sensor: CPUOS::LinuxRAPL(sensor),
                 system: system.clone(),
             }));
         }

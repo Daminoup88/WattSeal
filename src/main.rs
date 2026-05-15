@@ -32,6 +32,10 @@ struct Options {
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
     db_mode: bool,
+    #[cfg(target_os = "windows")]
+    install_cpu_driver: bool,
+    #[cfg(target_os = "windows")]
+    uninstall_cpu_driver: bool,
 }
 
 /// Returns options parser to run
@@ -67,16 +71,45 @@ fn options() -> OptionParser<Options> {
         .help("Do not save sensors metrics in local database.")
         .flag(false, true);
 
-    construct!(Options {
-        ui_mode,
-        background_mode,
-        headless_mode,
-        mqtt_id,
-        mqtt_addr,
-        db_mode,
-    })
-    .to_options()
-    .descr("WattSeal - Per-app power monitoring tool")
+    let description = "WattSeal - Per-app power monitoring tool";
+
+    #[cfg(target_os = "windows")]
+    {
+        let install_cpu_driver = long("install-cpu-driver")
+            .help("Install the Windows CPU MSR driver (requires Administrator privileges).")
+            .switch();
+
+        let uninstall_cpu_driver = long("uninstall-cpu-driver")
+            .help("Uninstall the Windows CPU MSR driver (requires Administrator privileges).")
+            .switch();
+
+        return construct!(Options {
+            ui_mode,
+            background_mode,
+            headless_mode,
+            mqtt_id,
+            mqtt_addr,
+            db_mode,
+            install_cpu_driver,
+            uninstall_cpu_driver,
+        })
+        .to_options()
+        .descr(description);
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        return construct!(Options {
+            ui_mode,
+            background_mode,
+            headless_mode,
+            mqtt_id,
+            mqtt_addr,
+            db_mode,
+        })
+        .to_options()
+        .descr(description);
+    }
 }
 
 /// Spawns the UI subprocess if not already running.
@@ -211,16 +244,18 @@ fn main() {
     let options = options().run();
 
     #[cfg(target_os = "windows")]
-    if !options.ui_mode && !is_admin::is_admin() {
-        let exe = std::env::current_exe();
-        if let Ok(exe) = exe {
-            let args: Vec<String> = std::env::args().skip(1).collect();
-            let relaunched = runas::Command::new(&exe).args(&args).gui(true).status();
-            match relaunched {
-                Ok(status) if status.success() => return,
-                _ => {}
-            }
+    {
+        if options.install_cpu_driver {
+            collector::sensors::cpu::windows_cpu::install();
+            return;
         }
+
+        if options.uninstall_cpu_driver {
+            collector::sensors::cpu::windows_cpu::uninstall();
+            return;
+        }
+
+        collector::sensors::cpu::windows_cpu::setup();
     }
 
     if !options.db_mode && options.mqtt_addr.is_none() {

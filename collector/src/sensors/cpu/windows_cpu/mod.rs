@@ -1,11 +1,76 @@
 use std::{cell::RefCell, time::Instant};
 
-use driver::WinRing0Reader;
+use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
 use crate::database::{CPUData, SensorData};
 
 mod driver;
+
+fn explain_driver_error(error: &str) -> String {
+    if error.contains("OpenSCManagerW (code 5)")
+        || error.contains("CreateServiceW (code 5)")
+        || error.contains("DeleteService (code 5)")
+        || error.contains("Access is denied")
+    {
+        return format!("{error}. Administrator privileges are required.");
+    }
+
+    if error.contains("(code 1072)") {
+        return format!(
+            "{error}. Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the Scaphandre driver), then retry. If it persists, reboot Windows."
+        );
+    }
+
+    error.to_string()
+}
+
+pub fn install() -> bool {
+    match ScaphandreMsrReader::install() {
+        Ok(()) => {
+            common::clog!("✓ CPU MSR driver installed successfully");
+            true
+        }
+        Err(e) => {
+            common::clog!("✗ Failed to install CPU MSR driver: {}", explain_driver_error(&e));
+            false
+        }
+    }
+}
+
+pub fn uninstall() -> bool {
+    match ScaphandreMsrReader::uninstall() {
+        Ok(()) => {
+            common::clog!("✓ CPU MSR driver uninstalled successfully");
+            true
+        }
+        Err(e) => {
+            common::clog!("✗ Failed to uninstall CPU MSR driver: {}", explain_driver_error(&e));
+            false
+        }
+    }
+}
+
+pub fn setup() {
+    if !ScaphandreMsrReader::is_installed() {
+        common::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.");
+        if let Ok(exe) = std::env::current_exe() {
+            match runas::Command::new(&exe).arg("--install-cpu-driver").gui(true).status() {
+                Ok(status) if status.success() => {
+                    common::clog!("✓ CPU MSR driver installation completed");
+                }
+                Ok(_) => {
+                    common::clog!("\u{26a0} CPU MSR driver installation canceled or failed; using estimation");
+                }
+                Err(e) => {
+                    common::clog!("\u{26a0} Failed to launch driver installer: {e}");
+                }
+            }
+        } else {
+            common::clog!("\u{26a0} Unable to locate executable to install the CPU driver");
+        }
+    }
+}
 
 #[derive(Clone)]
 struct CPUValues {
@@ -46,19 +111,19 @@ impl Default for EnergyMeasurement {
     }
 }
 
-/// Windows CPU power sensor using MSR (Model-Specific Registers) via WinRing0.
+/// Windows CPU power sensor using MSR (Model-Specific Registers) via Scaphandre.
 pub struct WindowsCPUSensor {
     msr_reader: MSRReader,
     last_energy_measurement: RefCell<EnergyMeasurement>,
 }
 
 impl WindowsCPUSensor {
-    /// Initializes the WinRing0 driver and MSR reader for the given CPU vendor.
+    /// Initializes the Scaphandre driver and MSR reader for the given CPU vendor.
     pub fn new(vendor_id: &str) -> Result<Self, SensorError> {
         let vendor = CPUVendor::from_str(vendor_id);
-        let ring0_reader =
-            WinRing0Reader::new().map_err(|e| SensorError::ReadError(format!("WinRing0 init failed: {}", e)))?;
-        let msr_reader = MSRReader::new(ring0_reader, vendor);
+        let msr_driver = ScaphandreMsrReader::new()
+            .map_err(|e| SensorError::ReadError(format!("Scaphandre driver init failed: {}", e)))?;
+        let msr_reader = MSRReader::new(msr_driver, vendor);
 
         Ok(WindowsCPUSensor {
             msr_reader,
@@ -106,28 +171,28 @@ impl Sensor for WindowsCPUSensor {
 }
 
 struct MSRReader {
-    ring0_reader: WinRing0Reader,
+    msr_reader: ScaphandreMsrReader,
     vendor: CPUVendor,
     energy_unit: f64,
 }
 
 impl MSRReader {
-    fn new(ring0_reader: WinRing0Reader, vendor: CPUVendor) -> Self {
-        let energy_unit = Self::read_energy_unit(&ring0_reader, &vendor).unwrap_or(0.0);
+    fn new(msr_reader: ScaphandreMsrReader, vendor: CPUVendor) -> Self {
+        let energy_unit = Self::read_energy_unit(&msr_reader, &vendor).unwrap_or(0.0);
         MSRReader {
-            ring0_reader,
+            msr_reader,
             vendor,
             energy_unit,
         }
     }
 
-    fn read_energy_unit(ring0_reader: &WinRing0Reader, vendor: &CPUVendor) -> Result<f64, SensorError> {
+    fn read_energy_unit(msr_reader: &ScaphandreMsrReader, vendor: &CPUVendor) -> Result<f64, SensorError> {
         let read_fn = match vendor {
             CPUVendor::Intel => IntelMSR::read_energy_unit,
             CPUVendor::Amd => AMDMSR::read_energy_unit,
             CPUVendor::Other => return Err(SensorError::NotSupported),
         };
-        read_fn(ring0_reader).map_err(SensorError::ReadError)
+        read_fn(msr_reader).map_err(SensorError::ReadError)
     }
 
     fn read_energy(&self) -> Result<EnergyMeasurement, SensorError> {
@@ -136,7 +201,7 @@ impl MSRReader {
             CPUVendor::Amd => AMDMSR::read_energy_value,
             CPUVendor::Other => return Err(SensorError::NotSupported),
         };
-        let cpu_energy_values = read_fn(&self.ring0_reader).map_err(SensorError::ReadError)?;
+        let cpu_energy_values = read_fn(&self.msr_reader).map_err(SensorError::ReadError)?;
         Ok(EnergyMeasurement {
             cpu_energy_values,
             instant: Instant::now(),
@@ -205,18 +270,18 @@ trait MSR {
         ((edx as u64) << 32) | (eax as u64)
     }
     fn read_msr<T>(
-        ring0_reader: &WinRing0Reader,
+        msr_reader: &ScaphandreMsrReader,
         msr_addr: u32,
         expression: fn(edx: u32, eax: u32) -> T,
     ) -> Result<T, String> {
-        let out = ring0_reader.read_msr(msr_addr)?;
+        let out = msr_reader.read_msr(msr_addr)?;
         let edx = ((out >> 32) & 0xffffffff) as u32;
         let eax = (out & 0xffffffff) as u32;
         let result = expression(edx, eax);
         Ok(result)
     }
-    fn read_energy_unit(ring0_reader: &WinRing0Reader) -> Result<f64, String>;
-    fn read_energy_value(ring0_reader: &WinRing0Reader) -> Result<CPUValues, String>;
+    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String>;
+    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String>;
 }
 
 #[allow(non_camel_case_types)]
@@ -233,34 +298,18 @@ impl MSR for IntelMSR {
         let energy_unit_raw = (eax >> Self::ENERGY_UNIT_OFFSET) & Self::ENERGY_UNIT_MASK;
         1.0 / (1u64 << energy_unit_raw) as f64
     }
-    fn read_energy_unit(ring0_reader: &WinRing0Reader) -> Result<f64, String> {
+    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String> {
         Self::read_msr(
-            ring0_reader,
+            msr_reader,
             Self::MSR_RAPL_POWER_UNIT as u32,
             Self::energy_unit_expression,
         )
     }
-    fn read_energy_value(ring0_reader: &WinRing0Reader) -> Result<CPUValues, String> {
-        let pkg_energy = Self::read_msr(
-            ring0_reader,
-            Self::MSR_PKG_ENERGY_STATUS as u32,
-            Self::energy_expression,
-        )?;
-        let pp0_energy = Self::read_msr(
-            ring0_reader,
-            Self::MSR_PP0_ENERGY_STATUS as u32,
-            Self::energy_expression,
-        )?;
-        let pp1_energy = Self::read_msr(
-            ring0_reader,
-            Self::MSR_PP1_ENERGY_STATUS as u32,
-            Self::energy_expression,
-        )?;
-        let dram_energy = Self::read_msr(
-            ring0_reader,
-            Self::MSR_DRAM_ENERGY_STATUS as u32,
-            Self::energy_expression,
-        )?;
+    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
+        let pkg_energy = Self::read_msr(msr_reader, Self::MSR_PKG_ENERGY_STATUS as u32, Self::energy_expression)?;
+        let pp0_energy = Self::read_msr(msr_reader, Self::MSR_PP0_ENERGY_STATUS as u32, Self::energy_expression)?;
+        let pp1_energy = Self::read_msr(msr_reader, Self::MSR_PP1_ENERGY_STATUS as u32, Self::energy_expression)?;
+        let dram_energy = Self::read_msr(msr_reader, Self::MSR_DRAM_ENERGY_STATUS as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
             pkg: Some(pkg_energy as f64),
@@ -284,17 +333,17 @@ impl MSR for AMDMSR {
         1.0 / (1u64 << energy_unit_raw) as f64
     }
 
-    fn read_energy_unit(ring0_reader: &WinRing0Reader) -> Result<f64, String> {
+    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String> {
         Self::read_msr(
-            ring0_reader,
+            msr_reader,
             Self::ENERGY_PWR_UNIT_MSR as u32,
             Self::energy_unit_expression,
         )
     }
 
-    fn read_energy_value(ring0_reader: &WinRing0Reader) -> Result<CPUValues, String> {
-        let pkg_energy: u64 = Self::read_msr(ring0_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
-        let pp0_energy = Self::read_msr(ring0_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
+    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
+        let pkg_energy: u64 = Self::read_msr(msr_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
+        let pp0_energy = Self::read_msr(msr_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
             pkg: Some(pkg_energy as f64),

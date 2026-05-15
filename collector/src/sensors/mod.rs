@@ -168,7 +168,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
     }
 
     // --- Integrated-GPU power resolution ---
-    // Priority 1: Real PP1 reading from MSR (WinRing0).
+    // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
     if let Some(igpu_power) = integrated_gpu_power {
         let merged = data.iter_mut().any(|d| {
             if let SensorData::GPU(gpu) = d {

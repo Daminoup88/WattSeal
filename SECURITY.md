@@ -14,44 +14,32 @@ We'll acknowledge your report within 48 hours and work with you to understand an
 
 ## Scope
 
-WattSeal runs with elevated privileges (admin/root) to access hardware energy counters. We take this responsibility seriously.
+WattSeal may request elevated privileges to install a Windows CPU driver or to access Linux RAPL counters. We take this responsibility seriously.
 
 ---
 
-## WinRing0 Kernel Driver (Windows)
+## Scaphandre RAPL Driver (Windows)
 
-On Windows, WattSeal uses **WinRing0**, a third-party signed kernel-mode driver, to read CPU Model Specific Registers (MSRs). This is currently the only mechanism available to access hardware RAPL energy counters on Windows without building a custom kernel driver (that would be flagged by Windows Defender if not signed). Precise CPU measurements are a core requirement of WattSeal — without them the application cannot fulfil its primary purpose.
+On Windows, WattSeal uses the **Scaphandre RAPL driver**, a minimal signed kernel-mode driver, to read CPU Model Specific Registers (MSRs) required for RAPL energy counters. This replaces the previous generic MSR driver and reduces the exposed surface to the read-only operations WattSeal needs.
 
 ### Why it exists
 
-Reading CPU energy registers on Windows requires Ring-0 (kernel) access. WinRing0 is the only widely available signed driver that provides this without requiring test-signing mode. WattSeal uses it in a strictly read-only, targeted manner.
+Reading CPU energy registers on Windows requires Ring-0 (kernel) access. The Scaphandre driver provides read-only MSR access focused on RAPL counters, avoiding the generic read/write capabilities of legacy drivers.
 
 ### Security implications
 
-Kernel drivers run at the highest privilege level on the system. WinRing0 exposes generic MSR read/write capability, which goes beyond WattSeal's own read-only needs. This represents an elevated attack surface. While WattSeal constrains its own use of the driver, it cannot fully control what the driver exposes to other processes on the system.
+Kernel drivers run at the highest privilege level on the system. While the Scaphandre driver is minimal and read-only, it is still privileged code. WattSeal installs it once and then accesses it from user mode; normal operation does not require elevated privileges.
 
-WattSeal does not install WinRing0 as a permanent service. The driver is loaded on demand and its lifecycle is managed by the application. However, driver registration requires writing to the Windows registry and placing the `.sys` file on disk.
+### Installing and removing the driver
 
-### We want to replace it
+To install the driver:
 
-We are actively seeking a safer alternative — a minimal purpose-built signed driver or an official Windows API. **Contributions and suggestions toward this goal are very welcome.** Until a replacement exists, WinRing0 remains a necessary dependency for full measurement accuracy.
+1. Run `WattSeal --install-cpu-driver` **as Administrator**.
 
-### Your responsibility
+To remove the driver:
 
-By running WattSeal as administrator on Windows and accepting the UAC prompt, **you explicitly consent to loading a third-party kernel-mode driver.** You are responsible for this decision. If you are not comfortable with it, you may run WattSeal without administrator privileges — CPU power readings will fall back to estimates, but no kernel driver will be loaded.
+1. Run `WattSeal --uninstall-cpu-driver` **as Administrator**.
 
-### Removing WinRing0
+### Reporting driver-related issues
 
-If WinRing0 has been loaded by WattSeal and you wish to remove it entirely:
-
-1. Open PowerShell **as Administrator**.
-2. Stop and remove the service:
-   ```powershell
-   sc.exe stop WinRing0_1_2_0
-   sc.exe delete WinRing0_1_2_0
-   ```
-3. **Reboot** to fully unload the driver from kernel memory.
-
-### Reporting WinRing0-related issues
-
-If you discover a security vulnerability related to how WattSeal loads or uses WinRing0, or if you know of a safer alternative that could replace it, please report it through the process above or open a GitHub discussion. We treat any such report as high priority.
+If you discover a security vulnerability related to how WattSeal loads or uses the Scaphandre driver, please report it through the process above. We treat any such report as high priority.

@@ -1,72 +1,99 @@
-use std::{any::Any, ffi::c_ulong, panic, process::Command};
+use std::{thread, time::Duration};
 
-use common::clog;
-use win_ring0::WinRing0;
+use scaphandre_driver_rs::ScaphandreDriver;
 
-/// Safe wrapper around the WinRing0 kernel driver for MSR access.
-pub struct WinRing0Reader {
-    ring0: WinRing0,
+/// Safe wrapper around the Scaphandre RAPL driver for MSR access.
+pub struct ScaphandreMsrReader {
+    driver: ScaphandreDriver,
+    cpu_index: u32,
 }
 
-impl WinRing0Reader {
-    /// Installs and opens the WinRing0 driver, recovering from stuck state if needed.
+impl ScaphandreMsrReader {
+    fn has_windows_error_code(message: &str, code: u32) -> bool {
+        let code_fragment = format!("(code {code})");
+        message.contains(&code_fragment)
+    }
+
+    /// Opens the Scaphandre driver device for MSR access.
     pub fn new() -> Result<Self, String> {
-        clog!("Initializing WinRing0 driver...");
-        let mut handler = match panic::catch_unwind(|| WinRing0Reader { ring0: WinRing0::new() }) {
-            Ok(handler) => handler,
-            Err(e) => Self::free_stuck_driver(e)?,
-        };
-        clog!("Installing WinRing0 driver...");
-        handler.ring0.install().or_else(|_| handler.retry_install())?;
-        clog!("Opening WinRing0 driver...");
-        handler.ring0.open()?;
-        clog!("WinRing0 driver opened successfully.");
-        Ok(handler)
+        let driver = ScaphandreDriver::new().map_err(|e| format!("Failed to open Scaphandre driver: {e}"))?;
+        Ok(Self { driver, cpu_index: 0 })
     }
 
     /// Reads a Model-Specific Register by address.
-    pub fn read_msr(&self, msr: c_ulong) -> Result<u64, String> {
-        self.ring0.readMsr(msr)
+    pub fn read_msr(&self, msr: u32) -> Result<u64, String> {
+        self.driver
+            .read_msr(msr, self.cpu_index)
+            .map_err(|e| format!("Failed to read MSR {msr:#x}: {e}"))
     }
 
-    /// Uninstalls and re-installs the driver after a failed install.
-    fn retry_install(&mut self) -> Result<(), String> {
-        clog!("Uninstalling existing WinRing0 driver...");
-        self.ring0.uninstall()?;
-        clog!("Retrying WinRing0 driver installation...");
-        self.ring0.install()?;
-        Ok(())
-    }
-
-    /// Stops a stuck WinRing0 service and re-creates the reader.
-    fn free_stuck_driver(_: Box<dyn Any + Send>) -> Result<Self, String> {
-        clog!("WinRing0 initialization panicked. Freeing stuck driver...");
-        // sc stop WinRing0_1_2_0
-        let system_root = std::env::var("SystemRoot").unwrap_or_else(|_| r"C:\Windows".to_string());
-        let sc_path = format!(r"{}\System32\sc.exe", system_root);
-        Command::new(&sc_path).args(["stop", "WinRing0_1_2_0"]).output().ok();
-        clog!("Stuck WinRing0 driver stopped successfully.");
-        let mut handler = panic::catch_unwind(|| WinRing0Reader { ring0: WinRing0::new() })
-            .map_err(|e| format!("Failed to create WinRing0Reader after freeing driver: {:?}", e))?;
-        match handler.ring0.uninstall() {
-            Ok(_) => clog!("Stuck WinRing0 driver uninstalled successfully."),
-            Err(e) => clog!("Error uninstalling stuck WinRing0 driver: {}", e),
+    /// Returns whether the driver is installed on the system.
+    pub fn is_installed() -> bool {
+        match ScaphandreDriver::is_installed() {
+            Ok(installed) => installed,
+            Err(e) => {
+                eprintln!("Warning: failed to query Scaphandre driver status: {e}");
+                false
+            }
         }
-        return Ok(handler);
+    }
+
+    /// Installs the driver (requires Administrator privileges).
+    pub fn install() -> Result<(), String> {
+        let mut last_error = String::new();
+
+        // 1072 means the service is marked for deletion. This can be transient
+        // after uninstall or while another process still releases service handles.
+        for attempt in 0..3 {
+            match ScaphandreDriver::install() {
+                Ok(()) => return Ok(()),
+                Err(e) => {
+                    let message = format!("{e}");
+                    if Self::has_windows_error_code(&message, 1072) && attempt < 2 {
+                        thread::sleep(Duration::from_millis(500));
+                        last_error = message;
+                        continue;
+                    }
+                    return Err(format!("Failed to install Scaphandre driver: {message}"));
+                }
+            }
+        }
+
+        Err(format!(
+            "Failed to install Scaphandre driver: {last_error}. Service is marked for deletion (code 1072); close apps using the driver and retry, or reboot Windows."
+        ))
+    }
+
+    /// Uninstalls the driver (requires Administrator privileges).
+    pub fn uninstall() -> Result<(), String> {
+        match ScaphandreDriver::is_installed() {
+            Ok(false) => return Ok(()),
+            Ok(true) => {}
+            Err(e) => return Err(format!("Failed to query Scaphandre driver status: {e}")),
+        }
+
+        let mut driver = match ScaphandreDriver::new() {
+            Ok(driver) => driver,
+            Err(e) => return Err(format!("Failed to open Scaphandre driver for uninstall: {e}")),
+        };
+
+        match driver.uninstall() {
+            Ok(()) => Ok(()),
+            Err(e) => {
+                let message = format!("{e}");
+                if Self::has_windows_error_code(&message, 1072) {
+                    // Already marked for deletion: treat as successful uninstall.
+                    Ok(())
+                } else {
+                    Err(format!("Failed to uninstall Scaphandre driver: {message}"))
+                }
+            }
+        }
     }
 }
 
-impl Drop for WinRing0Reader {
+impl Drop for ScaphandreMsrReader {
     fn drop(&mut self) {
-        clog!("Closing WinRing0 driver...");
-        match self.ring0.close() {
-            Ok(_) => clog!("WinRing0 driver closed successfully."),
-            Err(e) => clog!("Error closing WinRing0 driver: {}", e),
-        }
-        clog!("Uninstalling WinRing0 driver...");
-        match self.ring0.uninstall() {
-            Ok(_) => clog!("WinRing0 driver uninstalled successfully."),
-            Err(e) => clog!("Error uninstalling WinRing0 driver: {}", e),
-        }
+        let _ = self.driver.close();
     }
 }

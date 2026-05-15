@@ -11,7 +11,7 @@
 
 ### Security
 
-- [ ] Remove WinRing0 driver dependency on Windows (see [Security](SECURITY.md#winring0-kernel-driver-windows) section for details) ([#19](https://github.com/Daminoup88/WattSeal/issues/19))
+- [x] Remove WinRing0 driver dependency on Windows (see [Security](SECURITY.md#winring0-kernel-driver-windows) section for details) ([#19](https://github.com/Daminoup88/WattSeal/issues/19))
 
 ## Data integration
 

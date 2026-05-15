@@ -50,10 +50,6 @@ winit = "0.30.13"
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 
-[target.'cfg(windows)'.dependencies]
-is-admin = "0.1.4"
-runas = "1.2"
-
 [profile.release]
 opt-level = 3
 lto = true
