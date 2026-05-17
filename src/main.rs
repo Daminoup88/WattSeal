@@ -255,7 +255,10 @@ fn main() {
             return;
         }
 
-        collector::sensors::cpu::windows_cpu::setup();
+        // Prevent UI process from trying to setup the driver again
+        if !options.ui_mode {
+            collector::sensors::cpu::windows_cpu::setup();
+        }
     }
 
     if !options.db_mode && options.mqtt_addr.is_none() {
