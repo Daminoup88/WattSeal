@@ -2,8 +2,8 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData, UiSettings,
-    generic_name_for_table,
+    AllTimeDataDB, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessDataDB, SensorDataDB, TotalDataDB,
+    UiSettings, generic_name_for_table,
 };
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
@@ -58,7 +58,7 @@ pub struct App {
     footer: Footer,
     theme: AppTheme,
     database: Database,
-    all_time_data: AllTimeData,
+    all_time_data: AllTimeDataDB,
     tick_count: u64,
     show_close_dialog: bool,
 }
@@ -155,7 +155,7 @@ impl App {
                 self.refresh_all_time_data();
                 self.tick_count += 1;
                 if self.tick_count % 10 == 0 {
-                    let table_name = ProcessData::table_name_static();
+                    let table_name = ProcessDataDB::table_name_static();
                     let time_range = self
                         .sensors
                         .get(table_name)
@@ -345,12 +345,12 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorDataDB)> {
         from_db(self.database.select_last_n_records(n))
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
-        if table_name == ProcessData::table_name_static() {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorDataDB)> {
+        if table_name == ProcessDataDB::table_name_static() {
             return self.load_process_data(time_range);
         }
         let result = match time_range {
@@ -371,14 +371,14 @@ impl App {
         if time_range.is_energy_mode() {
             let factor = time_range.power_scale_factor();
             for (_, sensor_data) in &mut data {
-                sensor_data.scale_power(factor);
+                sensor_data.scale_power(factor); // To change
             }
         }
 
         data
     }
 
-    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorDataDB)> {
         from_db(
             self.database
                 .select_top_processes_average(time_range.seconds(), 10, time_range.is_energy_mode()),
@@ -455,7 +455,7 @@ impl App {
             .push(description);
 
         if let Some(sensor) = self.sensors.get(target) {
-            let power = sensor.get_latest_reading().and_then(|d| d.total_power_watts());
+            let power = sensor.get_latest_reading().and_then(|d| d.total_consumption());
 
             let power_text = power
                 .map(|p| format!("{:.1} W", p))
@@ -476,7 +476,7 @@ impl App {
                         .class(TextStyle::Primary),
                 );
 
-            if target != ProcessData::table_name_static() {
+            if target != ProcessDataDB::table_name_static() {
                 content = content.push(power_row);
             }
         }
@@ -500,7 +500,7 @@ impl App {
             content = content.push(all_time_row);
         }
 
-        if target == TotalData::table_name_static() {
+        if target == TotalDataDB::table_name_static() {
             if let Some((name, power)) = self.find_current_top_consumer() {
                 let consumer_row = Row::new()
                     .spacing(SPACING_MEDIUM)
@@ -538,8 +538,8 @@ impl App {
             }
         }
 
-        if target == ProcessData::table_name_static() {
-            if let Some(proc_sensor) = self.sensors.get(ProcessData::table_name_static()) {
+        if target == ProcessDataDB::table_name_static() {
+            if let Some(proc_sensor) = self.sensors.get(ProcessDataDB::table_name_static()) {
                 if let Some(top_proc) = proc_sensor.get_top_process() {
                     let mut proc_row = Row::new().spacing(SPACING_MEDIUM).align_y(Alignment::Center).push(
                         Text::new(info_modal_top_process(language))
@@ -559,7 +559,7 @@ impl App {
                         Text::new(format!(
                             "{} ({:.1} {})",
                             top_proc.app_name,
-                            top_proc.process_power_watts,
+                            top_proc.process_consumption,
                             proc_sensor.current_time_range().power_unit()
                         ))
                         .size(FONT_SIZE_SUBTITLE)
@@ -576,7 +576,7 @@ impl App {
             let total_energy_wh = self
                 .all_time_data
                 .components
-                .get(TotalData::table_name_static())
+                .get(TotalDataDB::table_name_static())
                 .copied()
                 .unwrap_or(0.0);
             let measured_g = (total_energy_wh / 1000.0) * self.carbon_intensity.g_per_kwh;
@@ -609,9 +609,11 @@ impl App {
     fn find_current_top_consumer(&self) -> Option<(String, f64)> {
         self.sensors
             .iter()
-            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
+            .filter(|(name, _)| {
+                *name != TotalDataDB::table_name_static() && *name != ProcessDataDB::table_name_static()
+            })
             .filter_map(|(_, sensor)| {
-                let power = sensor.get_latest_reading().and_then(|d| d.total_power_watts())?;
+                let power = sensor.get_latest_reading().and_then(|d| d.total_consumption())?;
                 Some((sensor.name().to_string(), power))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -621,7 +623,9 @@ impl App {
         self.all_time_data
             .components
             .iter()
-            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
+            .filter(|(name, _)| {
+                *name != TotalDataDB::table_name_static() && *name != ProcessDataDB::table_name_static()
+            })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
             .map(|(name, energy)| (info_modal_title(self.language, name), *energy))
     }
@@ -824,7 +828,7 @@ impl App {
     }
 }
 
-fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorData)> {
+fn from_db(data: Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorDataDB)> {
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))

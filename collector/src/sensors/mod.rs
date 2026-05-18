@@ -10,7 +10,9 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
 use battery::Manager;
 pub use common::{
     AllTimeData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
-    types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
+    types::{
+        BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
+    },
 };
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
@@ -21,7 +23,7 @@ pub use process::get_processes;
 pub use ram::RamSensor;
 use sysinfo::System;
 
-/// Variant wrapper for all supported sensor types.
+/// Variant wrapper for all supported sensor.
 pub enum SensorType {
     CPU(CPUSensor),
     GPU(GPUSensor),
@@ -32,8 +34,23 @@ pub enum SensorType {
     Total,
 }
 
+impl SensorType {
+    /// Returns the sensor kind of this sensor variant.
+    pub fn sensor_kind(&self) -> SensorKind {
+        match self {
+            SensorType::CPU(_) => SensorKind::CPU,
+            SensorType::GPU(_) => SensorKind::GPU,
+            SensorType::RAM(_) => SensorKind::Ram,
+            SensorType::Disk(_) => SensorKind::Disk,
+            SensorType::Network(_) => SensorKind::Network,
+            SensorType::Total => SensorKind::Total,
+            SensorType::Process => SensorKind::Process,
+        }
+    }
+}
+
 impl Sensor for SensorType {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
@@ -73,7 +90,7 @@ impl Sensor for SensorType {
 /// Common interface for hardware sensors.
 pub trait Sensor {
     /// Reads current power, usage, and throughput data.
-    fn read_full_data(&self) -> Result<SensorData, SensorError>;
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError>;
     /// Returns static hardware specs (model, capacity, etc.).
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
         Err(SensorError::NotSupported)
@@ -90,9 +107,9 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<System>>) -> Event {
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<System>>) -> Event<f64> {
     let time = SystemTime::now();
-    let mut data: Vec<SensorData> = Vec::new();
+    let mut data: Vec<SensorData<f64>> = Vec::new();
 
     let (mut cpu_power, mut cpu_usage, mut nb_cpus) = (0.0, 0.0, 0);
     let (mut gpu_power, mut gpu_usage, mut nb_gpus) = (0.0, 0.0, 0);
@@ -124,10 +141,10 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
         match sensor_data {
             Ok(mut d) => {
                 if let SensorData::CPU(ref mut cpu) = d {
-                    if let Some(pp1) = cpu.pp1_power_watts.take() {
+                    if let Some(pp1) = cpu.pp1_consumption.take() {
                         has_pp1_source = true;
                         if pp1 > 0.0 {
-                            if let Some(ref mut total) = cpu.total_power_watts {
+                            if let Some(ref mut total) = cpu.total_consumption {
                                 *total -= pp1;
                             }
                             integrated_gpu_power = Some(pp1);
@@ -135,7 +152,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
                     }
                 }
 
-                if let Some(power) = d.total_power_watts() {
+                if let Some(power) = d.total_consumption() {
                     total_power += power;
 
                     if let SensorData::CPU(cpu) = &d {
@@ -172,8 +189,8 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
     if let Some(igpu_power) = integrated_gpu_power {
         let merged = data.iter_mut().any(|d| {
             if let SensorData::GPU(gpu) = d {
-                if gpu.total_power_watts.is_none() {
-                    gpu.total_power_watts = Some(igpu_power);
+                if gpu.total_consumption.is_none() {
+                    gpu.total_consumption = Some(igpu_power);
                     return true;
                 }
             }
@@ -181,7 +198,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
         });
         if !merged {
             data.push(SensorData::GPU(GPUData {
-                total_power_watts: Some(igpu_power),
+                total_consumption: Some(igpu_power),
                 usage_percent: None,
                 vram_usage_percent: None,
             }));
@@ -195,10 +212,10 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
     if !has_pp1_source {
         for &idx in &integrated_gpu_indices {
             if let SensorData::GPU(ref mut gpu) = data[idx] {
-                if gpu.total_power_watts.is_none() {
+                if gpu.total_consumption.is_none() {
                     if let Some(usage) = gpu.usage_percent {
                         let estimated = cpu::estimate_igpu_power(usage);
-                        gpu.total_power_watts = Some(estimated);
+                        gpu.total_consumption = Some(estimated);
                         gpu_power += estimated;
                     }
                 }
@@ -207,14 +224,14 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
     }
 
     data.push(SensorData::Total(TotalData {
-        total_power_watts: total_power,
+        total_consumption: total_power,
         period_type: "second".to_string(),
     }));
 
     cpu_usage /= nb_cpus.max(1) as f64;
     gpu_usage /= nb_gpus.max(1) as f64;
 
-    let top10_process_data: Vec<ProcessData> = get_processes(
+    let top10_process_data: Vec<ProcessData<f64>> = get_processes(
         system.clone(),
         cpu_power,
         cpu_usage,
@@ -231,13 +248,12 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
 
 /// Collects hardware info (names + initial specs) from all sensors.
 pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
-    let mut tables: Vec<String> = Vec::new();
+    let mut sensors_kind: Vec<SensorKind> = Vec::new();
     let mut detected_materials: Vec<String> = Vec::new();
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
     for sensor in sensors {
-        tables.push(sensor.table_name().to_string());
-
+        sensors_kind.push(sensor.sensor_kind()); // Problem general data with entry
         match sensor.read_name() {
             Ok(name) => detected_materials.push(name),
             Err(SensorError::NotSupported) => {}
@@ -324,8 +340,8 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
     let hardware_info: HardwareInfo = sensors_info.into();
 
     let data = GeneralData {
-        tables: tables.join(","),
-        hardware_info_serialized: hardware_info.serialized(),
+        sensors: sensors_kind,
+        hardware_info: hardware_info,
     };
 
     return data;

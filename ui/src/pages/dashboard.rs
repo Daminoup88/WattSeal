@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::{AllTimeData, DatabaseEntry, ProcessData, TotalData};
+use common::{AllTimeDataDB, DatabaseEntry, ProcessDataDB, TotalDataDB};
 use iced::{
     Alignment, Element, Length, Padding,
     alignment::{Horizontal, Vertical},
@@ -32,7 +32,7 @@ impl DashboardPage {
     pub fn view<'a>(
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
-        all_time_data: &'a AllTimeData,
+        all_time_data: &'a AllTimeDataDB,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
         kwh_cost_per_kwh: f64,
@@ -49,7 +49,7 @@ impl DashboardPage {
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.chart_or_placeholder(sensors, None, TotalData::table_name_static(), 300.0, false, language))
+            .push(self.chart_or_placeholder(sensors, None, TotalDataDB::table_name_static(), 300.0, false, language))
             .push(self.view_process_summary(sensors, language))
             .push(self.view_component_cards(sensors));
 
@@ -66,7 +66,7 @@ impl DashboardPage {
     fn view_power_summary<'a>(
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
-        all_time_data: &'a AllTimeData,
+        all_time_data: &'a AllTimeDataDB,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
         kwh_cost_per_kwh: f64,
@@ -74,9 +74,9 @@ impl DashboardPage {
         let power_value = format!(
             "{:.1}",
             sensors
-                .get(TotalData::table_name_static())
+                .get(TotalDataDB::table_name_static())
                 .and_then(|c| c.get_latest_reading())
-                .and_then(|data| data.total_power_watts())
+                .and_then(|data| data.total_consumption())
                 .unwrap_or(0.0)
         );
 
@@ -105,7 +105,7 @@ impl DashboardPage {
 
         let total_energy_wh = all_time_data
             .components
-            .get(TotalData::table_name_static())
+            .get(TotalDataDB::table_name_static())
             .copied()
             .unwrap_or(0.0);
 
@@ -189,7 +189,7 @@ impl DashboardPage {
         sensors: &'a HashMap<String, SensorState>,
         language: AppLanguage,
     ) -> Element<'a, Message, AppTheme> {
-        let process_data = sensors.get(ProcessData::table_name_static());
+        let process_data = sensors.get(ProcessDataDB::table_name_static());
 
         if let Some(process_card) = process_data.and_then(|p| Some(p.sensor_visual_card(None, 300.0, false))) {
             process_card
@@ -204,7 +204,7 @@ impl DashboardPage {
         let mut sensors: Vec<(&String, &SensorState)> = sensors
             .iter()
             .filter(|(table_name, _)| {
-                *table_name != TotalData::table_name_static() && *table_name != ProcessData::table_name_static()
+                *table_name != TotalDataDB::table_name_static() && *table_name != ProcessDataDB::table_name_static()
             })
             .collect();
 

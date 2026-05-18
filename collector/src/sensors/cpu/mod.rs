@@ -47,7 +47,7 @@ impl CPUSensor {
 }
 
 impl Sensor for CPUSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         // Get CPU usage first (needed for estimation, always populated)
         let usage_percent = {
             let mut sys = self
@@ -64,10 +64,10 @@ impl Sensor for CPUSensor {
             #[cfg(target_os = "linux")]
             CPUOS::LinuxRAPL(sensor) => sensor.read_full_data()?,
             CPUOS::Estimation(sensor) => SensorData::CPU(CPUData {
-                total_power_watts: Some(sensor.estimate(usage_percent)),
-                pp0_power_watts: None,
-                pp1_power_watts: None,
-                dram_power_watts: None,
+                total_consumption: Some(sensor.estimate(usage_percent)),
+                pp0_consumption: None,
+                pp1_consumption: None,
+                dram_consumption: None,
                 usage_percent: None,
             }),
         };

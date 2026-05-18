@@ -105,7 +105,7 @@ pub enum GPUSensor {
 }
 
 impl Sensor for GPUSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensor::Nvidia(sensor) => sensor.read_full_data(),
@@ -216,7 +216,7 @@ mod amd_gpu {
     }
 
     impl Sensor for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
@@ -327,7 +327,7 @@ mod nvidia_gpu {
     }
 
     impl Sensor for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
@@ -341,7 +341,7 @@ mod nvidia_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_power_watts: Some(power_usage_mw as f64 / 1000.0),
+                total_consumption: Some(power_usage_mw as f64 / 1000.0),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
             };
@@ -409,7 +409,7 @@ mod intel_gpu {
     }
 
     impl Sensor for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
             unsafe {
                 PdhCollectQueryData(self.query);
                 if !self.initialized.get() {

@@ -31,7 +31,7 @@ impl DiskSensor {
 }
 
 impl Sensor for DiskSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         let mut read_speed = 0.0;
         let mut write_speed = 0.0;
         let mut total_power = 0.0;
@@ -59,7 +59,7 @@ impl Sensor for DiskSensor {
         }
 
         Ok(SensorData::Disk(DiskData {
-            total_power_watts: Some(total_power),
+            total_consumption: Some(total_power),
             read_usage_mb_s: read_speed,
             write_usage_mb_s: write_speed,
         }))

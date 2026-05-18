@@ -35,7 +35,7 @@ impl LinuxCPUSensor {
 }
 
 impl Sensor for LinuxCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         let current_uj = self.read_energy_uj()?;
         let now = Instant::now();
 
@@ -62,10 +62,10 @@ impl Sensor for LinuxCPUSensor {
         *self.last_reading.borrow_mut() = Some((current_uj, now));
 
         Ok(SensorData::CPU(CPUData {
-            total_power_watts: power,
-            pp0_power_watts: None,
-            pp1_power_watts: None,
-            dram_power_watts: None,
+            total_consumption: power,
+            pp0_consumption: None,
+            pp1_consumption: None,
+            dram_consumption: None,
             usage_percent: None,
         }))
     }

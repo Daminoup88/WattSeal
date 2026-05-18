@@ -7,8 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DatabaseEntry, DiskData, IconData, MetricType, NetworkData, ProcessData, RamData, SecondaryValues, SensorData,
-    TotalData,
+    DatabaseEntry, DiskDataDB, IconData, MetricType, NetworkDataDB, ProcessDataDB, RamDataDB, SecondaryValues,
+    SensorDataDB, TotalDataDB,
     utils::{bytes_to_mb, load_icon_and_name},
 };
 use iced::{
@@ -142,8 +142,8 @@ impl ComponentState {
         }
     }
 
-    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
-        if let Some(power) = data.total_power_watts() {
+    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+        if let Some(power) = data.total_consumption() {
             self.power_graph.append_power(timestamp, power as f32);
         }
         if let Some(secondary_values) = data.secondary_values() {
@@ -228,7 +228,7 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&SensorData>) -> Vec<MetricType> {
+    fn available_metrics(&self, latest: Option<&SensorDataDB>) -> Vec<MetricType> {
         let mut metrics = vec![MetricType::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
             metrics.push(secondary_values.metric_type);
@@ -238,7 +238,7 @@ impl ComponentState {
 
     fn snapshot_row(
         &self,
-        latest: Option<&SensorData>,
+        latest: Option<&SensorDataDB>,
         language: AppLanguage,
     ) -> Option<Row<'static, Message, AppTheme>> {
         let secondary_values = latest?.secondary_values()?;
@@ -288,8 +288,8 @@ impl TotalState {
         }
     }
 
-    fn append(&self, timestamp: DateTime<Local>, data: &SensorData) {
-        if let Some(power) = data.total_power_watts() {
+    fn append(&self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+        if let Some(power) = data.total_consumption() {
             self.power_graph.append_power(timestamp, power as f32);
         }
     }
@@ -310,7 +310,7 @@ impl TotalState {
 }
 
 struct ProcessesState {
-    top_processes: Vec<ProcessData>,
+    top_processes: Vec<ProcessDataDB>,
     icon_handles: HashMap<String, image::Handle>,
     icon_cache: HashMap<String, (Option<IconData>, Option<String>)>,
 }
@@ -324,7 +324,7 @@ impl ProcessesState {
         }
     }
 
-    fn update_from_snapshot(&mut self, processes: &[ProcessData]) {
+    fn update_from_snapshot(&mut self, processes: &[ProcessDataDB]) {
         let mut next_top = processes.to_vec();
 
         for process in &mut next_top {
@@ -366,7 +366,7 @@ impl ProcessesState {
         self.icon_handles.clear();
     }
 
-    fn icon_handle_for(&self, process: &ProcessData) -> Option<image::Handle> {
+    fn icon_handle_for(&self, process: &ProcessDataDB) -> Option<image::Handle> {
         self.icon_handles.get(&process_identity(process)).cloned()
     }
 }
@@ -382,7 +382,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<SensorData>,
+    latest_reading: Option<SensorDataDB>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -390,9 +390,9 @@ pub struct SensorState {
 impl SensorState {
     /// Creates a sensor state for the given table and display name.
     pub fn new(table_name: String, display_name: String, theme: AppTheme, language: AppLanguage) -> Self {
-        let sensor_category = if table_name == TotalData::table_name_static() {
+        let sensor_category = if table_name == TotalDataDB::table_name_static() {
             SensorCategory::Total(TotalState::new(theme, &display_name, language))
-        } else if table_name == ProcessData::table_name_static() {
+        } else if table_name == ProcessDataDB::table_name_static() {
             SensorCategory::Processes(ProcessesState::new())
         } else {
             SensorCategory::Component(ComponentState::new(theme, &display_name, language, &table_name))
@@ -421,12 +421,12 @@ impl SensorState {
     }
 
     /// Returns the most recent sensor reading.
-    pub fn get_latest_reading(&self) -> Option<&SensorData> {
+    pub fn get_latest_reading(&self) -> Option<&SensorDataDB> {
         self.latest_reading.as_ref()
     }
 
     /// Returns the highest-power process, if this is a process sensor.
-    pub fn get_top_process(&self) -> Option<&ProcessData> {
+    pub fn get_top_process(&self) -> Option<&ProcessDataDB> {
         if let SensorCategory::Processes(state) = &self.sensor_category {
             state.top_processes.first()
         } else {
@@ -435,7 +435,7 @@ impl SensorState {
     }
 
     /// Returns the cached icon handle for a process.
-    pub fn get_process_icon(&self, process: &ProcessData) -> Option<image::Handle> {
+    pub fn get_process_icon(&self, process: &ProcessDataDB) -> Option<image::Handle> {
         if let SensorCategory::Processes(state) = &self.sensor_category {
             state.icon_handle_for(process)
         } else {
@@ -511,7 +511,7 @@ impl SensorState {
     }
 
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
@@ -541,7 +541,7 @@ impl SensorState {
     }
 
     /// Adds a data point to history without updating the latest reading.
-    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
+    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         match &mut self.sensor_category {
             SensorCategory::Component(state) => state.append(timestamp, data),
@@ -551,9 +551,9 @@ impl SensorState {
     }
 
     /// Replaces chart data with a full history batch.
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorData)]) {
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorDataDB)]) {
         if let SensorCategory::Processes(state) = &mut self.sensor_category {
-            if let Some((_, SensorData::Process(processes))) = data.last() {
+            if let Some((_, SensorDataDB::Process(processes))) = data.last() {
                 state.update_from_snapshot(processes);
             }
             return;
@@ -630,8 +630,8 @@ impl SensorState {
     }
 
     fn time_range_selector(&self) -> Element<'_, Message, AppTheme> {
-        let options = if self.table_name == TotalData::table_name_static()
-            || self.table_name == ProcessData::table_name_static()
+        let options = if self.table_name == TotalDataDB::table_name_static()
+            || self.table_name == ProcessDataDB::table_name_static()
         {
             TranslatedTimeRange::options_total(self.language)
         } else {
@@ -837,7 +837,7 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!("{:.1}{}", p.process_power_watts, unit_str),
+                        format!("{:.1}{}", p.process_consumption, unit_str),
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_POWER_WIDTH),
@@ -905,7 +905,7 @@ impl SensorState {
         height: f32,
         show_secondary: bool,
     ) -> Element<'b, Message, AppTheme> {
-        let power = self.latest_reading.as_ref().and_then(|d| d.total_power_watts());
+        let power = self.latest_reading.as_ref().and_then(|d| d.total_consumption());
 
         match &self.sensor_category {
             SensorCategory::Component(state) => {
@@ -960,7 +960,7 @@ fn process_icon_cell(cached_handle: Option<image::Handle>) -> Element<'static, M
         .into()
 }
 
-fn process_identity(process: &ProcessData) -> String {
+fn process_identity(process: &ProcessDataDB) -> String {
     process
         .process_exe_path
         .as_ref()
@@ -977,9 +977,9 @@ fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
 }
 
 fn initial_metric_for_table(table_name: &str) -> Option<MetricType> {
-    if table_name == RamData::table_name_static() {
+    if table_name == RamDataDB::table_name_static() {
         Some(MetricType::Usage)
-    } else if table_name == DiskData::table_name_static() || table_name == NetworkData::table_name_static() {
+    } else if table_name == DiskDataDB::table_name_static() || table_name == NetworkDataDB::table_name_static() {
         Some(MetricType::Speed)
     } else {
         None

@@ -20,7 +20,7 @@ impl RamSensor {
 }
 
 impl Sensor for RamSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         let mut system = self
             .system
             .try_borrow_mut()
@@ -36,7 +36,7 @@ impl Sensor for RamSensor {
         };
 
         Ok(SensorData::Ram(RamData {
-            total_power_watts: Some(5.0),
+            total_consumption: Some(5.0),
             usage_percent: Some(usage_percent),
         }))
     }

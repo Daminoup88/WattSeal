@@ -26,7 +26,7 @@ impl NetworkSensor {
 }
 
 impl Sensor for NetworkSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         let mut networks = self
             .networks
             .try_borrow_mut()
@@ -49,7 +49,7 @@ impl Sensor for NetworkSensor {
         }
 
         Ok(SensorData::Network(NetworkData {
-            total_power_watts: Some(total_power.min(NIC_MAX_W)),
+            total_consumption: Some(total_power.min(NIC_MAX_W)),
             download_speed_mb_s,
             upload_speed_mb_s,
         }))

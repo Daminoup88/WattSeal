@@ -14,7 +14,7 @@ pub fn get_processes(
     total_power: f64,
     number_processes: usize,
     proc_gpu_usage: HashMap<u32, f64>,
-) -> Vec<ProcessData> {
+) -> Vec<ProcessData<f64>> {
     let mut sys = match system.try_borrow_mut() {
         Ok(sys) => sys,
         Err(e) => {
@@ -46,8 +46,8 @@ pub fn get_processes(
         proc_gpu_usage,
     );
     processes.sort_by(|a, b| {
-        b.process_power_watts
-            .partial_cmp(&a.process_power_watts)
+        b.process_consumption
+            .partial_cmp(&a.process_consumption)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
@@ -67,8 +67,8 @@ fn extract_and_group_processes(
     gpu_usage: f64,
     total_power: f64,
     proc_gpu_usage: HashMap<u32, f64>,
-) -> Vec<ProcessData> {
-    let mut grouped: HashMap<String, ProcessData> = HashMap::new();
+) -> Vec<ProcessData<f64>> {
+    let mut grouped: HashMap<String, ProcessData<f64>> = HashMap::new();
 
     for (pid, proc_) in processes {
         let name = proc_.name().to_str().unwrap_or("Other").to_string().to_lowercase();
@@ -107,7 +107,7 @@ fn extract_and_group_processes(
         if entry.app_name.is_empty() {
             entry.app_name = name;
         }
-        entry.process_power_watts += process_power;
+        entry.process_consumption += process_power;
         entry.process_cpu_usage += process_cpu_usage;
         if let Some(gpu_usage) = process_gpu_usage {
             match entry.process_gpu_usage {

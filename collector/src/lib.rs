@@ -10,7 +10,7 @@ use std::{
 };
 
 pub use common::clog;
-use common::database::purge::averaging_and_purging_data;
+use common::database::{purge::averaging_and_purging_data, types::GeneralDataDB};
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
 use database::Database;
@@ -177,14 +177,15 @@ impl CollectorApp {
         let info = get_hardware_info(&self.sensors);
 
         if let Some(database) = &mut self.database {
-            match database.insert_hardware_info(&info) {
+            let infodb = GeneralDataDB::from(info.clone());
+            match database.insert_hardware_info(&infodb) {
                 Ok(_) => crate::clog!("✓ Hardware info saved"),
                 Err(e) => crate::clog!("✗ Failed to save hardware info: {e}"),
             }
         }
         if let Some(mqtt_infos) = &self.mqtt_infos {
             let topic = hardware_info_topic(&mqtt_infos.id);
-            match mqtt_infos.publisher.publish(&topic, &info.hardware_info_serialized) {
+            match mqtt_infos.publisher.publish(&topic, &info.hardware_info.serialized()) {
                 Ok(_) => crate::clog!("✓ Hardware info published on broker"),
                 Err(e) => crate::clog!("✗ Failed to publish hardware info: {e}"),
             }

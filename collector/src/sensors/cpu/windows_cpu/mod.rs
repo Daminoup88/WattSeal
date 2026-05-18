@@ -145,7 +145,7 @@ impl WindowsCPUSensor {
 }
 
 impl Sensor for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
         let cpu_power_values = self.read_raw_power()?;
 
         let data = CPUData {
