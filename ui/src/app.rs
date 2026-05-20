@@ -279,9 +279,9 @@ impl App {
                 }
                 Task::none()
             }
-            Message::ChangeChartMetricType(table_name, metric_type) => {
+            Message::ChangeChartMetricType(table_name, metric_kind) => {
                 if let Some(sensor) = self.sensors.get_mut(&table_name) {
-                    sensor.set_metric_type(metric_type);
+                    sensor.set_metric_kind(metric_kind);
                 }
                 Task::none()
             }
@@ -371,7 +371,7 @@ impl App {
         if time_range.is_energy_mode() {
             let factor = time_range.power_scale_factor();
             for (_, sensor_data) in &mut data {
-                sensor_data.scale_power(factor); // To change
+                sensor_data.power_to_energy(factor);
             }
         }
 
@@ -573,13 +573,13 @@ impl App {
         }
 
         if target == "carbon_emissions" {
-            let total_energy_wh = self
+            let total_consumption = self
                 .all_time_data
                 .components
                 .get(TotalDataDB::table_name_static())
                 .copied()
                 .unwrap_or(0.0);
-            let measured_g = (total_energy_wh / 1000.0) * self.carbon_intensity.g_per_kwh;
+            let measured_g = (total_consumption / 1000.0) * self.carbon_intensity.g_per_kwh;
 
             let make_co2_row = |label: &'static str, value: String, style: TextStyle| {
                 Row::new()

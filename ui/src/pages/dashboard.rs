@@ -103,14 +103,14 @@ impl DashboardPage {
                     .push(Text::new("W").size(FONT_SIZE_TITLE).class(TextStyle::Muted)),
             );
 
-        let total_energy_wh = all_time_data
+        let total_consumption = all_time_data
             .components
             .get(TotalDataDB::table_name_static())
             .copied()
             .unwrap_or(0.0);
 
-        let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
-        let bill_usd = total_energy_wh / 1000.0 * kwh_cost_per_kwh;
+        let carbon_grams = wh_to_co2_grams(total_consumption, carbon_intensity.g_per_kwh);
+        let bill_usd = total_consumption / 1000.0 * kwh_cost_per_kwh;
 
         let help_button = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
@@ -124,7 +124,7 @@ impl DashboardPage {
                 Row::new()
                     .push(metric_tile(
                         all_time(language),
-                        format_wh(total_energy_wh),
+                        format_wh(total_consumption),
                         "Wh",
                         TextStyle::Secondary,
                     ))
@@ -310,12 +310,12 @@ fn metric_tile<'a>(
     .into()
 }
 
-fn wh_to_co2_grams(energy_wh: f64, intensity_g_per_kwh: f64) -> f64 {
-    (energy_wh / 1000.0) * intensity_g_per_kwh
+fn wh_to_co2_grams(total_consumption: f64, intensity_g_per_kwh: f64) -> f64 {
+    (total_consumption / 1000.0) * intensity_g_per_kwh
 }
 
-fn format_wh(energy_wh: f64) -> String {
-    format!("{:.1}", energy_wh.max(0.0))
+fn format_wh(total_consumption: f64) -> String {
+    format!("{:.1}", total_consumption.max(0.0))
 }
 
 fn format_grams(co2_grams: f64) -> String {

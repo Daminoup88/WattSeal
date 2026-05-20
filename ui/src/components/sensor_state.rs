@@ -7,7 +7,7 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DatabaseEntry, DiskDataDB, IconData, MetricType, NetworkDataDB, ProcessDataDB, RamDataDB, SecondaryValues,
+    DatabaseEntry, DiskDataDB, IconData, MetricKindDB, NetworkDataDB, ProcessDataDB, RamDataDB, SecondaryValues,
     SensorDataDB, TotalDataDB,
     utils::{bytes_to_mb, load_icon_and_name},
 };
@@ -38,7 +38,7 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_type_name, na,
+        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_kind_name, na,
         power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
     },
     types::{AppLanguage, TimeRange},
@@ -74,12 +74,12 @@ impl PowerChartState {
     }
 
     fn init_power_series(&mut self, display_name: &str, language: AppLanguage) {
-        let metric_type = MetricType::default();
-        self.chart.set_y_axis_unit(metric_type.unit());
-        let key = metric_type.legend(display_name);
-        let display = metric_type_name(language, metric_type);
+        let metric_kind = MetricKindDB::default();
+        self.chart.set_y_axis_unit(metric_kind.unit_label());
+        let key = metric_kind.legend(display_name);
+        let display = metric_kind_name(language, metric_kind);
         self.chart
-            .add_series(&key, display, self.line_type, Some(metric_type as usize));
+            .add_series(&key, display, self.line_type, Some(metric_kind as usize));
         self.chart.set_data(&key, self.power_history.clone());
     }
 
@@ -118,8 +118,8 @@ struct ComponentState {
     power_graph: PowerChartState,
     secondary_histories: Vec<HistoryRef>,
     _show_in_total: bool,
-    metric_type: MetricType,
-    pending_initial_metric: Option<MetricType>,
+    metric_kind: MetricKindDB,
+    pending_initial_metric: Option<MetricKindDB>,
 }
 
 impl ComponentState {
@@ -131,7 +131,7 @@ impl ComponentState {
             power_graph,
             secondary_histories: Vec::new(),
             _show_in_total: true,
-            metric_type: MetricType::default(),
+            metric_kind: MetricKindDB::default(),
             pending_initial_metric: initial_metric_for_table(table_name),
         }
     }
@@ -180,28 +180,28 @@ impl ComponentState {
         }
     }
 
-    fn update_metric_type(
+    fn update_metric_kind(
         &mut self,
-        metric_type: MetricType,
+        metric_kind: MetricKindDB,
         display_name: &str,
         language: AppLanguage,
         secondary_values: Option<SecondaryValues>,
         energy_mode: bool,
     ) {
-        self.metric_type = metric_type;
+        self.metric_kind = metric_kind;
         self.power_graph.chart.clear_all();
         self.power_graph
             .chart
-            .set_y_axis_unit(metric_type.effective_unit(energy_mode));
-        match metric_type {
-            MetricType::Power => {
-                let key = metric_type.legend(display_name);
-                let display = metric_type_name(language, metric_type);
+            .set_y_axis_unit(metric_kind.effective_unit(energy_mode));
+        match metric_kind {
+            MetricKindDB::Power => {
+                let key = metric_kind.legend(display_name);
+                let display = metric_kind_name(language, metric_kind);
                 self.power_graph.chart.add_series(
                     &key,
                     display,
                     self.power_graph.line_type,
-                    Some(metric_type as usize),
+                    Some(metric_kind as usize),
                 );
                 self.power_graph
                     .chart
@@ -228,10 +228,10 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&SensorDataDB>) -> Vec<MetricType> {
-        let mut metrics = vec![MetricType::default()];
+    fn available_metrics(&self, latest: Option<&SensorDataDB>) -> Vec<MetricKindDB> {
+        let mut metrics = vec![MetricKindDB::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
-            metrics.push(secondary_values.metric_type);
+            metrics.push(secondary_values.metric_kind);
         }
         metrics
     }
@@ -261,7 +261,7 @@ impl ComponentState {
                                 .class(TextStyle::Muted),
                         )
                         .push(
-                            Text::new(format!("{:.1} {}", value, secondary_values.metric_type.unit()))
+                            Text::new(format!("{:.1} {}", value, secondary_values.metric_kind.unit_label()))
                                 .size(FONT_SIZE_BODY)
                                 .class(style)
                                 .font(FONT_BOLD),
@@ -460,10 +460,10 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
-                if s.metric_type == MetricType::Power {
+                if s.metric_kind == MetricKindDB::Power {
                     s.power_graph
                         .chart
-                        .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                        .set_y_axis_unit(MetricKindDB::Power.effective_unit(energy_mode));
                     s.power_graph
                         .chart
                         .set_all_display_labels(power_or_energy(self.language, energy_mode));
@@ -473,7 +473,7 @@ impl SensorState {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
                 s.power_graph
                     .chart
-                    .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                    .set_y_axis_unit(MetricKindDB::Power.effective_unit(energy_mode));
                 s.power_graph.chart.set_all_line_types(line_type);
                 s.power_graph
                     .chart
@@ -497,11 +497,11 @@ impl SensorState {
     }
 
     /// Switches the displayed metric (power, usage, or speed).
-    pub fn set_metric_type(&mut self, metric_type: MetricType) {
+    pub fn set_metric_kind(&mut self, metric_kind: MetricKindDB) {
         if let SensorCategory::Component(state) = &mut self.sensor_category {
             let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-            state.update_metric_type(
-                metric_type,
+            state.update_metric_kind(
+                metric_kind,
                 &self.display_name,
                 self.language,
                 secondary_values,
@@ -563,7 +563,7 @@ impl SensorState {
             if let Some(initial_metric) = state.pending_initial_metric.take() {
                 if let Some((_, sensor_data)) = data.last() {
                     let secondary = sensor_data.secondary_values();
-                    state.update_metric_type(
+                    state.update_metric_kind(
                         initial_metric,
                         &self.display_name,
                         self.language,
@@ -597,8 +597,8 @@ impl SensorState {
             SensorCategory::Component(state) => {
                 state.power_graph.chart.update_language(language);
                 let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-                state.update_metric_type(
-                    state.metric_type,
+                state.update_metric_kind(
+                    state.metric_kind,
                     &self.display_name,
                     language,
                     secondary_values,
@@ -917,7 +917,7 @@ impl SensorState {
                             .into_iter()
                             .map(|m| TranslatedMetricType::new(m, self.language))
                             .collect();
-                        let selected = TranslatedMetricType::new(state.metric_type, self.language);
+                        let selected = TranslatedMetricType::new(state.metric_kind, self.language);
                         Some(
                             pick_list(translated, Some(selected), |tm: TranslatedMetricType| {
                                 Message::ChangeChartMetricType(self.table_name.clone(), tm.metric)
@@ -976,11 +976,11 @@ fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
     }
 }
 
-fn initial_metric_for_table(table_name: &str) -> Option<MetricType> {
+fn initial_metric_for_table(table_name: &str) -> Option<MetricKindDB> {
     if table_name == RamDataDB::table_name_static() {
-        Some(MetricType::Usage)
+        Some(MetricKindDB::Usage)
     } else if table_name == DiskDataDB::table_name_static() || table_name == NetworkDataDB::table_name_static() {
-        Some(MetricType::Speed)
+        Some(MetricKindDB::Speed)
     } else {
         None
     }

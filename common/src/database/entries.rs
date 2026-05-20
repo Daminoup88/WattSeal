@@ -86,20 +86,20 @@ impl DatabaseEntry for CPUDataDB {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
-            ("pp0_power_watts", "REAL"),
-            ("pp1_power_watts", "REAL"),
-            ("dram_power_watts", "REAL"),
+            ("total_consumption", "REAL"),
+            ("pp0_consumption", "REAL"),
+            ("pp1_consumption", "REAL"),
+            ("dram_consumption", "REAL"),
             ("usage_percent", "REAL"),
         ]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(CPUDataDB {
-            total_consumption: row.get("total_power_watts")?,
-            pp0_consumption: row.get("pp0_power_watts")?,
-            pp1_consumption: row.get("pp1_power_watts")?,
-            dram_consumption: row.get("dram_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
+            pp0_consumption: row.get("pp0_consumption")?,
+            pp1_consumption: row.get("pp1_consumption")?,
+            dram_consumption: row.get("dram_consumption")?,
             usage_percent: row.get("usage_percent")?,
         })
     }
@@ -125,7 +125,7 @@ impl DatabaseEntry for GPUDataDB {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_consumption", "REAL"),
             ("usage_percent", "REAL"),
             ("vram_usage_percent", "REAL"),
         ]
@@ -133,7 +133,7 @@ impl DatabaseEntry for GPUDataDB {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(GPUDataDB {
-            total_consumption: row.get("total_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
             usage_percent: row.get("usage_percent")?,
             vram_usage_percent: row.get("vram_usage_percent")?,
         })
@@ -160,7 +160,7 @@ impl DatabaseEntry for DiskDataDB {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_consumption", "REAL"),
             ("read_usage_mb_s", "REAL"),
             ("write_usage_mb_s", "REAL"),
         ]
@@ -168,7 +168,7 @@ impl DatabaseEntry for DiskDataDB {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(DiskDataDB {
-            total_consumption: row.get("total_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
             read_usage_mb_s: row.get("read_usage_mb_s")?,
             write_usage_mb_s: row.get("write_usage_mb_s")?,
         })
@@ -189,12 +189,12 @@ impl DatabaseEntry for RamDataDB {
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_power_watts", "REAL"), ("usage_percent", "REAL")]
+        &[("total_consumption", "REAL"), ("usage_percent", "REAL")]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(RamDataDB {
-            total_consumption: row.get("total_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
             usage_percent: row.get("usage_percent")?,
         })
     }
@@ -220,7 +220,7 @@ impl DatabaseEntry for NetworkDataDB {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("total_power_watts", "REAL"),
+            ("total_consumption", "REAL"),
             ("download_speed_mb_s", "REAL"),
             ("upload_speed_mb_s", "REAL"),
         ]
@@ -228,7 +228,7 @@ impl DatabaseEntry for NetworkDataDB {
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(NetworkDataDB {
-            total_consumption: row.get("total_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
             download_speed_mb_s: row.get("download_speed_mb_s")?,
             upload_speed_mb_s: row.get("upload_speed_mb_s")?,
         })
@@ -249,12 +249,12 @@ impl DatabaseEntry for TotalDataDB {
     }
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_power_watts", "REAL"), ("period_type", "TEXT NOT NULL")]
+        &[("total_consumption", "REAL"), ("period_type", "TEXT NOT NULL")]
     }
 
     fn from_row(row: &Row) -> rusqlite::Result<Self> {
         Ok(TotalDataDB {
-            total_consumption: row.get("total_power_watts")?,
+            total_consumption: row.get("total_consumption")?,
             period_type: row.get("period_type")?,
         })
     }
@@ -288,7 +288,7 @@ impl DatabaseEntry for ProcessDataDB {
         &[
             ("app_name", "TEXT NOT NULL"),
             ("process_exe_path", "TEXT"),
-            ("process_power_watts", "REAL"),
+            ("process_consumption", "REAL"),
             ("process_cpu_usage", "REAL"),
             ("process_gpu_usage", "REAL"),
             ("process_mem_usage", "REAL"),
@@ -302,7 +302,7 @@ impl DatabaseEntry for ProcessDataDB {
         Ok(ProcessDataDB {
             app_name: row.get("app_name")?,
             process_exe_path: row.get("process_exe_path")?,
-            process_consumption: row.get("process_power_watts")?,
+            process_consumption: row.get("process_consumption")?,
             process_cpu_usage: row.get("process_cpu_usage")?,
             process_gpu_usage: row.get("process_gpu_usage")?,
             process_mem_usage: row.get("process_mem_usage")?,

@@ -64,8 +64,8 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
                     WHEN t.timestamp < ?3 THEN ?1
                     ELSE (t.timestamp / ?4) * ?4
                 END AS bucket_start,
-                AVG(d.total_power_watts) AS avg_power,
-                COUNT(d.total_power_watts) AS value_count
+                AVG(d.total_consumption) AS avg_power,
+                COUNT(d.total_consumption) AS value_count
              FROM timestamp t
              JOIN total_data d ON t.id = d.timestamp_id
              WHERE t.timestamp >= ?1
@@ -103,7 +103,7 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
         .map_err(|e| format!("Failed to prepare timestamp insert: {}", e))?;
 
     let mut insert_total_stmt = tx
-        .prepare("INSERT INTO total_data (timestamp_id, total_power_watts, period_type) VALUES (?1, ?2, 'hour')")
+        .prepare("INSERT INTO total_data (timestamp_id, total_consumption, period_type) VALUES (?1, ?2, 'hour')")
         .map_err(|e| format!("Failed to prepare total_data insert: {}", e))?;
 
     for (bucket_start, avg_power, value_count) in aggregated {
@@ -167,7 +167,7 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
                 (t.timestamp / ?2) * ?2 AS bucket_start,
                 p.app_name,
                 MAX(p.process_exe_path)              AS process_exe_path,
-                SUM(COALESCE(p.process_power_watts, 0.0)) / MAX(1, COUNT(*)) AS process_power_watts,
+                SUM(COALESCE(p.process_consumption, 0.0)) / MAX(1, COUNT(*)) AS process_consumption,
                 SUM(COALESCE(p.process_cpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_cpu_usage,
                 SUM(COALESCE(p.process_gpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_gpu_usage,
                 SUM(COALESCE(p.process_mem_usage, 0.0))   / MAX(1, COUNT(*)) AS process_mem_usage,
@@ -179,7 +179,7 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
              WHERE t.period_type = 1
                AND t.timestamp < ?1
              GROUP BY bucket_start, p.app_name
-             ORDER BY bucket_start, process_power_watts DESC",
+             ORDER BY bucket_start, process_consumption DESC",
         )
         .map_err(|e| format!("prepare process avg: {}", e))?;
 
@@ -227,7 +227,7 @@ fn averaging_process_data(database: &mut Database, duration_in_hours: i64) -> Re
     let mut insert_proc = tx
         .prepare(
             "INSERT INTO process_data (timestamp_id, app_name, process_exe_path, \
-             process_power_watts, process_cpu_usage, process_gpu_usage, \
+             process_consumption, process_cpu_usage, process_gpu_usage, \
              process_mem_usage, read_bytes_per_sec, written_bytes_per_sec, \
              subprocess_count) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
         )

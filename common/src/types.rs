@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt::Display, ops::Mul, time::SystemTime};
+use std::{collections::HashMap, fmt::Display, time::SystemTime};
 
 use serde::{Deserialize, Serialize};
 
@@ -265,108 +265,61 @@ pub struct BatteryInfo {
     pub cycle_count: Option<u32>,
 }
 
-/// Category of a sensor value (power, usage, or speed).
-#[derive(Default, PartialEq, Clone, Copy, Debug)]
-pub enum MetricType {
-    #[default]
-    Power,
-    Usage,
-    Speed,
+/// Possible energy unit of sensors results.
+pub enum EnergyUnit {
+    WattHeure,
+    UJoul,
 }
 
-impl Display for MetricType {
-    // TODO Change metrics
+/// Possible power unit of sensors results.
+pub enum PowerUnit {
+    Watt,
+}
+
+/// Possible consumption unit of sensors results.
+pub enum ConsumptionUnit {
+    Energy(EnergyUnit),
+    Power(PowerUnit),
+}
+
+pub struct ConsumptionMetric {
+    pub value: f64,
+    pub unit: ConsumptionUnit,
+}
+
+impl Display for EnergyUnit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricType::Power => write!(f, "Power"),
-            MetricType::Usage => write!(f, "Usage"),
-            MetricType::Speed => write!(f, "Speed"),
+            EnergyUnit::WattHeure => write!(f, "Wh"),
+            EnergyUnit::UJoul => write!(f, "uj"),
         }
     }
 }
 
-impl MetricType {
-    /// Returns the human-readable label.
-    pub fn label(&self) -> &'static str {
+impl Display for PowerUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricType::Power => "Power",
-            MetricType::Usage => "Usage",
-            MetricType::Speed => "Speed",
+            PowerUnit::Watt => write!(f, "W"),
         }
     }
+}
 
-    /// Returns the measurement unit string.
-    pub fn unit(&self) -> &'static str {
+impl Display for ConsumptionUnit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricType::Power => "W",
-            MetricType::Usage => "%",
-            MetricType::Speed => "MB/s",
-        }
-    }
-
-    /// Formats a chart legend label for the given component.
-    pub fn legend(&self, component_name: &str) -> String {
-        format!("{} {}", component_name, self.label())
-    }
-
-    /// Returns the display unit, swapping uj for Wh when energy mode, and W otherwise.
-    pub fn effective_unit(&self, energy_mode: bool) -> &'static str {
-        if *self == MetricType::Power {
-            if energy_mode { "W" } else { "Wh" }
-        } else {
-            self.unit()
+            ConsumptionUnit::Energy(e) => write!(f, "{}", e),
+            ConsumptionUnit::Power(p) => write!(f, "{}", p),
         }
     }
 }
 
-/// Named optional numeric value for secondary metrics.
-#[derive(Debug, Clone, Copy)]
-pub struct LabeledValue {
-    pub label: &'static str,
-    pub value: Option<f64>,
-}
-
-/// Collection of secondary metric values with their type.
-#[derive(Debug, Clone)]
-pub struct SecondaryValues {
-    pub metric_type: MetricType,
-    pub values: Vec<LabeledValue>,
-}
-
-impl SecondaryValues {
-    fn from_labeled_values(metric_type: MetricType, values: Vec<LabeledValue>) -> Self {
-        Self { metric_type, values }
-    }
-
-    /// Returns the list of labeled values.
-    pub fn values(&self) -> &Vec<LabeledValue> {
-        &self.values
-    }
-
-    /// Returns the metric type of these secondary values.
-    pub fn metric_type(&self) -> MetricType {
-        self.metric_type
+impl Display for ConsumptionMetric {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} {}", self.value, self.unit)
     }
 }
 
-impl LabeledValue {
-    fn from_percent(percent: Option<f64>, label: &'static str) -> Self {
-        Self { label, value: percent }
-    }
-
-    fn from_usage_percent(percent: Option<f64>) -> Self {
-        Self::from_percent(percent, "Usage")
-    }
-
-    fn from_mb_s(speed: Option<f64>, label: &'static str) -> Self {
-        Self {
-            label: label,
-            value: speed,
-        }
-    }
-}
-
-impl<T: Clone + Mul<f64, Output = T>> SensorData<T> {
+impl<T: Clone> SensorData<T> {
     /// Returns the sensor kind of this sensor variant.
     pub fn sensor_kind(&self) -> SensorKind {
         match self {
@@ -390,67 +343,6 @@ impl<T: Clone + Mul<f64, Output = T>> SensorData<T> {
             SensorData::Network(data) => data.total_consumption.clone(),
             SensorData::Total(power) => Some(power.total_consumption.clone()),
             SensorData::Process(_) => None,
-        }
-    }
-
-    /// Multiply all power fields by `factor`.
-    /// Used to convert average watts → Wh when switching to energy mode.
-    pub fn scale_power(&mut self, factor: f64) {
-        match self {
-            SensorData::CPU(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::GPU(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Ram(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Disk(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Network(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Total(d) => d.total_consumption = d.total_consumption.clone() * factor,
-            SensorData::Process(procs) => {
-                for p in procs {
-                    p.process_consumption = p.process_consumption.clone() * factor;
-                }
-            }
-        }
-    }
-
-    /// Returns secondary metrics (usage or speed) if applicable.
-    pub fn secondary_values(&self) -> Option<SecondaryValues> {
-        let metric_type = self.secondary_metric()?;
-        match self {
-            SensorData::CPU(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::GPU(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::Ram(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![
-                    LabeledValue::from_mb_s(Some(data.read_usage_mb_s), "Read"),
-                    LabeledValue::from_mb_s(Some(data.write_usage_mb_s), "Write"),
-                ],
-            )),
-            SensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![
-                    LabeledValue::from_mb_s(Some(data.download_speed_mb_s), "Download"),
-                    LabeledValue::from_mb_s(Some(data.upload_speed_mb_s), "Upload"),
-                ],
-            )),
-            _ => None,
-        }
-    }
-
-    /// Returns the secondary metric type for this sensor variant.
-    pub fn secondary_metric(&self) -> Option<MetricType> {
-        match self {
-            SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricType::Usage),
-            SensorData::Disk(_) | SensorData::Network(_) => Some(MetricType::Speed),
-            _ => None,
         }
     }
 }

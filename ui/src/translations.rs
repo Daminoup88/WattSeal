@@ -1,4 +1,4 @@
-use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricType, NetworkData, ProcessData, RamData, TotalData};
+use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKindDB, NetworkData, ProcessData, RamData, TotalData};
 
 use crate::types::{AppLanguage, TimeRange};
 
@@ -532,11 +532,11 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn metric_type_name(language: AppLanguage, metric: MetricType) -> &'static str {
+pub fn metric_kind_name(language: AppLanguage, metric: MetricKindDB) -> &'static str {
     match metric {
-        MetricType::Power => metric_power(language),
-        MetricType::Usage => metric_usage(language),
-        MetricType::Speed => metric_speed(language),
+        MetricKindDB::Power => metric_power(language),
+        MetricKindDB::Usage => metric_usage(language),
+        MetricKindDB::Speed => metric_speed(language),
     }
 }
 
@@ -1110,19 +1110,19 @@ impl std::fmt::Display for TranslatedTimeRange {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslatedMetricType {
-    pub metric: MetricType,
+    pub metric: MetricKindDB,
     language: AppLanguage,
 }
 
 impl TranslatedMetricType {
-    pub fn new(metric: MetricType, language: AppLanguage) -> Self {
+    pub fn new(metric: MetricKindDB, language: AppLanguage) -> Self {
         Self { metric, language }
     }
 }
 
 impl std::fmt::Display for TranslatedMetricType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", metric_type_name(self.language, self.metric))
+        write!(f, "{}", metric_kind_name(self.language, self.metric))
     }
 }
 

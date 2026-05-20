@@ -232,7 +232,7 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_power_watts: Some(power_mw as f64 / 1000.0),
+                total_consumption: Some(power_mw as f64 / 1000.0),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
@@ -421,7 +421,7 @@ mod intel_gpu {
                     != PDH_MORE_DATA
                 {
                     return Ok(GPUData {
-                        total_power_watts: None,
+                        total_consumption: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                     }
@@ -431,7 +431,7 @@ mod intel_gpu {
                 let items = buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
                 if PdhGetFormattedCounterArrayW(self.counter, PDH_FMT_DOUBLE, &mut size, &mut count, Some(items)) != 0 {
                     return Ok(GPUData {
-                        total_power_watts: None,
+                        total_consumption: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                     }
@@ -446,7 +446,7 @@ mod intel_gpu {
                     })
                     .fold(0.0f64, f64::max);
                 Ok(GPUData {
-                    total_power_watts: None,
+                    total_consumption: None,
                     usage_percent: Some(max.clamp(0.0, 100.0)),
                     vram_usage_percent: None,
                 }

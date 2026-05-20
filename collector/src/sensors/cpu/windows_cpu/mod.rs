@@ -149,10 +149,10 @@ impl Sensor for WindowsCPUSensor {
         let cpu_power_values = self.read_raw_power()?;
 
         let data = CPUData {
-            total_power_watts: cpu_power_values.pkg,
-            pp0_power_watts: cpu_power_values.pp0,
-            pp1_power_watts: cpu_power_values.pp1,
-            dram_power_watts: cpu_power_values.dram,
+            total_consumption: cpu_power_values.pkg,
+            pp0_consumption: cpu_power_values.pp0,
+            pp1_consumption: cpu_power_values.pp1,
+            dram_consumption: cpu_power_values.dram,
             usage_percent: None,
         };
         Ok(data.into())
