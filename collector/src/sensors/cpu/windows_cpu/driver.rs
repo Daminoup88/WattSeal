@@ -1,5 +1,3 @@
-use std::{thread, time::Duration};
-
 use scaphandre_driver_rs::ScaphandreDriver;
 
 /// Safe wrapper around the Scaphandre RAPL driver for MSR access.
@@ -9,11 +7,6 @@ pub struct ScaphandreMsrReader {
 }
 
 impl ScaphandreMsrReader {
-    fn has_windows_error_code(message: &str, code: u32) -> bool {
-        let code_fragment = format!("(code {code})");
-        message.contains(&code_fragment)
-    }
-
     /// Opens the Scaphandre driver device for MSR access.
     pub fn new() -> Result<Self, String> {
         let driver = ScaphandreDriver::new().map_err(|e| format!("Failed to open Scaphandre driver: {e}"))?;
@@ -40,28 +33,17 @@ impl ScaphandreMsrReader {
 
     /// Installs the driver (requires Administrator privileges).
     pub fn install() -> Result<(), String> {
-        let mut last_error = String::new();
-
-        // 1072 means the service is marked for deletion. This can be transient
-        // after uninstall or while another process still releases service handles.
-        for attempt in 0..3 {
-            match ScaphandreDriver::install() {
-                Ok(()) => return Ok(()),
-                Err(e) => {
-                    let message = format!("{e}");
-                    if Self::has_windows_error_code(&message, 1072) && attempt < 2 {
-                        thread::sleep(Duration::from_millis(500));
-                        last_error = message;
-                        continue;
-                    }
-                    return Err(format!("Failed to install Scaphandre driver: {message}"));
-                }
+        // 1072 means the service is marked for deletion.
+        match ScaphandreDriver::install() {
+            Ok(()) => return Ok(()),
+            Err(e) => {
+                let message = format!("{e}");
+                return Err(format!(
+                    "Failed to install Scaphandre driver: {message}. {}",
+                    explain_windows_error_code(extract_windows_error_code(&message).unwrap_or(0))
+                ));
             }
         }
-
-        Err(format!(
-            "Failed to install Scaphandre driver: {last_error}. Service is marked for deletion (code 1072); close apps using the driver and retry, or reboot Windows."
-        ))
     }
 
     /// Uninstalls the driver (requires Administrator privileges).
@@ -81,11 +63,15 @@ impl ScaphandreMsrReader {
             Ok(()) => Ok(()),
             Err(e) => {
                 let message = format!("{e}");
-                if Self::has_windows_error_code(&message, 1072) {
+                let code = extract_windows_error_code(&message);
+                if code == Some(1072) {
                     // Already marked for deletion: treat as successful uninstall.
                     Ok(())
                 } else {
-                    Err(format!("Failed to uninstall Scaphandre driver: {message}"))
+                    Err(format!(
+                        "Failed to uninstall Scaphandre driver: {message}. {}",
+                        explain_windows_error_code(code.unwrap_or(0))
+                    ))
                 }
             }
         }
@@ -95,5 +81,27 @@ impl ScaphandreMsrReader {
 impl Drop for ScaphandreMsrReader {
     fn drop(&mut self) {
         let _ = self.driver.close();
+    }
+}
+
+fn extract_windows_error_code(message: &str) -> Option<u32> {
+    let code_prefix = "(code ";
+    if let Some(start) = message.find(code_prefix) {
+        let start_index = start + code_prefix.len();
+        if let Some(end) = message[start_index..].find(')') {
+            let code_str = &message[start_index..start_index + end];
+            return code_str.parse::<u32>().ok();
+        }
+    }
+    None
+}
+
+fn explain_windows_error_code(code: u32) -> &'static str {
+    match code {
+        1072 => {
+            "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the Scaphandre driver), then retry. If it persists, reboot Windows."
+        }
+        5 => "Administrator privileges are required.",
+        _ => "Unknown error code.",
     }
 }
