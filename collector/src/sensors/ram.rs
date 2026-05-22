@@ -1,26 +1,32 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, rc::Rc, time::Instant};
 
-use common::types::{InitialInfo, MemoryInfo};
-
-use crate::{
-    database::{RamData, SensorData},
-    sensors::{Sensor, SensorError, System},
+use common::{
+    ConsumptionMetric, ConsumptionUnit, EnergyUnit, RamData, SensorData,
+    types::{InitialInfo, MemoryInfo},
 };
+
+use crate::sensors::{Sensor, SensorError, System};
 
 /// RAM usage sensor backed by sysinfo.
 pub struct RamSensor {
     system: Rc<RefCell<System>>,
+    last_reading: RefCell<Instant>,
 }
 
 impl RamSensor {
     /// Creates a sensor sharing the given `System` handle.
     pub fn new(system: Rc<RefCell<System>>) -> Self {
-        Self { system }
+        Self {
+            system,
+            last_reading: RefCell::new(Instant::now()),
+        }
     }
 }
 
 impl Sensor for RamSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        let now = Instant::now();
+        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
         let mut system = self
             .system
             .try_borrow_mut()
@@ -35,8 +41,15 @@ impl Sensor for RamSensor {
             0.0
         };
 
+        let energy_uj = 5.0 * duration * 1_000_000.0;
+
+        *self.last_reading.borrow_mut() = now;
+
         Ok(SensorData::Ram(RamData {
-            total_consumption: Some(5.0),
+            total_consumption: Some(ConsumptionMetric {
+                value: energy_uj,
+                unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
+            }),
             usage_percent: Some(usage_percent),
         }))
     }

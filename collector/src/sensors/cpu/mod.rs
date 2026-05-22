@@ -1,10 +1,12 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
-use common::types::{CpuInfo, InitialInfo};
+use common::{
+    CPUData, ConsumptionMetric, SensorData,
+    types::{CpuInfo, InitialInfo},
+};
 use sysinfo::System;
 
 use super::{Sensor, SensorError, SensorType};
-use crate::database::{CPUData, SensorData};
 
 mod estimation;
 #[cfg(target_os = "linux")]
@@ -47,7 +49,7 @@ impl CPUSensor {
 }
 
 impl Sensor for CPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
         // Get CPU usage first (needed for estimation, always populated)
         let usage_percent = {
             let mut sys = self

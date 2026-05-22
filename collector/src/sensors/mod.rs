@@ -2,24 +2,23 @@ pub mod cpu;
 pub mod disk;
 pub mod gpu;
 pub mod network;
-pub mod process;
 pub mod ram;
 
-use std::{cell::RefCell, collections::HashMap, rc::Rc, time::SystemTime};
+use std::{collections::HashMap, time::SystemTime};
 
 use battery::Manager;
 pub use common::{
-    AllTimeData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
+    AllTimeData, Event, GPUData, GeneralData, SensorData,
     types::{
         BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
     },
 };
+use common::{ConsumptionMetric, ConsumptionUnit, PowerUnit};
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
 pub use gpu::{GPUSensor, get_gpu_list};
 pub use network::NetworkSensor;
-pub use process::get_processes;
 pub use ram::RamSensor;
 use sysinfo::System;
 
@@ -30,8 +29,6 @@ pub enum SensorType {
     RAM(RamSensor),
     Disk(DiskSensor),
     Network(NetworkSensor),
-    Process,
-    Total,
 }
 
 impl SensorType {
@@ -43,22 +40,18 @@ impl SensorType {
             SensorType::RAM(_) => SensorKind::Ram,
             SensorType::Disk(_) => SensorKind::Disk,
             SensorType::Network(_) => SensorKind::Network,
-            SensorType::Total => SensorKind::Total,
-            SensorType::Process => SensorKind::Process,
         }
     }
 }
 
 impl Sensor for SensorType {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
             SensorType::RAM(sensor) => sensor.read_full_data(),
             SensorType::Disk(sensor) => sensor.read_full_data(),
             SensorType::Network(sensor) => sensor.read_full_data(),
-            SensorType::Process => Err(SensorError::NotSupported),
-            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 
@@ -69,8 +62,6 @@ impl Sensor for SensorType {
             SensorType::RAM(sensor) => sensor.read_initial_info(),
             SensorType::Disk(sensor) => sensor.read_initial_info(),
             SensorType::Network(_) => Err(SensorError::NotSupported),
-            SensorType::Process => Err(SensorError::NotSupported),
-            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 
@@ -81,8 +72,6 @@ impl Sensor for SensorType {
             SensorType::Disk(sensor) => sensor.read_name(),
             SensorType::Network(sensor) => sensor.read_name(),
             SensorType::RAM(_) => Err(SensorError::NotSupported),
-            SensorType::Process => Err(SensorError::NotSupported),
-            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 }
@@ -90,7 +79,7 @@ impl Sensor for SensorType {
 /// Common interface for hardware sensors.
 pub trait Sensor {
     /// Reads current power, usage, and throughput data.
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError>;
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError>;
     /// Returns static hardware specs (model, capacity, etc.).
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
         Err(SensorError::NotSupported)
@@ -107,64 +96,27 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<System>>) -> Event<f64> {
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event<ConsumptionMetric> {
     let time = SystemTime::now();
-    let mut data: Vec<SensorData<f64>> = Vec::new();
+    let mut data: Vec<SensorData<ConsumptionMetric>> = Vec::new();
 
-    let (mut cpu_power, mut cpu_usage, mut nb_cpus) = (0.0, 0.0, 0);
-    let (mut gpu_power, mut gpu_usage, mut nb_gpus) = (0.0, 0.0, 0);
-
-    let mut total_power = 0.0;
-    let mut integrated_gpu_power: Option<f64> = None;
+    let mut integrated_gpu_consumption: Option<ConsumptionMetric> = None;
     let mut has_pp1_source = false;
     let mut integrated_gpu_indices: Vec<usize> = Vec::new();
-    let mut proc_gpu_usage = HashMap::new();
     for sensor in sensors {
-        match sensor {
-            SensorType::Process | SensorType::Total => continue,
-            SensorType::GPU(gpu_sensor) => {
-                if let Ok(gpu_process_usage) = gpu_sensor.get_process_gpu_usage(
-                    time.duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                ) {
-                    proc_gpu_usage.extend(gpu_process_usage);
-                }
-            }
-            _ => {}
-        }
-        if let SensorType::Total | SensorType::Process = sensor {
-            continue;
-        }
-
         let sensor_data = sensor.read_full_data();
         match sensor_data {
             Ok(mut d) => {
                 if let SensorData::CPU(ref mut cpu) = d {
                     if let Some(pp1) = cpu.pp1_consumption.take() {
                         has_pp1_source = true;
-                        if pp1 > 0.0 {
+                        if pp1.value > 0.0 {
                             if let Some(ref mut total) = cpu.total_consumption {
-                                *total -= pp1;
+                                let sub = total.sub(pp1).unwrap_or(*total);
+                                *total = sub;
                             }
-                            integrated_gpu_power = Some(pp1);
+                            integrated_gpu_consumption = Some(pp1);
                         }
-                    }
-                }
-
-                if let Some(power) = d.total_consumption() {
-                    total_power += power;
-
-                    if let SensorData::CPU(cpu) = &d {
-                        cpu_power += power;
-                        cpu_usage += cpu.usage_percent.unwrap_or(0.0);
-                        nb_cpus += 1;
-                    }
-
-                    if let SensorData::GPU(gpu) = &d {
-                        gpu_power += power;
-                        gpu_usage += gpu.usage_percent.unwrap_or(0.0);
-                        nb_gpus += 1;
                     }
                 }
 
@@ -186,11 +138,11 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
 
     // --- Integrated-GPU power resolution ---
     // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
-    if let Some(igpu_power) = integrated_gpu_power {
+    if let Some(igpu_consumption) = integrated_gpu_consumption {
         let merged = data.iter_mut().any(|d| {
             if let SensorData::GPU(gpu) = d {
                 if gpu.total_consumption.is_none() {
-                    gpu.total_consumption = Some(igpu_power);
+                    gpu.total_consumption = Some(igpu_consumption);
                     return true;
                 }
             }
@@ -198,14 +150,11 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
         });
         if !merged {
             data.push(SensorData::GPU(GPUData {
-                total_consumption: Some(igpu_power),
+                total_consumption: Some(igpu_consumption),
                 usage_percent: None,
                 vram_usage_percent: None,
             }));
-            nb_gpus += 1;
         }
-        gpu_power += igpu_power;
-        total_power += igpu_power;
     }
 
     // Priority 2: Estimate iGPU power from usage when PP1 is unavailable.
@@ -215,33 +164,15 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, system: Rc<RefCell<S
                 if gpu.total_consumption.is_none() {
                     if let Some(usage) = gpu.usage_percent {
                         let estimated = cpu::estimate_igpu_power(usage);
-                        gpu.total_consumption = Some(estimated);
-                        gpu_power += estimated;
+                        gpu.total_consumption = Some(ConsumptionMetric {
+                            value: estimated,
+                            unit: ConsumptionUnit::Power(PowerUnit::Watt),
+                        });
                     }
                 }
             }
         }
     }
-
-    data.push(SensorData::Total(TotalData {
-        total_consumption: total_power,
-        period_type: "second".to_string(),
-    }));
-
-    cpu_usage /= nb_cpus.max(1) as f64;
-    gpu_usage /= nb_gpus.max(1) as f64;
-
-    let top10_process_data: Vec<ProcessData<f64>> = get_processes(
-        system.clone(),
-        cpu_power,
-        cpu_usage,
-        gpu_power,
-        gpu_usage,
-        total_power,
-        10,
-        proc_gpu_usage,
-    );
-    data.push(SensorData::Process(top10_process_data));
 
     return Event::new(time, data);
 }
@@ -345,4 +276,26 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
     };
 
     return data;
+}
+
+pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
+    let time = SystemTime::now();
+    let mut proc_gpu_usage = HashMap::new();
+
+    for sensor in sensors {
+        match sensor {
+            SensorType::GPU(gpu_sensor) => {
+                if let Ok(gpu_process_usage) = gpu_sensor.get_process_gpu_usage(
+                    time.duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                ) {
+                    proc_gpu_usage.extend(gpu_process_usage);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    proc_gpu_usage
 }

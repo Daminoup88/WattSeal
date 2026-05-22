@@ -3,7 +3,7 @@ use std::{cell::RefCell, time::Instant};
 use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
-use crate::database::{CPUData, SensorData};
+use crate::database::{CPUData, ConsumptionMetric, SensorData};
 
 mod driver;
 
@@ -120,15 +120,15 @@ impl WindowsCPUSensor {
         })
     }
 
-    /// Reads raw energy counters and computes power delta since last call.
-    fn read_raw_power(&self) -> Result<CPUValues, SensorError> {
+    /// Reads raw energy counters and compute delta since last call.
+    fn read_raw_energy(&self) -> Result<CPUValues, SensorError> {
         let current_energy = self.msr_reader.read_energy()?;
-        let power_values = {
+        let energy_values = {
             let last_energy = self
                 .last_energy_measurement
                 .try_borrow()
                 .map_err(|e| SensorError::ReadError(format!("Failed to borrow last energy measurement: {}", e)))?;
-            self.msr_reader.calculate_power(&current_energy, &last_energy)
+            self.msr_reader.calculate_delta_energy(&current_energy, &last_energy)
         };
 
         let mut last_energy_mut = self
@@ -140,19 +140,19 @@ impl WindowsCPUSensor {
         if power_values.pkg.is_none() {
             return Err(SensorError::ReadError("Failed to calculate power".to_string()));
         }
-        Ok(power_values)
+        Ok(energy_values)
     }
 }
 
 impl Sensor for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
-        let cpu_power_values = self.read_raw_power()?;
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        let cpu_energy_values = self.read_raw_energy()?;
 
         let data = CPUData {
-            total_consumption: cpu_power_values.pkg,
-            pp0_consumption: cpu_power_values.pp0,
-            pp1_consumption: cpu_power_values.pp1,
-            dram_consumption: cpu_power_values.dram,
+            total_consumption: cpu_energy_values.pkg,
+            pp0_consumption: cpu_energy_values.pp0,
+            pp1_consumption: cpu_energy_values.pp1,
+            dram_consumption: cpu_energy_values.dram,
             usage_percent: None,
         };
         Ok(data.into())
@@ -197,45 +197,33 @@ impl MSRReader {
         })
     }
 
-    fn calculate_power(&self, current_energy: &EnergyMeasurement, last_energy: &EnergyMeasurement) -> CPUValues {
+    fn compute_delta_energy(&self, current_energy: &EnergyMeasurement, last_energy: &EnergyMeasurement) -> CPUValues {
         let duration: f64 = current_energy.instant.duration_since(last_energy.instant).as_secs_f64();
-        if duration == 0.0 {
-            return CPUValues::default(); // Division by zero protection
-        }
 
-        let pp1_value = self.calculate_component_power(
-            current_energy.cpu_energy_values.pp1,
-            last_energy.cpu_energy_values.pp1,
-            duration,
-        );
+        let pp1_value = self
+            .calculate_component_delta_energy(current_energy.cpu_energy_values.pp1, last_energy.cpu_energy_values.pp1);
 
-        let pkg_value = self.calculate_component_power(
-            current_energy.cpu_energy_values.pkg,
-            last_energy.cpu_energy_values.pkg,
-            duration,
-        );
+        let pkg_value = self
+            .calculate_component_delta_energy(current_energy.cpu_energy_values.pkg, last_energy.cpu_energy_values.pkg);
 
         CPUValues {
             pkg: pkg_value,
-            pp0: self.calculate_component_power(
+            pp0: self.calculate_component_delta_energy(
                 current_energy.cpu_energy_values.pp0,
                 last_energy.cpu_energy_values.pp0,
-                duration,
             ),
             pp1: pp1_value,
-            dram: self.calculate_component_power(
+            dram: self.calculate_component_delta_energy(
                 current_energy.cpu_energy_values.dram,
                 last_energy.cpu_energy_values.dram,
-                duration,
             ),
         }
     }
 
-    fn calculate_component_power(
+    fn compute_component_delta_energy(
         &self,
         current_energy_value: Option<f64>,
         last_energy_value: Option<f64>,
-        duration: f64,
     ) -> Option<f64> {
         match (current_energy_value, last_energy_value) {
             (Some(current), Some(last)) => {
@@ -243,8 +231,7 @@ impl MSRReader {
                 if current == 0.0 || last == 0.0 || energy_diff == 0 {
                     return None;
                 }
-                let power = (energy_diff as f64) * self.energy_unit / duration;
-                Some(power)
+                Some(energy_diff * self.energy_unit * 1_000_000) // To uj
             }
             _ => None,
         }

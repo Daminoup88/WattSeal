@@ -1,12 +1,12 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Instant};
 
-use common::types::{DiskInfo, InitialInfo};
+use common::{
+    ConsumptionMetric, ConsumptionUnit, DiskData, EnergyUnit, SensorData,
+    types::{DiskInfo, InitialInfo},
+};
 use sysinfo::Disks;
 
-use crate::{
-    database::{DiskData, SensorData},
-    sensors::{Sensor, SensorError},
-};
+use crate::sensors::{Sensor, SensorError};
 
 const SSD_IDLE_W: f64 = 0.05;
 const HDD_IDLE_W: f64 = 3.0;
@@ -19,6 +19,7 @@ const UNKNOWN_W_PER_MB_S: f64 = 0.02;
 /// Disk I/O sensor that estimates power from throughput.
 pub struct DiskSensor {
     disks: RefCell<Disks>,
+    last_reading: RefCell<Instant>,
 }
 
 impl DiskSensor {
@@ -26,15 +27,19 @@ impl DiskSensor {
     pub fn new() -> Self {
         Self {
             disks: RefCell::new(Disks::new_with_refreshed_list()),
+            last_reading: RefCell::new(Instant::now()),
         }
     }
 }
 
 impl Sensor for DiskSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        let now = Instant::now();
+        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+
         let mut read_speed = 0.0;
         let mut write_speed = 0.0;
-        let mut total_power = 0.0;
+        let mut total_energy_uj = 0.0;
 
         let mut disks = self
             .disks
@@ -55,11 +60,17 @@ impl Sensor for DiskSensor {
                 sysinfo::DiskKind::HDD => (HDD_IDLE_W, HDD_W_PER_MB_S),
                 _ => (UNKNOWN_IDLE_W, UNKNOWN_W_PER_MB_S),
             };
-            total_power += idle + throughput * per_mb;
+            let power = idle + throughput * per_mb;
+            total_energy_uj += power * duration * 1_000_000.0;
         }
 
+        *self.last_reading.borrow_mut() = now;
+
         Ok(SensorData::Disk(DiskData {
-            total_consumption: Some(total_power),
+            total_consumption: Some(ConsumptionMetric {
+                value: total_energy_uj,
+                unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
+            }),
             read_usage_mb_s: read_speed,
             write_usage_mb_s: write_speed,
         }))

@@ -1,11 +1,9 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Instant};
 
+use common::{ConsumptionMetric, ConsumptionUnit, EnergyUnit, NetworkData, SensorData};
 use sysinfo::Networks;
 
-use crate::{
-    database::{NetworkData, SensorData},
-    sensors::{Sensor, SensorError},
-};
+use crate::sensors::{Sensor, SensorError};
 
 const NIC_IDLE_W: f64 = 0.2;
 const NIC_W_PER_MB_S: f64 = 0.01;
@@ -14,6 +12,7 @@ const NIC_MAX_W: f64 = 3.0;
 /// Network interface sensor that estimates power from throughput.
 pub struct NetworkSensor {
     networks: RefCell<Networks>,
+    last_reading: RefCell<Instant>,
 }
 
 impl NetworkSensor {
@@ -21,12 +20,16 @@ impl NetworkSensor {
     pub fn new() -> Self {
         Self {
             networks: RefCell::new(Networks::new()),
+            last_reading: RefCell::new(Instant::now()),
         }
     }
 }
 
 impl Sensor for NetworkSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        let now = Instant::now();
+        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+
         let mut networks = self
             .networks
             .try_borrow_mut()
@@ -35,7 +38,7 @@ impl Sensor for NetworkSensor {
 
         let mut download_speed_mb_s = 0.0;
         let mut upload_speed_mb_s = 0.0;
-        let mut total_power = 0.0;
+        let mut total_energy_uj = 0.0;
 
         for (_, data) in networks.iter() {
             let dl = data.received() as f64 / 1_048_576.0;
@@ -44,12 +47,16 @@ impl Sensor for NetworkSensor {
             upload_speed_mb_s += ul;
 
             let throughput = dl + ul;
-            let nic_power = NIC_IDLE_W + throughput * NIC_W_PER_MB_S;
-            total_power += nic_power;
+            let nic_power = (NIC_IDLE_W + throughput * NIC_W_PER_MB_S).min(NIC_MAX_W);
+            total_energy_uj += nic_power * duration * 1_000_000.0;
         }
+        *self.last_reading.borrow_mut() = now;
 
         Ok(SensorData::Network(NetworkData {
-            total_consumption: Some(total_power.min(NIC_MAX_W)),
+            total_consumption: Some(ConsumptionMetric {
+                value: total_energy_uj,
+                unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
+            }),
             download_speed_mb_s,
             upload_speed_mb_s,
         }))

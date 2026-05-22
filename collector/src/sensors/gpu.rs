@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use common::types::InitialInfo;
+use common::{ConsumptionMetric, SensorData, types::InitialInfo};
 
 use super::{Sensor, SensorError, SensorType};
-use crate::database::SensorData;
 
 /// GPU hardware vendor identifier.
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -105,7 +104,7 @@ pub enum GPUSensor {
 }
 
 impl Sensor for GPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
         match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensor::Nvidia(sensor) => sensor.read_full_data(),
@@ -128,7 +127,7 @@ impl Sensor for GPUSensor {
 }
 
 /// Creates a GPU power sensor appropriate for the given vendor.
-pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
+pub fn get_gpu_consumption_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
 
     #[cfg(target_os = "windows")]
@@ -185,6 +184,7 @@ impl GPUSensor {
 #[cfg(target_os = "windows")]
 mod amd_gpu {
     use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
+    use common::{ConsumptionUnit, PowerUnit};
 
     use super::{Sensor, SensorError};
     use crate::database::{GPUData, SensorData};
@@ -232,7 +232,10 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(power_mw as f64 / 1000.0),
+                total_consumption: Some(ConsumptionMetric {
+                    value: power_mw as f64 / 1000.0,
+                    unit: ConsumptionUnit::Power(PowerUnit::Watt),
+                }),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
@@ -246,15 +249,16 @@ mod amd_gpu {
 mod nvidia_gpu {
     use std::{cell::RefCell, collections::HashMap};
 
+    use common::{ConsumptionMetric, GPUData, SensorData};
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     pub struct NvidiaGPUSensor {
         nvml: Nvml,
         device_index: u32,
         last_timestamp: RefCell<u64>,
+        last_energy: RefCell<u64>,
     }
 
     impl NvidiaGPUSensor {
@@ -292,6 +296,7 @@ mod nvidia_gpu {
                 nvml,
                 device_index: index,
                 last_timestamp: RefCell::new(0),
+                last_energy: RefCell::new(0),
             })
         }
 
@@ -327,21 +332,38 @@ mod nvidia_gpu {
     }
 
     impl Sensor for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
                 .device_by_index(self.device_index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let power_usage_mw = device
-                .power_usage()
+            let current_energy_mj = device
+                .total_energy_consumption()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
+
+            let mut last_energy = self
+                .last_energy
+                .try_borrow_mut()
+                .map_err(|_| SensorError::ReadError("Failed to borrow last_energy".to_string()))?;
+
+            let energy_uj = if *last_energy == 0 {
+                0.0
+            } else {
+                current_energy_mj.saturating_sub((*last_energy) as u64) as f64 * 1_000.0 // mJ -> uj
+            };
+
+            *last_energy = current_energy_mj;
+
             let utilization = device
                 .utilization_rates()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(power_usage_mw as f64 / 1000.0),
+                total_consumption: Some(ConsumptionMetric {
+                    value: energy_uj,
+                    unit: common::ConsumptionUnit::Energy(common::EnergyUnit::UJoul),
+                }),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
             };
