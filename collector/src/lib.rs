@@ -1,3 +1,4 @@
+pub mod conversion;
 pub mod database;
 pub mod sensors;
 
@@ -10,9 +11,13 @@ use std::{
 };
 
 pub use common::clog;
-use common::database::{purge::averaging_and_purging_data, types::GeneralDataDB};
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
+use common::{
+    DatabaseEntry, ProcessDataDB, TotalDataDB,
+    database::{purge::averaging_and_purging_data, types::GeneralDataDB},
+};
+use conversion::consumption_event_to_eventdb;
 use database::Database;
 use mqtt::{
     MQTTPublisher,
@@ -20,6 +25,7 @@ use mqtt::{
 };
 use sensors::{
     DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
+    get_process_gpu_usage,
     gpu::{GPUVendor, get_gpu_list},
 };
 use sysinfo::System;
@@ -133,7 +139,7 @@ impl CollectorApp {
                 GPUVendor::Other => 0,
             };
 
-            match sensors::gpu::get_gpu_power_sensor(gpu_name, vendor_index) {
+            match sensors::gpu::get_gpu_consumption_sensor(gpu_name, vendor_index) {
                 Ok(sensor) => {
                     crate::clog!(
                         "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
@@ -159,13 +165,13 @@ impl CollectorApp {
         self.sensors.push(SensorType::RAM(RamSensor::new(self.system.clone())));
         self.sensors.push(SensorType::Disk(DiskSensor::new()));
         self.sensors.push(SensorType::Network(NetworkSensor::new()));
-        self.sensors.push(SensorType::Total);
-        self.sensors.push(SensorType::Process);
 
         if let Some(database) = &mut self.database {
             // Database
             crate::clog!("\n========== SETTING UP DATABASE ==========");
-            let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
+            let mut table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
+            table_names.push(ProcessDataDB::table_name_static());
+            table_names.push(TotalDataDB::table_name_static());
             database
                 .create_tables_if_not_exists(&table_names)
                 .map_err(|e| format!("Failed to create database tables: {e}"))?;
@@ -209,19 +215,25 @@ impl CollectorApp {
                 self.purge_and_average();
             }
             let start_time = Instant::now();
-            let since_last_update_secs = self.last_update.elapsed().as_secs_f64();
+            let since_last_update = self.last_update.elapsed();
             self.last_update = start_time;
 
             #[cfg(debug_assertions)]
             println!("\n--- Iteration {} ---", self.iteration);
 
-            let event = create_event_from_sensors(&self.sensors, self.system.clone());
+            let event = create_event_from_sensors(&self.sensors);
+
+            let proc_gpu_usage = get_process_gpu_usage(&self.sensors);
 
             if let Some(database) = &mut self.database {
+                let eventdb =
+                    consumption_event_to_eventdb(&event, since_last_update, self.system.clone(), proc_gpu_usage);
+
                 #[cfg(debug_assertions)]
                 {
                     let start = Instant::now();
-                    let result = database.insert_event_and_update_energy(&event, since_last_update_secs);
+                    let result = database.insert_event_and_update_energy(&eventdb, since_last_update.as_secs_f64());
+
                     let duration = start.elapsed();
                     match result {
                         Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
@@ -230,7 +242,7 @@ impl CollectorApp {
                 }
 
                 #[cfg(not(debug_assertions))]
-                let _ = database.insert_event_and_update_energy(&event, since_last_update_secs);
+                let _ = database.insert_event_and_update_energy(&eventdb, since_last_update.as_secs_f64());
             }
 
             if let Some(mqtt_infos) = &self.mqtt_infos {
