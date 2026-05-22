@@ -7,24 +7,6 @@ use crate::database::{CPUData, SensorData};
 
 mod driver;
 
-fn explain_driver_error(error: &str) -> String {
-    if error.contains("OpenSCManagerW (code 5)")
-        || error.contains("CreateServiceW (code 5)")
-        || error.contains("DeleteService (code 5)")
-        || error.contains("Access is denied")
-    {
-        return format!("{error}. Administrator privileges are required.");
-    }
-
-    if error.contains("(code 1072)") {
-        return format!(
-            "{error}. Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the Scaphandre driver), then retry. If it persists, reboot Windows."
-        );
-    }
-
-    error.to_string()
-}
-
 pub fn install() -> bool {
     match ScaphandreMsrReader::install() {
         Ok(()) => {
@@ -32,7 +14,7 @@ pub fn install() -> bool {
             true
         }
         Err(e) => {
-            common::clog!("✗ Failed to install CPU MSR driver: {}", explain_driver_error(&e));
+            common::clog!("✗ Failed to install CPU MSR driver: {e}");
             false
         }
     }
@@ -45,7 +27,7 @@ pub fn uninstall() -> bool {
             true
         }
         Err(e) => {
-            common::clog!("✗ Failed to uninstall CPU MSR driver: {}", explain_driver_error(&e));
+            common::clog!("✗ Failed to uninstall CPU MSR driver: {e}");
             false
         }
     }
