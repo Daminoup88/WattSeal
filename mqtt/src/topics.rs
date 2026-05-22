@@ -1,6 +1,6 @@
 use common::types::SensorData;
 
-pub fn sensor_data_to_topic(id: &str, sensor_data: &SensorData<f64>) -> String {
+pub fn sensor_data_to_topic<T: Clone>(id: &str, sensor_data: &SensorData<T>) -> String {
     let topic = "sensor_data";
     let type_topic = sensor_data.sensor_kind().to_string().to_lowercase();
 
