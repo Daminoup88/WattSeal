@@ -18,14 +18,14 @@ macro_rules! clog {
 pub use database::{
     DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table,
     types::{
-        AllTimeDataDB, CPUDataDB, DiskDataDB, EventDB, GPUDataDB, LabeledValue, MetricKindDB, NetworkDataDB,
-        ProcessDataDB, RamDataDB, SecondaryValues, SensorDataDB, TotalDataDB,
+        AllTimeDataDB, CPUDataDB, DataDB, DiskDataDB, EventDB, GPUDataDB, IconData, LabeledValue, MetricKindDB,
+        NetworkDataDB, ProcessDataDB, RamDataDB, SecondaryValues, SensorDataDB, TotalDataDB,
     },
 };
 pub use singleton::SingletonGuard;
 pub use types::{
     AllTimeData, CPUData, ConsumptionMetric, ConsumptionUnit, DiskData, EnergyUnit, Event, GPUData, GeneralData,
-    HardwareInfo, IconData, NetworkData, PowerUnit, ProcessData, RamData, SensorData, SensorKind, TotalData,
+    HardwareInfo, NetworkData, PowerUnit, RamData, SensorData, SensorKind,
 };
 pub use utils::set_current_dir_to_exe_dir;
 

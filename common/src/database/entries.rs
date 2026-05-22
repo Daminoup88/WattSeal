@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rusqlite::{Row, ToSql};
 
 use crate::database::types::{
-    AllTimeDataDB, CPUDataDB, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, SensorDataDB, TotalDataDB,
+    AllTimeDataDB, CPUDataDB, DataDB, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, TotalDataDB,
 };
 
 /// Maps a data type to its SQLite table schema and row conversion.
@@ -16,9 +16,9 @@ pub trait DatabaseEntry {
     where
         Self: Sized;
 
-    fn zero() -> SensorDataDB
+    fn zero() -> DataDB
     where
-        Self: Default + Into<SensorDataDB>,
+        Self: Default + Into<DataDB>,
     {
         Self::default().into()
     }
@@ -313,8 +313,8 @@ impl DatabaseEntry for ProcessDataDB {
         })
     }
 
-    fn zero() -> SensorDataDB {
-        SensorDataDB::Process(Vec::new())
+    fn zero() -> DataDB {
+        DataDB::Process(Vec::new())
     }
 }
 
@@ -345,15 +345,15 @@ impl DatabaseEntry for AllTimeDataDB {
 #[cfg(test)]
 mod tests {
     use super::{
-        CPUDataDB, DatabaseEntry, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, SensorDataDB,
-        TotalDataDB,
+        CPUDataDB, DataDB, DatabaseEntry, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, TotalDataDB,
     };
+    use crate::SensorDataDB;
 
     #[test]
     fn zero_defaults_are_zero_filled() {
         // CPU
         match CPUDataDB::zero() {
-            SensorDataDB::CPU(cpu) => {
+            DataDB::Sensor(SensorDataDB::CPU(cpu)) => {
                 assert_eq!(cpu.total_consumption, Some(0.0));
                 assert_eq!(cpu.pp0_consumption, Some(0.0));
                 assert_eq!(cpu.pp1_consumption, Some(0.0));
@@ -365,7 +365,7 @@ mod tests {
 
         // GPU
         match GPUDataDB::zero() {
-            SensorDataDB::GPU(gpu) => {
+            DataDB::Sensor(SensorDataDB::GPU(gpu)) => {
                 assert_eq!(gpu.total_consumption, Some(0.0));
                 assert_eq!(gpu.usage_percent, Some(0.0));
                 assert_eq!(gpu.vram_usage_percent, Some(0.0));
@@ -375,7 +375,7 @@ mod tests {
 
         // RAM
         match RamDataDB::zero() {
-            SensorDataDB::Ram(ram) => {
+            DataDB::Sensor(SensorDataDB::Ram(ram)) => {
                 assert_eq!(ram.total_consumption, Some(0.0));
                 assert_eq!(ram.usage_percent, Some(0.0));
             }
@@ -384,7 +384,7 @@ mod tests {
 
         // Disk
         match DiskDataDB::zero() {
-            SensorDataDB::Disk(disk) => {
+            DataDB::Sensor(SensorDataDB::Disk(disk)) => {
                 assert_eq!(disk.total_consumption, Some(0.0));
                 assert_eq!(disk.read_usage_mb_s, 0.0);
                 assert_eq!(disk.write_usage_mb_s, 0.0);
@@ -394,7 +394,7 @@ mod tests {
 
         // Network
         match NetworkDataDB::zero() {
-            SensorDataDB::Network(net) => {
+            DataDB::Sensor(SensorDataDB::Network(net)) => {
                 assert_eq!(net.total_consumption, Some(0.0));
                 assert_eq!(net.download_speed_mb_s, 0.0);
                 assert_eq!(net.upload_speed_mb_s, 0.0);
@@ -404,7 +404,7 @@ mod tests {
 
         // Total
         match TotalDataDB::zero() {
-            SensorDataDB::Total(total) => {
+            DataDB::Total(total) => {
                 assert_eq!(total.total_consumption, 0.0);
                 assert_eq!(total.period_type, "second");
             }
@@ -413,7 +413,7 @@ mod tests {
 
         // Process
         match ProcessDataDB::zero() {
-            SensorDataDB::Process(vec) => {
+            DataDB::Process(vec) => {
                 assert!(vec.is_empty());
             }
             _ => panic!("ProcessData::zero() returned wrong SensorData variant"),

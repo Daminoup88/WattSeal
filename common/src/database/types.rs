@@ -1,23 +1,64 @@
-use std::fmt::Display;
+use std::{fmt::Display, time::SystemTime};
+
+use serde::{Deserialize, Serialize};
 
 use crate::{
-    AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, GeneralData, NetworkData, ProcessData, RamData, SensorData,
-    SensorKind, TotalData, types::Event,
+    AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, GeneralData, NetworkData, RamData, SensorData, SensorKind,
 };
 
 pub type PowerWatt = f64;
 
 /// Sensors data for database
-pub type EventDB = Event<PowerWatt>;
+pub struct EventDB {
+    time: SystemTime,
+    data: Vec<DataDB>,
+}
+
 pub type CPUDataDB = CPUData<PowerWatt>;
 pub type GPUDataDB = GPUData<PowerWatt>;
 pub type RamDataDB = RamData<PowerWatt>;
 pub type DiskDataDB = DiskData<PowerWatt>;
 pub type NetworkDataDB = NetworkData<PowerWatt>;
-pub type ProcessDataDB = ProcessData<PowerWatt>;
-pub type TotalDataDB = TotalData<PowerWatt>;
 pub type SensorDataDB = SensorData<PowerWatt>;
 pub type AllTimeDataDB = AllTimeData<PowerWatt>;
+
+// Sensors dependant data used in database.
+#[derive(Debug, Clone)]
+pub enum DataDB {
+    Sensor(SensorDataDB),
+    Process(Vec<ProcessDataDB>),
+    Total(TotalDataDB),
+}
+
+/// Raw RGBA icon pixel data.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IconData {
+    pub width: u32,
+    pub height: u32,
+    pub pixels: Vec<u8>,
+}
+
+/// Per-application resource usage snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessDataDB {
+    pub app_name: String,
+    pub process_exe_path: Option<String>,
+    pub process_consumption: PowerWatt,
+    pub process_cpu_usage: f64,
+    pub process_gpu_usage: Option<f64>,
+    pub process_mem_usage: f64,
+    pub read_bytes_per_sec: f64,
+    pub written_bytes_per_sec: f64,
+    pub subprocess_count: u32,
+    pub icon: Option<IconData>,
+}
+
+/// Aggregated total consumption across all components.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TotalDataDB {
+    pub total_consumption: PowerWatt,
+    pub period_type: String,
+}
 
 #[derive(Debug)]
 pub struct GeneralDataDB {
@@ -25,9 +66,103 @@ pub struct GeneralDataDB {
     pub hardware_info_serialized: String,
 }
 
+/// Different kind of sensors dependent data kind.
+#[derive(Debug, Clone)]
+pub enum DataKindDB {
+    CPU,
+    GPU,
+    Ram,
+    Disk,
+    Network,
+    Process,
+    Total,
+}
+
+impl EventDB {
+    /// Creates an event with the given timestamp and data.
+    pub fn new(time: SystemTime, data: Vec<DataDB>) -> Self {
+        EventDB { time, data }
+    }
+
+    /// Returns the event timestamp.
+    pub fn time(&self) -> SystemTime {
+        self.time
+    }
+
+    /// Returns the list of sensor readings.
+    pub fn data(&self) -> &Vec<DataDB> {
+        &self.data
+    }
+
+    /// Appends a sensor reading to this event.
+    pub fn push_data(&mut self, data: DataDB) {
+        self.data.push(data);
+    }
+}
+
+impl From<SensorKind> for DataKindDB {
+    fn from(sk: SensorKind) -> Self {
+        match sk {
+            SensorKind::CPU => DataKindDB::CPU,
+            SensorKind::GPU => DataKindDB::GPU,
+            SensorKind::Ram => DataKindDB::Ram,
+            SensorKind::Disk => DataKindDB::Disk,
+            SensorKind::Network => DataKindDB::Network,
+        }
+    }
+}
+
+impl From<CPUDataDB> for DataDB {
+    fn from(data: CPUDataDB) -> Self {
+        DataDB::Sensor(SensorDataDB::CPU(data))
+    }
+}
+
+impl From<GPUDataDB> for DataDB {
+    fn from(data: GPUDataDB) -> Self {
+        DataDB::Sensor(SensorData::GPU(data))
+    }
+}
+
+impl From<RamDataDB> for DataDB {
+    fn from(data: RamDataDB) -> Self {
+        DataDB::Sensor(SensorData::Ram(data))
+    }
+}
+impl From<DiskDataDB> for DataDB {
+    fn from(data: DiskDataDB) -> Self {
+        DataDB::Sensor(SensorData::Disk(data))
+    }
+}
+impl From<NetworkDataDB> for DataDB {
+    fn from(data: NetworkDataDB) -> Self {
+        DataDB::Sensor(SensorData::Network(data))
+    }
+}
+
+impl From<ProcessDataDB> for DataDB {
+    fn from(data: ProcessDataDB) -> Self {
+        DataDB::Process(vec![data])
+    }
+}
+
+impl From<TotalDataDB> for DataDB {
+    fn from(data: TotalDataDB) -> Self {
+        DataDB::Total(data)
+    }
+}
+
 impl From<GeneralData> for GeneralDataDB {
     fn from(data: GeneralData) -> Self {
-        let tables: Vec<&str> = data.sensors.iter().map(|s| s.table_name()).collect();
+        let mut tables: Vec<&str> = data
+            .sensors
+            .iter()
+            .map(|s| DataKindDB::from(s.clone()).table_name())
+            .collect();
+
+        tables.push(ProcessDataDB::table_name_static());
+        tables.push(TotalDataDB::table_name_static());
+
         Self {
             tables: tables.join(","),
             hardware_info_serialized: data.hardware_info.serialized(),
@@ -35,74 +170,93 @@ impl From<GeneralData> for GeneralDataDB {
     }
 }
 
-impl SensorDataDB {
+impl DataDB {
+    /// Returns the total consumption value, if available.
+    pub fn total_consumption(&self) -> Option<PowerWatt> {
+        match self {
+            DataDB::Sensor(s) => s.total_consumption(),
+            DataDB::Total(power) => Some(power.total_consumption.clone()),
+            DataDB::Process(_) => None,
+        }
+    }
+
     /// Returns the database table name for this variant.
     pub fn table_name(&self) -> &'static str {
         match self {
-            SensorDataDB::CPU(_) => CPUDataDB::table_name_static(),
-            SensorDataDB::GPU(_) => GPUDataDB::table_name_static(),
-            SensorDataDB::Total(_) => TotalDataDB::table_name_static(),
-            SensorDataDB::Ram(_) => RamDataDB::table_name_static(),
-            SensorDataDB::Disk(_) => DiskDataDB::table_name_static(),
-            SensorDataDB::Network(_) => NetworkDataDB::table_name_static(),
-            SensorDataDB::Process(_) => ProcessDataDB::table_name_static(),
+            DataDB::Sensor(SensorDataDB::CPU(_)) => CPUDataDB::table_name_static(),
+            DataDB::Sensor(SensorDataDB::GPU(_)) => GPUDataDB::table_name_static(),
+            DataDB::Sensor(SensorDataDB::Ram(_)) => RamDataDB::table_name_static(),
+            DataDB::Sensor(SensorDataDB::Disk(_)) => DiskDataDB::table_name_static(),
+            DataDB::Sensor(SensorDataDB::Network(_)) => NetworkDataDB::table_name_static(),
+            DataDB::Process(_) => ProcessDataDB::table_name_static(),
+            DataDB::Total(_) => TotalDataDB::table_name_static(),
         }
     }
 
     /// Returns secondary metrics (usage or speed) if applicable.
     pub fn secondary_values(&self) -> Option<SecondaryValues> {
         let metric_type = self.secondary_metric()?;
-        match self {
-            SensorData::CPU(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::GPU(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::Ram(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![LabeledValue::from_usage_percent(data.usage_percent)],
-            )),
-            SensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![
-                    LabeledValue::from_mb_s(Some(data.read_usage_mb_s), "Read"),
-                    LabeledValue::from_mb_s(Some(data.write_usage_mb_s), "Write"),
-                ],
-            )),
-            SensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
-                metric_type,
-                vec![
-                    LabeledValue::from_mb_s(Some(data.download_speed_mb_s), "Download"),
-                    LabeledValue::from_mb_s(Some(data.upload_speed_mb_s), "Upload"),
-                ],
-            )),
-            _ => None,
+        if let DataDB::Sensor(s) = self {
+            match s {
+                SensorData::CPU(data) => Some(SecondaryValues::from_labeled_values(
+                    metric_type,
+                    vec![LabeledValue::from_usage_percent(data.usage_percent)],
+                )),
+                SensorData::GPU(data) => Some(SecondaryValues::from_labeled_values(
+                    metric_type,
+                    vec![LabeledValue::from_usage_percent(data.usage_percent)],
+                )),
+                SensorData::Ram(data) => Some(SecondaryValues::from_labeled_values(
+                    metric_type,
+                    vec![LabeledValue::from_usage_percent(data.usage_percent)],
+                )),
+                SensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
+                    metric_type,
+                    vec![
+                        LabeledValue::from_mb_s(Some(data.read_usage_mb_s), "Read"),
+                        LabeledValue::from_mb_s(Some(data.write_usage_mb_s), "Write"),
+                    ],
+                )),
+                SensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
+                    metric_type,
+                    vec![
+                        LabeledValue::from_mb_s(Some(data.download_speed_mb_s), "Download"),
+                        LabeledValue::from_mb_s(Some(data.upload_speed_mb_s), "Upload"),
+                    ],
+                )),
+            }
+        } else {
+            None
         }
     }
 
     /// Returns the secondary metric kind for this sensor variant.
     pub fn secondary_metric(&self) -> Option<MetricKindDB> {
-        match self {
-            SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricKindDB::Usage),
-            SensorData::Disk(_) | SensorData::Network(_) => Some(MetricKindDB::Speed),
-            _ => None,
+        if let DataDB::Sensor(s) = self {
+            match s {
+                SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricKindDB::Usage),
+                SensorData::Disk(_) | SensorData::Network(_) => Some(MetricKindDB::Speed),
+            }
+        } else {
+            None
         }
     }
 
     pub fn power_to_energy(&mut self, factor: f64) {
         match self {
-            SensorData::CPU(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::GPU(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Ram(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Disk(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Network(d) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
-            SensorData::Total(d) => {
+            DataDB::Sensor(SensorData::CPU(d)) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
+            DataDB::Sensor(SensorData::GPU(d)) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
+            DataDB::Sensor(SensorData::Ram(d)) => d.total_consumption = d.total_consumption.clone().map(|w| w * factor),
+            DataDB::Sensor(SensorData::Disk(d)) => {
+                d.total_consumption = d.total_consumption.clone().map(|w| w * factor)
+            }
+            DataDB::Sensor(SensorData::Network(d)) => {
+                d.total_consumption = d.total_consumption.clone().map(|w| w * factor)
+            }
+            DataDB::Total(d) => {
                 d.total_consumption *= factor;
             }
-            SensorData::Process(procs) => {
+            DataDB::Process(procs) => {
                 for p in procs {
                     p.process_consumption *= factor;
                 }
@@ -111,16 +265,16 @@ impl SensorDataDB {
     }
 }
 
-impl SensorKind {
+impl DataKindDB {
     pub fn table_name(&self) -> &'static str {
         match self {
-            SensorKind::CPU => CPUDataDB::table_name_static(),
-            SensorKind::GPU => GPUDataDB::table_name_static(),
-            SensorKind::Total => TotalDataDB::table_name_static(),
-            SensorKind::Ram => RamDataDB::table_name_static(),
-            SensorKind::Disk => DiskDataDB::table_name_static(),
-            SensorKind::Network => NetworkDataDB::table_name_static(),
-            SensorKind::Process => ProcessDataDB::table_name_static(),
+            DataKindDB::CPU => CPUDataDB::table_name_static(),
+            DataKindDB::GPU => GPUDataDB::table_name_static(),
+            DataKindDB::Total => TotalDataDB::table_name_static(),
+            DataKindDB::Ram => RamDataDB::table_name_static(),
+            DataKindDB::Disk => DiskDataDB::table_name_static(),
+            DataKindDB::Network => NetworkDataDB::table_name_static(),
+            DataKindDB::Process => ProcessDataDB::table_name_static(),
         }
     }
 }
@@ -202,6 +356,65 @@ impl Default for TotalDataDB {
     }
 }
 
+impl Display for DataDB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Sensor(s) => {
+                writeln!(f, "{}", s)?;
+                Ok(())
+            }
+            Self::Process(p) => {
+                writeln!(f, "Top Processes by CPU Usage:")?;
+                writeln!(
+                    f,
+                    "{:<30} {:>10} {:>10} {:>10} {:>10} {:>15} {:>15} {:>20}",
+                    "App Name", "CPU %", "GPU %", "Mem %", "Power W", "Read MB/s", "Write MB/s", "Subprocesses"
+                )?;
+                for process in p {
+                    write!(f, "{}", process)?;
+                }
+                Ok(())
+            }
+            Self::Total(t) => {
+                writeln!(f, "{}", t)?;
+                Ok(())
+            }
+        }
+    }
+}
+
+impl Display for ProcessDataDB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "{:<30} {:>10.2} {:>10} {:>10.2} {:>10} W {:>15.2} {:>15.2} {:>20}",
+            self.app_name,
+            self.process_cpu_usage,
+            self.process_gpu_usage
+                .map(|u| format!("{:.2} %", u))
+                .unwrap_or_else(|| "N/A".to_string()),
+            self.process_mem_usage,
+            self.process_consumption,
+            self.read_bytes_per_sec / 1_000_000.0,    // Convert to MB/s
+            self.written_bytes_per_sec / 1_000_000.0, // Convert to MB/s
+            self.subprocess_count
+        )?;
+        Ok(())
+    }
+}
+
+impl Display for TotalDataDB {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(
+            f,
+            "Total Power during 1 {}: {:.3} W",
+            self.period_type, self.total_consumption
+        )?;
+        Ok(())
+    }
+}
+
+/// Different kind of metric in database.
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum MetricKindDB {
     #[default]

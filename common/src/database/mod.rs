@@ -11,7 +11,7 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::{
     database::types::{
-        AllTimeDataDB, CPUDataDB, DiskDataDB, EventDB, GPUDataDB, GeneralDataDB, NetworkDataDB, ProcessDataDB,
+        AllTimeDataDB, CPUDataDB, DataDB, DiskDataDB, EventDB, GPUDataDB, GeneralDataDB, NetworkDataDB, ProcessDataDB,
         RamDataDB, SensorDataDB, TotalDataDB,
     },
     types::HardwareInfo,
@@ -190,7 +190,7 @@ impl Database {
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
+            Self::insert_data_db(&tx, &timestamp_id, sensor_data)?;
         }
         // Batch energy updates in the same transaction
         for sensor_data in event.data() {
@@ -219,7 +219,7 @@ impl Database {
         )?;
         let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
+            Self::insert_data_db(&tx, &timestamp_id, sensor_data)?;
         }
         tx.commit()?;
         Ok(())
@@ -324,19 +324,15 @@ impl Database {
         Ok(())
     }
 
-    fn insert_sensor_data(
-        tx: &Transaction,
-        timestamp_id: &i64,
-        sensor_data: &SensorDataDB,
-    ) -> Result<(), DatabaseError> {
-        match sensor_data {
-            SensorDataDB::CPU(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::GPU(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::Ram(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::Disk(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::Network(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::Total(data) => Self::insert_entry(tx, timestamp_id, data),
-            SensorDataDB::Process(processes) => {
+    fn insert_data_db(tx: &Transaction, timestamp_id: &i64, data_db: &DataDB) -> Result<(), DatabaseError> {
+        match data_db {
+            DataDB::Sensor(SensorDataDB::CPU(data)) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Sensor(SensorDataDB::GPU(data)) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Sensor(SensorDataDB::Ram(data)) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Sensor(SensorDataDB::Disk(data)) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Sensor(SensorDataDB::Network(data)) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Total(data) => Self::insert_entry(tx, timestamp_id, data),
+            DataDB::Process(processes) => {
                 for process in processes {
                     Self::insert_entry(tx, timestamp_id, process)?;
                 }
@@ -358,7 +354,7 @@ impl Database {
         table_name: &str,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, DataDB)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
@@ -371,11 +367,11 @@ impl Database {
         &mut self,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, DataDB)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
-        let mut records = Vec::<(i64, SensorDataDB)>::new();
+        let mut records = Vec::<(i64, DataDB)>::new();
         if let Some(tables) = &self.tables {
             for table_name in tables {
                 let mut table_records =
@@ -392,7 +388,7 @@ impl Database {
         n: i64,
         table_name: &str,
         window_seconds: i64,
-    ) -> Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, DataDB)>, DatabaseError> {
         if n <= 0 || window_seconds <= 0 {
             return Ok(Vec::new());
         }
@@ -419,8 +415,8 @@ impl Database {
     }
 
     /// Returns the most recent N timestamped records.
-    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError> {
-        let mut records = Vec::<(SystemTime, SensorDataDB)>::new();
+    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, DataDB)>, DatabaseError> {
+        let mut records = Vec::<(SystemTime, DataDB)>::new();
         let mut stmt = self
             .conn
             .prepare("SELECT id, timestamp FROM timestamp ORDER BY id DESC LIMIT ?1")?;
@@ -458,7 +454,7 @@ impl Database {
                     "SELECT timestamp_id, * FROM {} WHERE timestamp_id IN ({})",
                     table_name, id_list
                 );
-                let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
+                let sensor_data_list = self.execute_data_query(table_name, &query, [])?;
                 for (ts_id, sensor_data) in sensor_data_list {
                     if let Some(ts) = timestamps_map.get(&ts_id) {
                         records.push((*ts, sensor_data));
@@ -486,12 +482,12 @@ impl Database {
     }
 
     /// Dispatches a raw SQL query to the correct typed table reader.
-    pub fn execute_sensor_query<P>(
+    pub fn execute_data_query<P>(
         &self,
         table_name: &str,
         query: &str,
         params: P,
-    ) -> rusqlite::Result<Vec<(i64, SensorDataDB)>>
+    ) -> rusqlite::Result<Vec<(i64, DataDB)>>
     where
         P: rusqlite::Params,
     {
@@ -516,9 +512,9 @@ impl Database {
         }
     }
 
-    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, SensorDataDB)>>
+    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, DataDB)>>
     where
-        T: DatabaseEntry + Into<SensorDataDB>,
+        T: DatabaseEntry + Into<DataDB>,
         P: rusqlite::Params,
     {
         let mut stmt = self.conn.prepare(query)?;
@@ -536,7 +532,7 @@ impl Database {
         table_name: &str,
         start_time_millis: i64,
         end_time_millis: i64,
-    ) -> Result<Vec<(i64, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(i64, DataDB)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -549,7 +545,7 @@ impl Database {
             table_name
         );
 
-        Ok(self.execute_sensor_query(table_name, &query, params![start_time_millis, end_time_millis])?)
+        Ok(self.execute_data_query(table_name, &query, params![start_time_millis, end_time_millis])?)
     }
 
     fn select_windowed_table_data(
@@ -558,7 +554,7 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(i64, DataDB)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -578,7 +574,7 @@ impl Database {
             avg_cols, table_name
         );
 
-        let rows = self.execute_sensor_query(
+        let rows = self.execute_data_query(
             table_name,
             &query,
             params![start_window_start, window_seconds, end_exclusive],
@@ -610,7 +606,7 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(i64, DataDB)>, DatabaseError> {
         let second_query = "SELECT
                 (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start,
                 SUM(COALESCE(d.total_consumption, 0.0)) / ?2 AS total_consumption,
@@ -635,13 +631,13 @@ impl Database {
              GROUP BY window_start
              ORDER BY window_start ASC";
 
-        let second_rows = self.execute_sensor_query(
+        let second_rows = self.execute_data_query(
             TotalDataDB::table_name_static(),
             second_query,
             params![start_window_start, window_seconds, end_exclusive],
         )?;
 
-        let hour_rows = self.execute_sensor_query(
+        let hour_rows = self.execute_data_query(
             TotalDataDB::table_name_static(),
             hour_query,
             params![start_window_start, window_seconds, end_exclusive],
@@ -665,7 +661,7 @@ impl Database {
             } else if let Some(hour_data) = hour_by_window.remove(&current) {
                 hour_data
             } else {
-                SensorDataDB::Total(TotalDataDB {
+                DataDB::Total(TotalDataDB {
                     total_consumption: 0.0,
                     period_type: if window_seconds >= 3600 {
                         "hour".to_string()
@@ -688,9 +684,9 @@ impl Database {
         n_seconds: i64,
         top_n: usize,
         energy_mode: bool,
-    ) -> Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, DataDB)>, DatabaseError> {
         if n_seconds <= 0 {
-            return Ok(vec![(SystemTime::now(), SensorDataDB::Process(Vec::new()))]);
+            return Ok(vec![(SystemTime::now(), DataDB::Process(Vec::new()))]);
         }
 
         let now_ms = to_epoch_millis(SystemTime::now())?;
@@ -771,7 +767,7 @@ impl Database {
                 .to_string()
         };
 
-        let rows = self.execute_sensor_query(
+        let rows = self.execute_data_query(
             ProcessDataDB::table_name_static(),
             &query,
             params![start, now_ms, top_n as i64, n_seconds as f64],
@@ -779,11 +775,11 @@ impl Database {
 
         let mut processes = Vec::new();
         for (_, data) in rows {
-            if let SensorDataDB::Process(mut proc_data) = data {
+            if let DataDB::Process(mut proc_data) = data {
                 processes.append(&mut proc_data);
             }
         }
-        Ok(vec![(from_epoch_millis(now_ms), SensorDataDB::Process(processes))])
+        Ok(vec![(from_epoch_millis(now_ms), DataDB::Process(processes))])
     }
 }
 
@@ -805,7 +801,7 @@ fn get_windowed_average_columns(table_name: &str, prefix: &str, window_seconds: 
     Ok(aggregated)
 }
 
-fn zero_sensor_data(table_name: &str) -> Option<SensorDataDB> {
+fn zero_sensor_data(table_name: &str) -> Option<DataDB> {
     dispatch_entry!(table_name, zero())
 }
 
@@ -817,7 +813,7 @@ fn from_epoch_millis(ts_millis: i64) -> SystemTime {
     SystemTime::UNIX_EPOCH + time::Duration::from_millis(ts_millis as u64)
 }
 
-fn to_system_time_records(records: Vec<(i64, SensorDataDB)>) -> Vec<(SystemTime, SensorDataDB)> {
+fn to_system_time_records(records: Vec<(i64, DataDB)>) -> Vec<(SystemTime, DataDB)> {
     records
         .into_iter()
         .map(|(ts_millis, data)| (from_epoch_millis(ts_millis), data))

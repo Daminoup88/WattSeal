@@ -78,36 +78,6 @@ pub struct NetworkData<T> {
     pub upload_speed_mb_s: f64,
 }
 
-/// Raw RGBA icon pixel data.
-#[derive(Debug, Clone, Serialize)]
-pub struct IconData {
-    pub width: u32,
-    pub height: u32,
-    pub pixels: Vec<u8>,
-}
-
-/// Per-application resource usage snapshot.
-#[derive(Debug, Clone, Serialize)]
-pub struct ProcessData<T> {
-    pub app_name: String,
-    pub process_exe_path: Option<String>,
-    pub process_consumption: T,
-    pub process_cpu_usage: f64,
-    pub process_gpu_usage: Option<f64>,
-    pub process_mem_usage: f64,
-    pub read_bytes_per_sec: f64,
-    pub written_bytes_per_sec: f64,
-    pub subprocess_count: u32,
-    pub icon: Option<IconData>,
-}
-
-/// Aggregated total consumption across all components.
-#[derive(Debug, Clone, Serialize)]
-pub struct TotalData<T> {
-    pub total_consumption: T,
-    pub period_type: String,
-}
-
 /// Tagged union of all sensor reading types.
 #[derive(Debug, Clone, Serialize)]
 pub enum SensorData<T> {
@@ -116,8 +86,6 @@ pub enum SensorData<T> {
     Ram(RamData<T>),
     Disk(DiskData<T>),
     Network(NetworkData<T>),
-    Total(TotalData<T>),
-    Process(Vec<ProcessData<T>>),
 }
 
 /// Sensor component category type.
@@ -128,8 +96,6 @@ pub enum SensorKind {
     Ram,
     Disk,
     Network,
-    Total,
-    Process,
 }
 
 /// Hardware information variant collected at startup.
@@ -266,31 +232,117 @@ pub struct BatteryInfo {
 }
 
 /// Possible energy unit of sensors results.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum EnergyUnit {
-    WattHeure,
+    WattHour,
     UJoul,
 }
 
 /// Possible power unit of sensors results.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum PowerUnit {
     Watt,
 }
 
 /// Possible consumption unit of sensors results.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum ConsumptionUnit {
     Energy(EnergyUnit),
     Power(PowerUnit),
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub struct ConsumptionMetric {
     pub value: f64,
     pub unit: ConsumptionUnit,
 }
 
+#[derive(Debug, PartialEq)]
+pub enum ConsumptionMetricError {
+    UnitMismatch,
+    DivisionByZero,
+}
+
+impl Display for ConsumptionMetricError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnitMismatch => write!(f, "Cannot operate on different units"),
+            Self::DivisionByZero => write!(f, "Division by zero"),
+        }
+    }
+}
+
+impl ConsumptionMetric {
+    pub fn new(value: f64, unit: ConsumptionUnit) -> Self {
+        Self { value, unit }
+    }
+
+    fn has_same_unit(&self, other: &Self) -> bool {
+        self.unit == other.unit
+    }
+
+    pub fn add(self, el: Self) -> Result<Self, ConsumptionMetricError> {
+        if !self.has_same_unit(&el) {
+            return Err(ConsumptionMetricError::UnitMismatch);
+        }
+        Ok(Self {
+            value: self.value + el.value,
+            unit: self.unit,
+        })
+    }
+
+    pub fn sub(self, el: Self) -> Result<Self, ConsumptionMetricError> {
+        if !self.has_same_unit(&el) {
+            return Err(ConsumptionMetricError::UnitMismatch);
+        }
+        Ok(Self {
+            value: self.value - el.value,
+            unit: self.unit,
+        })
+    }
+
+    pub fn mul(self, el: Self) -> Result<Self, ConsumptionMetricError> {
+        if !self.has_same_unit(&el) {
+            return Err(ConsumptionMetricError::UnitMismatch);
+        }
+        Ok(Self {
+            value: self.value * el.value,
+            unit: self.unit,
+        })
+    }
+
+    pub fn mul_scalar(self, fact: f64) -> Self {
+        Self {
+            value: self.value * fact,
+            unit: self.unit,
+        }
+    }
+
+    pub fn div_scalar(self, fact: f64) -> Result<Self, ConsumptionMetricError> {
+        if fact == 0.0 {
+            return Err(ConsumptionMetricError::DivisionByZero);
+        }
+        Ok(Self {
+            value: self.value / fact,
+            unit: self.unit,
+        })
+    }
+
+    pub fn div(self, rhs: Self) -> Result<f64, ConsumptionMetricError> {
+        if !self.has_same_unit(&rhs) {
+            return Err(ConsumptionMetricError::UnitMismatch);
+        }
+        if rhs.value == 0.0 {
+            return Err(ConsumptionMetricError::DivisionByZero);
+        }
+        Ok(self.value / rhs.value)
+    }
+}
+
 impl Display for EnergyUnit {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EnergyUnit::WattHeure => write!(f, "Wh"),
+            EnergyUnit::WattHour => write!(f, "Wh"),
             EnergyUnit::UJoul => write!(f, "uj"),
         }
     }
@@ -328,8 +380,6 @@ impl<T: Clone> SensorData<T> {
             SensorData::Ram(_) => SensorKind::Ram,
             SensorData::Disk(_) => SensorKind::Disk,
             SensorData::Network(_) => SensorKind::Network,
-            SensorData::Total(_) => SensorKind::Total,
-            SensorData::Process(_) => SensorKind::Process,
         }
     }
 
@@ -341,8 +391,6 @@ impl<T: Clone> SensorData<T> {
             SensorData::Ram(data) => data.total_consumption.clone(),
             SensorData::Disk(data) => data.total_consumption.clone(),
             SensorData::Network(data) => data.total_consumption.clone(),
-            SensorData::Total(power) => Some(power.total_consumption.clone()),
-            SensorData::Process(_) => None,
         }
     }
 }
@@ -355,8 +403,6 @@ impl Display for SensorKind {
             SensorKind::Ram => write!(f, "Ram"),
             SensorKind::Disk => write!(f, "Disk"),
             SensorKind::Network => write!(f, "Network"),
-            SensorKind::Total => write!(f, "Total"),
-            SensorKind::Process => write!(f, "Process"),
         }
     }
 }
@@ -480,44 +526,7 @@ impl<T: Display> Display for SensorData<T> {
                 writeln!(f, "  Upload Speed:   {:.2} MB/s", data.upload_speed_mb_s)?;
                 Ok(())
             }
-            SensorData::Total(total) => writeln!(
-                f,
-                "Total Consumption during 1 {}: {}",
-                total.period_type, total.total_consumption
-            ),
-            SensorData::Process(processes) => {
-                writeln!(f, "Top Processes by CPU Usage:")?;
-                writeln!(
-                    f,
-                    "{:<30} {:>10} {:>10} {:>10} {:>10} {:>15} {:>15} {:>20}",
-                    "App Name", "CPU %", "GPU %", "Mem %", "Consumption", "Read MB/s", "Write MB/s", "Subprocesses"
-                )?;
-                for process in processes {
-                    write!(f, "{}", process)?;
-                }
-                Ok(())
-            }
         }
-    }
-}
-
-impl<T: Display> Display for ProcessData<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(
-            f,
-            "{:<30} {:>10.2} {:>10} {:>10.2} {:>10} {:>15.2} {:>15.2} {:>20}",
-            self.app_name,
-            self.process_cpu_usage,
-            self.process_gpu_usage
-                .map(|u| format!("{:.2} %", u))
-                .unwrap_or_else(|| "N/A".to_string()),
-            self.process_mem_usage,
-            self.process_consumption,
-            self.read_bytes_per_sec / 1_000_000.0,    // Convert to MB/s
-            self.written_bytes_per_sec / 1_000_000.0, // Convert to MB/s
-            self.subprocess_count
-        )?;
-        Ok(())
     }
 }
 
@@ -530,12 +539,6 @@ impl<T> From<CPUData<T>> for SensorData<T> {
 impl<T> From<GPUData<T>> for SensorData<T> {
     fn from(data: GPUData<T>) -> Self {
         SensorData::GPU(data)
-    }
-}
-
-impl<T> From<TotalData<T>> for SensorData<T> {
-    fn from(data: TotalData<T>) -> Self {
-        SensorData::Total(data)
     }
 }
 
@@ -552,11 +555,5 @@ impl<T> From<DiskData<T>> for SensorData<T> {
 impl<T> From<NetworkData<T>> for SensorData<T> {
     fn from(data: NetworkData<T>) -> Self {
         SensorData::Network(data)
-    }
-}
-
-impl<T> From<ProcessData<T>> for SensorData<T> {
-    fn from(data: ProcessData<T>) -> Self {
-        SensorData::Process(vec![data])
     }
 }
