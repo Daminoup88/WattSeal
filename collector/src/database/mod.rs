@@ -1,6 +1,9 @@
+pub mod process;
 mod tables;
 
 pub use common::{
     DATABASE_PATH, Database, DatabaseEntry, Event,
-    types::{CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData},
+    database::types::{
+        CPUDataDB, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, SensorDataDB, TotalDataDB,
+    },
 };
