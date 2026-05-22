@@ -2,7 +2,7 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeDataDB, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessDataDB, SensorDataDB, TotalDataDB,
+    AllTimeDataDB, DataDB, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessDataDB, TotalDataDB,
     UiSettings, generic_name_for_table,
 };
 use iced::{
@@ -345,11 +345,11 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorDataDB)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, DataDB)> {
         from_db(self.database.select_last_n_records(n))
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorDataDB)> {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, DataDB)> {
         if table_name == ProcessDataDB::table_name_static() {
             return self.load_process_data(time_range);
         }
@@ -378,7 +378,7 @@ impl App {
         data
     }
 
-    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorDataDB)> {
+    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, DataDB)> {
         from_db(
             self.database
                 .select_top_processes_average(time_range.seconds(), 10, time_range.is_energy_mode()),
@@ -828,7 +828,7 @@ impl App {
     }
 }
 
-fn from_db(data: Result<Vec<(SystemTime, SensorDataDB)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorDataDB)> {
+fn from_db(data: Result<Vec<(SystemTime, DataDB)>, DatabaseError>) -> Vec<(DateTime<Local>, DataDB)> {
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))

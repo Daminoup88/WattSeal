@@ -1,5 +1,5 @@
 use chrono::{DateTime, Local};
-use common::{MetricKindDB, SensorDataDB};
+use common::{DataDB, MetricKindDB};
 
 use crate::{
     pages::Page,
@@ -22,8 +22,8 @@ pub enum Message {
     CloseSettings,
     ChangeChartMetricType(String, MetricKindDB),
     ChangeChartTimeRange(String, TimeRange),
-    UpdateChartData(Vec<(DateTime<Local>, SensorDataDB)>),
-    ReplaceChartData(String, Vec<(DateTime<Local>, SensorDataDB)>),
+    UpdateChartData(Vec<(DateTime<Local>, DataDB)>),
+    ReplaceChartData(String, Vec<(DateTime<Local>, DataDB)>),
     FetchChartData(String, TimeRange),
     FetchAllChartsData(TimeRange),
     Redraw,

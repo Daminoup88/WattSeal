@@ -7,8 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DatabaseEntry, DiskDataDB, IconData, MetricKindDB, NetworkDataDB, ProcessDataDB, RamDataDB, SecondaryValues,
-    SensorDataDB, TotalDataDB,
+    DataDB, DatabaseEntry, DiskDataDB, IconData, MetricKindDB, NetworkDataDB, ProcessDataDB, RamDataDB,
+    SecondaryValues, TotalDataDB,
     utils::{bytes_to_mb, load_icon_and_name},
 };
 use iced::{
@@ -142,7 +142,7 @@ impl ComponentState {
         }
     }
 
-    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+    fn append(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
         if let Some(power) = data.total_consumption() {
             self.power_graph.append_power(timestamp, power as f32);
         }
@@ -228,7 +228,7 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&SensorDataDB>) -> Vec<MetricKindDB> {
+    fn available_metrics(&self, latest: Option<&DataDB>) -> Vec<MetricKindDB> {
         let mut metrics = vec![MetricKindDB::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
             metrics.push(secondary_values.metric_kind);
@@ -236,11 +236,7 @@ impl ComponentState {
         metrics
     }
 
-    fn snapshot_row(
-        &self,
-        latest: Option<&SensorDataDB>,
-        language: AppLanguage,
-    ) -> Option<Row<'static, Message, AppTheme>> {
+    fn snapshot_row(&self, latest: Option<&DataDB>, language: AppLanguage) -> Option<Row<'static, Message, AppTheme>> {
         let secondary_values = latest?.secondary_values()?;
         let mut col = Column::new().spacing(SPACING_SMALL);
         for (i, labeled_value) in secondary_values.values.into_iter().enumerate() {
@@ -288,7 +284,7 @@ impl TotalState {
         }
     }
 
-    fn append(&self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+    fn append(&self, timestamp: DateTime<Local>, data: &DataDB) {
         if let Some(power) = data.total_consumption() {
             self.power_graph.append_power(timestamp, power as f32);
         }
@@ -382,7 +378,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<SensorDataDB>,
+    latest_reading: Option<DataDB>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -421,7 +417,7 @@ impl SensorState {
     }
 
     /// Returns the most recent sensor reading.
-    pub fn get_latest_reading(&self) -> Option<&SensorDataDB> {
+    pub fn get_latest_reading(&self) -> Option<&DataDB> {
         self.latest_reading.as_ref()
     }
 
@@ -511,7 +507,7 @@ impl SensorState {
     }
 
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
@@ -541,7 +537,7 @@ impl SensorState {
     }
 
     /// Adds a data point to history without updating the latest reading.
-    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorDataDB) {
+    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         match &mut self.sensor_category {
             SensorCategory::Component(state) => state.append(timestamp, data),
@@ -551,9 +547,9 @@ impl SensorState {
     }
 
     /// Replaces chart data with a full history batch.
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorDataDB)]) {
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, DataDB)]) {
         if let SensorCategory::Processes(state) = &mut self.sensor_category {
-            if let Some((_, SensorDataDB::Process(processes))) = data.last() {
+            if let Some((_, DataDB::Process(processes))) = data.last() {
                 state.update_from_snapshot(processes);
             }
             return;
