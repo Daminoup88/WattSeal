@@ -21,14 +21,8 @@ impl ScaphandreMsrReader {
     }
 
     /// Returns whether the driver is installed on the system.
-    pub fn is_installed() -> bool {
-        match ScaphandreDriver::is_installed() {
-            Ok(installed) => installed,
-            Err(e) => {
-                eprintln!("Warning: failed to query Scaphandre driver status: {e}");
-                false
-            }
-        }
+    pub fn is_installed() -> Result<bool, String> {
+        ScaphandreDriver::is_installed().map_err(|e| format!("Failed to query Scaphandre driver status: {e}"))
     }
 
     /// Installs the driver (requires Administrator privileges).
@@ -48,10 +42,9 @@ impl ScaphandreMsrReader {
 
     /// Uninstalls the driver (requires Administrator privileges).
     pub fn uninstall() -> Result<(), String> {
-        match ScaphandreDriver::is_installed() {
-            Ok(false) => return Ok(()),
-            Ok(true) => {}
-            Err(e) => return Err(format!("Failed to query Scaphandre driver status: {e}")),
+        match Self::is_installed()? {
+            false => return Ok(()),
+            true => {}
         }
 
         let mut driver = match ScaphandreDriver::new() {

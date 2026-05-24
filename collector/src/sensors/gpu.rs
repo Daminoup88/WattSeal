@@ -6,7 +6,7 @@ use super::{Sensor, SensorError, SensorType};
 use crate::database::SensorData;
 
 /// GPU hardware vendor identifier.
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, PartialEq, Debug)]
 pub enum GPUVendor {
     Nvidia,
     Amd,
@@ -59,7 +59,15 @@ pub fn get_gpu_list() -> Vec<String> {
                         .cloned()
                         .collect::<Vec<u16>>(),
                 );
-                list.push(name);
+                let name = name.trim();
+
+                // Ignore Microsoft Basic Render Driver fallback driver or empty name
+                if name.to_ascii_lowercase().contains("microsoft basic render driver") || name.is_empty() {
+                    i += 1;
+                    continue;
+                }
+
+                list.push(name.to_string());
             }
             i += 1;
         }
@@ -104,7 +112,7 @@ impl Sensor for GPUSensor {
             #[cfg(target_os = "windows")]
             GPUSensor::Amd(sensor) => sensor.read_full_data(),
             #[cfg(target_os = "windows")]
-            GPUSensor::Intel { sensor, .. } => sensor.read_full_data(),
+            GPUSensor::Intel { sensor } => sensor.read_full_data(),
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
             _ => Err(SensorError::NotSupported),
         }
@@ -253,9 +261,33 @@ mod nvidia_gpu {
         pub fn new(index: u32) -> Result<Self, SensorError> {
             let nvml = Nvml::init().map_err(|e| SensorError::ReadError(e.to_string()))?;
             // Validate that the device exists
-            let _ = nvml
+            let device = nvml
                 .device_by_index(index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
+
+            let power_probe = device.power_usage();
+            let utilization_probe = device.utilization_rates();
+
+            if let (Err(power_err), Err(util_err)) = (&power_probe, &utilization_probe) {
+                return Err(SensorError::ReadError(format!(
+                    "NVML telemetry unavailable for device index {}: power='{}', utilization='{}'",
+                    index, power_err, util_err
+                )));
+            }
+
+            if let Err(power_err) = power_probe {
+                return Err(SensorError::ReadError(format!(
+                    "⚠ NVIDIA GPU {} power telemetry unavailable at initialization: {}",
+                    index, power_err
+                )));
+            }
+            if let Err(util_err) = utilization_probe {
+                return Err(SensorError::ReadError(format!(
+                    "⚠ NVIDIA GPU {} utilization telemetry unavailable at initialization: {}",
+                    index, util_err
+                )));
+            }
+
             Ok(NvidiaGPUSensor {
                 nvml,
                 device_index: index,

@@ -131,7 +131,16 @@ fn spawn_ui(ui_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
             }
             Err(e) => {
                 let msg = format!("Failed to spawn UI process: {}", e);
-                common::clog!("✗ Failed to spawn UI process: {}", e);
+                common::clog!("✗ {msg}");
+                #[cfg(target_os = "windows")]
+                if std::env::var("ICED_BACKEND").as_deref() != Ok("tiny-skia") {
+                    // Safe on Windows even in multi-threaded
+                    unsafe {
+                        std::env::set_var("ICED_BACKEND", "tiny-skia");
+                    }
+                    drop(guard);
+                    return spawn_ui(ui_child);
+                }
                 Err(msg)
             }
         }

@@ -9,18 +9,20 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
+pub use common::clog;
+use common::database::purge::averaging_and_purging_data;
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
-use common::{clog, database::purge::averaging_and_purging_data};
 use database::Database;
 use mqtt::{
     MQTTPublisher,
     topics::{hardware_info_topic, sensor_data_to_topic},
 };
-use sensors::{SensorType, create_event_from_sensors, get_hardware_info, gpu::get_gpu_list};
+use sensors::{
+    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
+    gpu::{GPUVendor, get_gpu_list},
+};
 use sysinfo::System;
-
-use crate::sensors::{DiskSensor, NetworkSensor, RamSensor};
 
 /// MQTT information to interact with a MQTT client
 pub struct MQTTInfos {
@@ -86,32 +88,70 @@ impl CollectorApp {
         #[cfg(not(debug_assertions))]
         start_log_session();
 
-        clog!("\n========== INITIALIZING SYSTEM ==========\n");
+        crate::clog!("\n========== INITIALIZING SYSTEM ==========\n");
 
         // CPU sensor
-        clog!("Initializing sensors...");
+        crate::clog!("Initializing sensors...");
         match sensors::cpu::get_cpu_power_sensor(self.system.clone(), 0) {
             Ok(sensor) => {
                 if let SensorType::CPU(cpu_sensor) = &sensor {
                     let (os_label, mode_label) = cpu_sensor.power_mode_labels();
-                    clog!("CPU power mode: {os_label}/{mode_label}");
+                    crate::clog!("CPU power mode: {os_label}/{mode_label}");
                 }
-                clog!("✓ CPU Power Sensor initialized successfully");
+                crate::clog!("✓ CPU Power Sensor initialized successfully");
                 self.sensors.push(sensor);
             }
-            Err(e) => clog!("✗ Failed to initialize CPU Power Sensor: {:?}", e),
+            Err(e) => crate::clog!("✗ Failed to initialize CPU Power Sensor: {:?}", e),
         }
 
         // GPU sensors
         let gpu_list = get_gpu_list();
-        clog!("\nDetected GPUs: {gpu_list:#?}");
-        for (i, gpu_name) in gpu_list.iter().enumerate() {
-            match sensors::gpu::get_gpu_power_sensor(gpu_name, i as u32) {
+        crate::clog!("\nDetected GPUs: {gpu_list:#?}");
+        if gpu_list.is_empty() {
+            crate::clog!("⚠ No supported GPU adapters detected.");
+        }
+
+        let (mut nvidia_index, mut amd_index, mut intel_index) = (0u32, 0u32, 0u32);
+        for gpu_name in &gpu_list {
+            let vendor = GPUVendor::from_str(gpu_name);
+            let vendor_index = match vendor {
+                GPUVendor::Nvidia => {
+                    let idx = nvidia_index;
+                    nvidia_index += 1;
+                    idx
+                }
+                GPUVendor::Amd => {
+                    let idx = amd_index;
+                    amd_index += 1;
+                    idx
+                }
+                GPUVendor::Intel => {
+                    let idx = intel_index;
+                    intel_index += 1;
+                    idx
+                }
+                GPUVendor::Other => 0,
+            };
+
+            match sensors::gpu::get_gpu_power_sensor(gpu_name, vendor_index) {
                 Ok(sensor) => {
-                    clog!("✓ GPU Sensor {i} initialized: {gpu_name}");
+                    crate::clog!(
+                        "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
+                        gpu_name,
+                        vendor,
+                        vendor_index
+                    );
                     self.sensors.push(sensor);
                 }
-                Err(e) => clog!("✗ Failed to initialize GPU sensor for {gpu_name}: {:?}", e),
+                Err(e) => {
+                    crate::clog!(
+                        "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, vendor_index={}): {:?}",
+                        gpu_name,
+                        vendor,
+                        vendor_index,
+                        e
+                    );
+                }
             }
         }
 
@@ -124,32 +164,32 @@ impl CollectorApp {
 
         if let Some(database) = &mut self.database {
             // Database
-            clog!("\n========== SETTING UP DATABASE ==========");
+            crate::clog!("\n========== SETTING UP DATABASE ==========");
             let table_names: Vec<&str> = self.sensors.iter().map(|s| s.table_name()).collect();
             database
                 .create_tables_if_not_exists(&table_names)
                 .map_err(|e| format!("Failed to create database tables: {e}"))?;
-            clog!("✓ Database initialized");
+            crate::clog!("✓ Database initialized");
         }
 
         // Hardware info
-        clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+        crate::clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
         let info = get_hardware_info(&self.sensors);
 
         if let Some(database) = &mut self.database {
             match database.insert_hardware_info(&info) {
-                Ok(_) => clog!("✓ Hardware info saved"),
-                Err(e) => clog!("✗ Failed to save hardware info: {e}"),
+                Ok(_) => crate::clog!("✓ Hardware info saved"),
+                Err(e) => crate::clog!("✗ Failed to save hardware info: {e}"),
             }
         }
         if let Some(mqtt_infos) = &self.mqtt_infos {
             let topic = hardware_info_topic(&mqtt_infos.id);
             match mqtt_infos.publisher.publish(&topic, &info.hardware_info_serialized) {
-                Ok(_) => clog!("✓ Hardware info published on broker"),
-                Err(e) => clog!("✗ Failed to publish hardware info: {e}"),
+                Ok(_) => crate::clog!("✓ Hardware info published on broker"),
+                Err(e) => crate::clog!("✗ Failed to publish hardware info: {e}"),
             }
         }
-        clog!("Initialization complete");
+        crate::clog!("Initialization complete");
         Ok(())
     }
 

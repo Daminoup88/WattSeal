@@ -10,11 +10,11 @@ mod driver;
 pub fn install() -> bool {
     match ScaphandreMsrReader::install() {
         Ok(()) => {
-            common::clog!("✓ CPU MSR driver installed successfully");
+            crate::clog!("✓ CPU MSR driver installed successfully");
             true
         }
         Err(e) => {
-            common::clog!("✗ Failed to install CPU MSR driver: {e}");
+            crate::clog!("✗ Failed to install CPU MSR driver: {e}");
             false
         }
     }
@@ -23,33 +23,40 @@ pub fn install() -> bool {
 pub fn uninstall() -> bool {
     match ScaphandreMsrReader::uninstall() {
         Ok(()) => {
-            common::clog!("✓ CPU MSR driver uninstalled successfully");
+            crate::clog!("✓ CPU MSR driver uninstalled successfully");
             true
         }
         Err(e) => {
-            common::clog!("✗ Failed to uninstall CPU MSR driver: {e}");
+            crate::clog!("✗ Failed to uninstall CPU MSR driver: {e}");
             false
         }
     }
 }
 
 pub fn setup() {
-    if !ScaphandreMsrReader::is_installed() {
-        common::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.");
+    let installed = match ScaphandreMsrReader::is_installed() {
+        Ok(installed) => installed,
+        Err(e) => {
+            crate::clog!("\u{26a0} {e}");
+            false
+        }
+    };
+    if !installed {
+        crate::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.");
         if let Ok(exe) = std::env::current_exe() {
             match runas::Command::new(&exe).arg("--install-cpu-driver").gui(true).status() {
                 Ok(status) if status.success() => {
-                    common::clog!("✓ CPU MSR driver installation completed");
+                    crate::clog!("✓ CPU MSR driver installation completed");
                 }
                 Ok(_) => {
-                    common::clog!("\u{26a0} CPU MSR driver installation canceled or failed; using estimation");
+                    crate::clog!("\u{26a0} CPU MSR driver installation canceled or failed; using estimation");
                 }
                 Err(e) => {
-                    common::clog!("\u{26a0} Failed to launch driver installer: {e}");
+                    crate::clog!("\u{26a0} Failed to launch driver installer: {e}");
                 }
             }
         } else {
-            common::clog!("\u{26a0} Unable to locate executable to install the CPU driver");
+            crate::clog!("\u{26a0} Unable to locate executable to install the CPU driver");
         }
     }
 }

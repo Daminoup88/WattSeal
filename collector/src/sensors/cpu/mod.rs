@@ -174,13 +174,13 @@ pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result
     #[cfg(target_os = "windows")]
     match WindowsCPUSensor::new(&vendor_id) {
         Ok(sensor) => {
-            println!("✓ MSR sensor initialized successfully for vendor: {}", vendor_id);
+            crate::clog!("✓ MSR sensor initialized successfully for vendor: {}", vendor_id);
             return Ok(SensorType::CPU(CPUSensor {
                 sensor: CPUOS::WindowsRAPL(sensor),
                 system: system.clone(),
             }));
         }
-        Err(e) => eprintln!("\u{26a0} MSR sensor unavailable ({:?}), falling back to estimation", e),
+        Err(e) => crate::clog!("\u{26a0} MSR sensor unavailable ({:?}), falling back to estimation", e),
     }
 
     #[cfg(target_os = "linux")]
@@ -191,12 +191,12 @@ pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result
                 system: system.clone(),
             }));
         }
-        Err(e) => eprintln!("\u{26a0} RAPL sensor unavailable ({:?}), falling back to estimation", e),
+        Err(e) => crate::clog!("\u{26a0} RAPL sensor unavailable ({:?}), falling back to estimation", e),
     }
-    println!("\u{26a0} No direct CPU power sensor available, using estimation based on TDP and usage");
+    crate::clog!("\u{26a0} No direct CPU power sensor available, using estimation based on TDP and usage");
 
     let tdp = estimation::lookup_tdp(&cpu_name);
-    println!("\u{26a0} Using TDP estimation ({:.0} W) for {}", tdp, cpu_name);
+    crate::clog!("\u{26a0} Using TDP estimation ({:.0} W) for {}", tdp, cpu_name);
     Ok(SensorType::CPU(CPUSensor {
         sensor: CPUOS::Estimation(EstimationCPUSensor::new(tdp)),
         system: system.clone(),
