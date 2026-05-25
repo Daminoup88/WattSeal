@@ -358,7 +358,10 @@ fn main() {
     {
         let event_loop = match EventLoop::new() {
             Ok(loop_handle) => loop_handle,
-            Err(_) => return,
+            Err(e) => {
+                common::clog!("✗ Failed to create event loop: {e}");
+                return;
+            }
         };
 
         let _tray_icon = setup_tray(&ui_child);

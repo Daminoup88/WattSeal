@@ -158,7 +158,7 @@ impl HardwareInfo {
         match serde_json::to_string(self) {
             Ok(json_string) => json_string,
             Err(e) => {
-                eprintln!("Failed to serialize to JSON: {}", e);
+                crate::clog!("✗ Failed to serialize hardware info to JSON: {}", e);
                 "{}".to_string()
             }
         }

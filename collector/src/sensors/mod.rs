@@ -240,18 +240,18 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
 
         match sensor.read_name() {
             Ok(name) => detected_materials.push(name),
-            #[cfg(debug_assertions)]
-            Err(_) => eprintln!("✗ No name available for sensor: {:?}", sensor.table_name()),
-            #[cfg(not(debug_assertions))]
-            Err(_) => {}
+            Err(SensorError::NotSupported) => {}
+            Err(e) => crate::clog!("✗ Failed to read sensor name for {}: {:?}", sensor.table_name(), e),
         }
 
         match sensor.read_initial_info() {
             Ok(info) => sensors_info.push(info),
-            #[cfg(debug_assertions)]
-            Err(_) => eprintln!("✗ Failed to read initial info for sensor: {:?}", sensor.table_name()),
-            #[cfg(not(debug_assertions))]
-            Err(_) => {}
+            Err(SensorError::NotSupported) => {}
+            Err(e) => crate::clog!(
+                "✗ Failed to read initial info for sensor {}: {:?}",
+                sensor.table_name(),
+                e
+            ),
         }
     }
 

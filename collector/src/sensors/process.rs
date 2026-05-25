@@ -18,7 +18,7 @@ pub fn get_processes(
     let mut sys = match system.try_borrow_mut() {
         Ok(sys) => sys,
         Err(e) => {
-            eprintln!("Failed to borrow system for process collection: {}", e);
+            crate::clog!("✗ Failed to borrow system for process collection: {}", e);
             return Vec::new();
         }
     };
