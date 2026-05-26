@@ -10,7 +10,7 @@ use std::{
 
 use bpaf::{OptionParser, Parser, construct, long, short};
 use collector::{CollectorApp, MQTTInfos};
-use common::WINDOW_ICON_BYTES;
+use common::{ConsumptionUnit, EnergyUnit, PowerUnit, WINDOW_ICON_BYTES};
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -31,6 +31,7 @@ struct Options {
     headless_mode: bool,
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
+    mqtt_unit: Option<ConsumptionUnit>,
     db_mode: bool,
     #[cfg(target_os = "windows")]
     install_cpu_driver: bool,
@@ -65,6 +66,24 @@ fn options() -> OptionParser<Options> {
     let mqtt_addr = long("mqtt-addr")
         .help("Specify MQTT broker address to send sensors data.")
         .argument::<SocketAddr>("ADDRESS")
+        .optional();
+
+    let mqtt_unit = long("mqtt-unit")
+        .help(
+            "Unit for collector consumption values published via MQTT. \
+       One of: uj (microjoules), w (watts), wh (watt-hours). \
+       If omitted, returns raw collector values with their original unit.",
+        )
+        .argument::<String>("UNIT")
+        .parse(|s| match s.as_str() {
+            "uj" => Ok(ConsumptionUnit::Energy(EnergyUnit::UJoul)),
+            "wh" => Ok(ConsumptionUnit::Energy(EnergyUnit::WattHour)),
+            "w" => Ok(ConsumptionUnit::Power(PowerUnit::Watt)),
+            other => Err(format!(
+                "Unknown returns unit '{}' for MQTT: expected uj, w or wh.",
+                other
+            )),
+        })
         .optional();
 
     let db_mode = long("no-db")
@@ -105,6 +124,7 @@ fn options() -> OptionParser<Options> {
             headless_mode,
             mqtt_id,
             mqtt_addr,
+            mqtt_unit,
             db_mode,
         })
         .to_options()
@@ -306,7 +326,8 @@ fn main() {
 
     let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
-        Some(MQTTInfos::new(&id, &mqtt_addr))
+        let unit = options.mqtt_unit;
+        Some(MQTTInfos::new(&id, &mqtt_addr, unit))
     } else {
         None
     };

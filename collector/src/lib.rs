@@ -14,10 +14,10 @@ pub use common::clog;
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
 use common::{
-    DatabaseEntry, ProcessDataDB, TotalDataDB,
+    ConsumptionUnit, DatabaseEntry, EnergyUnit, PowerUnit, ProcessDataDB, TotalDataDB,
     database::{purge::averaging_and_purging_data, types::GeneralDataDB},
 };
-use conversion::consumption_event_to_eventdb;
+use conversion::{ConsumptionConvertible, consumption_event_to_eventdb};
 use database::Database;
 use mqtt::{
     MQTTPublisher,
@@ -34,6 +34,7 @@ use sysinfo::System;
 pub struct MQTTInfos {
     id: String,
     publisher: MQTTPublisher<rumqttc::Client>,
+    unit: Option<ConsumptionUnit>,
 }
 
 /// Background sensor-collection application.
@@ -49,11 +50,12 @@ pub struct CollectorApp {
 }
 
 impl MQTTInfos {
-    pub fn new(id: &str, addr: &SocketAddr) -> Self {
+    pub fn new(id: &str, addr: &SocketAddr, unit: Option<ConsumptionUnit>) -> Self {
         let publisher = MQTTPublisher::new_from_addr(addr);
         MQTTInfos {
             id: id.to_string(),
             publisher,
+            unit,
         }
     }
 }
@@ -249,14 +251,25 @@ impl CollectorApp {
                 for sensor_data in event.data() {
                     let topic = sensor_data_to_topic(&mqtt_infos.id, &sensor_data);
 
+                    let _result =
+                        mqtt_infos
+                            .unit
+                            .map_or(mqtt_infos.publisher.publish(&topic, sensor_data), |u| match u {
+                                ConsumptionUnit::Energy(EnergyUnit::UJoul) => mqtt_infos
+                                    .publisher
+                                    .publish(&topic, &sensor_data.to_uj(since_last_update)),
+                                ConsumptionUnit::Energy(EnergyUnit::WattHour) => mqtt_infos
+                                    .publisher
+                                    .publish(&topic, &sensor_data.to_wh(since_last_update)),
+                                ConsumptionUnit::Power(PowerUnit::Watt) => mqtt_infos
+                                    .publisher
+                                    .publish(&topic, &sensor_data.to_watts(since_last_update)),
+                            });
                     #[cfg(debug_assertions)]
-                    match mqtt_infos.publisher.publish(&topic, sensor_data) {
+                    match _result {
                         Ok(_) => println!("✓ Sensor data published on topic {}", topic),
                         Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e),
                     }
-
-                    #[cfg(not(debug_assertions))]
-                    let _ = mqtt_infos.publisher.publish(&topic, sensor_data);
                 }
             }
 
