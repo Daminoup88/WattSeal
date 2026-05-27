@@ -108,6 +108,7 @@ fn options() -> OptionParser<Options> {
             headless_mode,
             mqtt_id,
             mqtt_addr,
+            mqtt_unit,
             db_mode,
             install_cpu_driver,
             uninstall_cpu_driver,

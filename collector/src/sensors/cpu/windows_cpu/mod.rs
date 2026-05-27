@@ -206,8 +206,6 @@ impl MSRReader {
     }
 
     fn compute_delta_energy(&self, current_energy: &EnergyMeasurement, last_energy: &EnergyMeasurement) -> CPUValues {
-        let duration: f64 = current_energy.instant.duration_since(last_energy.instant).as_secs_f64();
-
         let pp1_value = self
             .compute_component_delta_energy(current_energy.cpu_energy_values.pp1, last_energy.cpu_energy_values.pp1);
 
