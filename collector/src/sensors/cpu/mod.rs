@@ -11,8 +11,6 @@ use super::{Sensor, SensorError, SensorType};
 mod estimation;
 #[cfg(target_os = "linux")]
 mod linux_cpu;
-#[cfg(target_os = "windows")]
-pub mod windows_cpu;
 
 use estimation::EstimationCPUSensor;
 pub use estimation::estimate_igpu_power;

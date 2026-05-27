@@ -424,7 +424,7 @@ mod intel_gpu {
     }
 
     impl Sensor for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
             unsafe {
                 PdhCollectQueryData(self.query);
                 if !self.initialized.get() {

@@ -1,6 +1,6 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{CPUData, ConsumptionMetric, SensorData};
+use common::{CPUData, ConsumptionMetric, EnergyMetric, SensorData};
 use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
@@ -63,10 +63,10 @@ pub fn setup() {
 
 #[derive(Clone)]
 struct CPUValues {
-    pkg: Option<f64>,
-    pp0: Option<f64>,
-    pp1: Option<f64>,
-    dram: Option<f64>,
+    pkg: Option<u64>,
+    pp0: Option<u64>,
+    pp1: Option<u64>,
+    dram: Option<u64>,
 }
 
 impl Default for CPUValues {
@@ -90,10 +90,10 @@ impl Default for EnergyMeasurement {
     fn default() -> Self {
         EnergyMeasurement {
             cpu_energy_values: CPUValues {
-                pkg: Some(0.0),
-                pp0: Some(0.0),
-                pp1: Some(0.0),
-                dram: Some(0.0),
+                pkg: Some(0),
+                pp0: Some(0),
+                pp1: Some(0),
+                dram: Some(0),
             },
             instant: Instant::now(),
         }
@@ -149,10 +149,18 @@ impl Sensor for WindowsCPUSensor {
         let cpu_energy_values = self.read_raw_energy()?;
 
         let data = CPUData {
-            total_consumption: cpu_energy_values.pkg,
-            pp0_consumption: cpu_energy_values.pp0,
-            pp1_consumption: cpu_energy_values.pp1,
-            dram_consumption: cpu_energy_values.dram,
+            total_consumption: cpu_energy_values
+                .pkg
+                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
+            pp0_consumption: cpu_energy_values
+                .pp0
+                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
+            pp1_consumption: cpu_energy_values
+                .pp1
+                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
+            dram_consumption: cpu_energy_values
+                .dram
+                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
             usage_percent: None,
         };
         Ok(data.into())
@@ -228,10 +236,10 @@ impl MSRReader {
         match (current_energy_value, last_energy_value) {
             (Some(current), Some(last)) => {
                 let energy_diff = (current as u64).saturating_sub(last as u64);
-                if current == 0.0 || last == 0.0 || energy_diff == 0 {
+                if current == 0 || last == 0 || energy_diff == 0 {
                     return None;
                 }
-                Some(energy_diff * self.energy_unit * 1_000_000) // To uj
+                Some(((energy_diff as f64) * self.energy_unit * 1_000_000.0) as u64) // To uj
             }
             _ => None,
         }
@@ -288,10 +296,10 @@ impl MSR for IntelMSR {
         let dram_energy = Self::read_msr(msr_reader, Self::MSR_DRAM_ENERGY_STATUS as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
-            pkg: Some(pkg_energy as f64),
-            pp0: Some(pp0_energy as f64),
-            pp1: Some(pp1_energy as f64),
-            dram: Some(dram_energy as f64),
+            pkg: Some(pkg_energy as u64),
+            pp0: Some(pp0_energy as u64),
+            pp1: Some(pp1_energy as u64),
+            dram: Some(dram_energy as u64),
         })
     }
 }
@@ -322,8 +330,8 @@ impl MSR for AMDMSR {
         let pp0_energy = Self::read_msr(msr_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
-            pkg: Some(pkg_energy as f64),
-            pp0: Some(pp0_energy as f64),
+            pkg: Some(pkg_energy as u64),
+            pp0: Some(pp0_energy as u64),
             pp1: None,
             dram: None,
         })
