@@ -1,7 +1,7 @@
 use std::{cell::RefCell, time::Instant};
 
 use common::{
-    ConsumptionMetric, ConsumptionUnit, DiskData, EnergyUnit, SensorData,
+    ConsumptionMetric, DiskData, EnergyMetric, SensorData,
     types::{DiskInfo, InitialInfo},
 };
 use sysinfo::Disks;
@@ -39,7 +39,7 @@ impl Sensor for DiskSensor {
 
         let mut read_speed = 0.0;
         let mut write_speed = 0.0;
-        let mut total_energy_uj = 0.0;
+        let mut total_energy_uj = 0;
 
         let mut disks = self
             .disks
@@ -61,16 +61,13 @@ impl Sensor for DiskSensor {
                 _ => (UNKNOWN_IDLE_W, UNKNOWN_W_PER_MB_S),
             };
             let power = idle + throughput * per_mb;
-            total_energy_uj += power * duration * 1_000_000.0;
+            total_energy_uj += (power * duration * 1_000_000.0) as u64;
         }
 
         *self.last_reading.borrow_mut() = now;
 
         Ok(SensorData::Disk(DiskData {
-            total_consumption: Some(ConsumptionMetric {
-                value: total_energy_uj,
-                unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
-            }),
+            total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(total_energy_uj))),
             read_usage_mb_s: read_speed,
             write_usage_mb_s: write_speed,
         }))

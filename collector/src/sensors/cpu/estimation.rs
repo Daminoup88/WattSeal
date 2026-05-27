@@ -1,6 +1,6 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{ConsumptionMetric, ConsumptionUnit, EnergyUnit};
+use common::{ConsumptionMetric, EnergyMetric};
 
 static TDP_TABLE: &[(&str, f64)] = &[
     // Intel Desktop (12th–14th gen)
@@ -106,8 +106,8 @@ pub fn estimate_igpu_power(usage_percent: f64) -> f64 {
 }
 
 /// Estimates energy in µJ directly from usage and elapsed duration.
-pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Duration) -> f64 {
-    estimate_power(tdp, usage_percent) * duration.as_secs_f64() * 1_000_000.0
+pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Duration) -> u64 {
+    (estimate_power(tdp, usage_percent) * duration.as_secs_f64() * 1_000_000.0) as u64
 }
 
 /// TDP-based CPU power estimator.
@@ -131,9 +131,6 @@ impl EstimationCPUSensor {
         let duration = now.duration_since(*self.last_reading.borrow());
         *self.last_reading.borrow_mut() = now;
         let energy = estimate_energy(self.tdp, usage_percent, duration);
-        ConsumptionMetric {
-            value: energy,
-            unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
-        }
+        ConsumptionMetric::Energy(EnergyMetric::UJoul(energy))
     }
 }

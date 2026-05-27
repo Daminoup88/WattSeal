@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, time::Duration};
 
 use common::{
-    CPUData, ConsumptionMetric, ConsumptionUnit, DataDB, DiskData, EnergyUnit, Event, EventDB, GPUData, NetworkData,
-    PowerUnit, ProcessDataDB, RamData, SensorData, TotalDataDB,
+    CPUData, ConsumptionMetric, DataDB, DiskData, EnergyMetric, Event, EventDB, GPUData, NetworkData, PowerMetric,
+    ProcessDataDB, RamData, SensorData, TotalDataDB,
 };
 use sysinfo::System;
 
@@ -13,37 +13,39 @@ use crate::database::process::get_processes;
 /// The `duration` parameter is required for conversions between energy and power units
 /// (e.g. µJ -> W), and ignored for same-dimension conversions (e.g. µJ -> Wh).
 pub trait ConsumptionConvertible {
-    /// The output type after conversion.
-    type ConsumptionOutput;
+    /// The output unsigned type after conversion.
+    type UnsignedOutput;
+    /// The output float type after conversion.
+    type FloatOutput;
 
     /// Converts consumption values to watts (W).
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput;
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput;
 
     /// Converts consumption values to microjoules (µJ).
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput;
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput;
 
     /// Converts consumption values to watt-hours (Wh).
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput;
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput;
 }
 
-fn watts_to_uj(watts: f64, duration: Duration) -> f64 {
-    watts * duration.as_secs_f64() * 1_000_000.0
+fn watts_to_uj(watts: f64, duration: Duration) -> u64 {
+    (watts * duration.as_secs_f64() * 1_000_000.0) as u64
 }
 
-fn wh_to_uj(wh: f64) -> f64 {
-    wh * 3_600_000_000.0
+fn wh_to_uj(wh: f64) -> u64 {
+    (wh * 3_600_000_000.0) as u64
 }
 
 fn watts_to_wh(watts: f64, duration: Duration) -> f64 {
     watts * duration.as_secs_f64() / 3600.0
 }
 
-fn uj_to_wh(uj: f64) -> f64 {
-    uj / 3_600_000_000.0
+fn uj_to_wh(uj: u64) -> f64 {
+    (uj as f64) / 3_600_000_000.0
 }
 
-fn uj_to_watts(uj: f64, duration: Duration) -> f64 {
-    let j = uj / 1_000_000.0;
+fn uj_to_watts(uj: u64, duration: Duration) -> f64 {
+    let j = (uj as f64) / 1_000_000.0;
     let secs = duration.as_secs_f64().max(0.001);
     j / secs
 }
@@ -54,37 +56,39 @@ fn wh_to_watts(wh: f64, duration: Duration) -> f64 {
 }
 
 impl ConsumptionConvertible for ConsumptionMetric {
-    type ConsumptionOutput = f64;
+    type UnsignedOutput = u64;
+    type FloatOutput = f64;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
-        match self.unit {
-            ConsumptionUnit::Energy(EnergyUnit::UJoul) => uj_to_wh(self.value),
-            ConsumptionUnit::Energy(EnergyUnit::WattHour) => self.value,
-            ConsumptionUnit::Power(PowerUnit::Watt) => watts_to_wh(self.value, duration),
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
+        match *self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => uj_to_wh(v),
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => v,
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => watts_to_wh(v, duration),
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
-        match self.unit {
-            ConsumptionUnit::Energy(EnergyUnit::UJoul) => uj_to_watts(self.value, duration),
-            ConsumptionUnit::Energy(EnergyUnit::WattHour) => wh_to_watts(self.value, duration),
-            ConsumptionUnit::Power(PowerUnit::Watt) => self.value,
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
+        match *self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => uj_to_watts(v, duration),
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => wh_to_watts(v, duration),
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => v,
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
-        match self.unit {
-            ConsumptionUnit::Energy(EnergyUnit::UJoul) => self.value,
-            ConsumptionUnit::Energy(EnergyUnit::WattHour) => wh_to_uj(self.value),
-            ConsumptionUnit::Power(PowerUnit::Watt) => watts_to_uj(self.value, duration),
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
+        match *self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => v,
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => wh_to_uj(v),
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => watts_to_uj(v, duration),
         }
     }
 }
 
 impl ConsumptionConvertible for CPUData<ConsumptionMetric> {
-    type ConsumptionOutput = CPUData<f64>;
+    type UnsignedOutput = CPUData<u64>;
+    type FloatOutput = CPUData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         CPUData {
             total_consumption: self.total_consumption.map(|t| t.to_wh(duration)),
             pp0_consumption: self.pp0_consumption.map(|pp0| pp0.to_wh(duration)),
@@ -94,7 +98,7 @@ impl ConsumptionConvertible for CPUData<ConsumptionMetric> {
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         CPUData {
             total_consumption: self.total_consumption.map(|t| t.to_watts(duration)),
             pp0_consumption: self.pp0_consumption.map(|pp0| pp0.to_watts(duration)),
@@ -104,7 +108,7 @@ impl ConsumptionConvertible for CPUData<ConsumptionMetric> {
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         CPUData {
             total_consumption: self.total_consumption.map(|t| t.to_uj(duration)),
             pp0_consumption: self.pp0_consumption.map(|pp0| pp0.to_uj(duration)),
@@ -116,9 +120,10 @@ impl ConsumptionConvertible for CPUData<ConsumptionMetric> {
 }
 
 impl ConsumptionConvertible for GPUData<ConsumptionMetric> {
-    type ConsumptionOutput = GPUData<f64>;
+    type UnsignedOutput = GPUData<u64>;
+    type FloatOutput = GPUData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         GPUData {
             total_consumption: self.total_consumption.map(|t| t.to_wh(duration)),
             usage_percent: self.usage_percent,
@@ -126,7 +131,7 @@ impl ConsumptionConvertible for GPUData<ConsumptionMetric> {
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         GPUData {
             total_consumption: self.total_consumption.map(|t| t.to_watts(duration)),
             usage_percent: self.usage_percent,
@@ -134,7 +139,7 @@ impl ConsumptionConvertible for GPUData<ConsumptionMetric> {
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         GPUData {
             total_consumption: self.total_consumption.map(|t| t.to_uj(duration)),
             usage_percent: self.usage_percent,
@@ -144,23 +149,24 @@ impl ConsumptionConvertible for GPUData<ConsumptionMetric> {
 }
 
 impl ConsumptionConvertible for RamData<ConsumptionMetric> {
-    type ConsumptionOutput = RamData<f64>;
+    type UnsignedOutput = RamData<u64>;
+    type FloatOutput = RamData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         RamData {
             total_consumption: self.total_consumption.map(|t| t.to_wh(duration)),
             usage_percent: self.usage_percent,
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         RamData {
             total_consumption: self.total_consumption.map(|t| t.to_watts(duration)),
             usage_percent: self.usage_percent,
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         RamData {
             total_consumption: self.total_consumption.map(|t| t.to_uj(duration)),
             usage_percent: self.usage_percent,
@@ -169,9 +175,10 @@ impl ConsumptionConvertible for RamData<ConsumptionMetric> {
 }
 
 impl ConsumptionConvertible for DiskData<ConsumptionMetric> {
-    type ConsumptionOutput = DiskData<f64>;
+    type UnsignedOutput = DiskData<u64>;
+    type FloatOutput = DiskData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         DiskData {
             total_consumption: self.total_consumption.map(|t| t.to_wh(duration)),
             read_usage_mb_s: self.read_usage_mb_s,
@@ -179,7 +186,7 @@ impl ConsumptionConvertible for DiskData<ConsumptionMetric> {
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         DiskData {
             total_consumption: self.total_consumption.map(|t| t.to_watts(duration)),
             read_usage_mb_s: self.read_usage_mb_s,
@@ -187,7 +194,7 @@ impl ConsumptionConvertible for DiskData<ConsumptionMetric> {
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         DiskData {
             total_consumption: self.total_consumption.map(|t| t.to_uj(duration)),
             read_usage_mb_s: self.read_usage_mb_s,
@@ -197,9 +204,10 @@ impl ConsumptionConvertible for DiskData<ConsumptionMetric> {
 }
 
 impl ConsumptionConvertible for NetworkData<ConsumptionMetric> {
-    type ConsumptionOutput = NetworkData<f64>;
+    type UnsignedOutput = NetworkData<u64>;
+    type FloatOutput = NetworkData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         NetworkData {
             total_consumption: self.total_consumption.map(|t| t.to_wh(duration)),
             download_speed_mb_s: self.download_speed_mb_s,
@@ -207,7 +215,7 @@ impl ConsumptionConvertible for NetworkData<ConsumptionMetric> {
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         NetworkData {
             total_consumption: self.total_consumption.map(|t| t.to_watts(duration)),
             download_speed_mb_s: self.download_speed_mb_s,
@@ -215,7 +223,7 @@ impl ConsumptionConvertible for NetworkData<ConsumptionMetric> {
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         NetworkData {
             total_consumption: self.total_consumption.map(|t| t.to_uj(duration)),
             download_speed_mb_s: self.download_speed_mb_s,
@@ -225,9 +233,10 @@ impl ConsumptionConvertible for NetworkData<ConsumptionMetric> {
 }
 
 impl ConsumptionConvertible for SensorData<ConsumptionMetric> {
-    type ConsumptionOutput = SensorData<f64>;
+    type UnsignedOutput = SensorData<u64>;
+    type FloatOutput = SensorData<f64>;
 
-    fn to_wh(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_wh(&self, duration: Duration) -> Self::FloatOutput {
         match self {
             SensorData::CPU(cpudata) => SensorData::CPU(cpudata.to_wh(duration)),
             SensorData::GPU(gpudata) => SensorData::GPU(gpudata.to_wh(duration)),
@@ -237,7 +246,7 @@ impl ConsumptionConvertible for SensorData<ConsumptionMetric> {
         }
     }
 
-    fn to_watts(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_watts(&self, duration: Duration) -> Self::FloatOutput {
         match self {
             SensorData::CPU(cpudata) => SensorData::CPU(cpudata.to_watts(duration)),
             SensorData::GPU(gpudata) => SensorData::GPU(gpudata.to_watts(duration)),
@@ -247,7 +256,7 @@ impl ConsumptionConvertible for SensorData<ConsumptionMetric> {
         }
     }
 
-    fn to_uj(&self, duration: Duration) -> Self::ConsumptionOutput {
+    fn to_uj(&self, duration: Duration) -> Self::UnsignedOutput {
         match self {
             SensorData::CPU(cpudata) => SensorData::CPU(cpudata.to_uj(duration)),
             SensorData::GPU(gpudata) => SensorData::GPU(gpudata.to_uj(duration)),

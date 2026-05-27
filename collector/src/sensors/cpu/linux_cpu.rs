@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use common::{CPUData, ConsumptionMetric, ConsumptionUnit, SensorData};
+use common::{CPUData, ConsumptionMetric, EnergyMetric, SensorData};
 
 use super::{Sensor, SensorError};
 
@@ -8,7 +8,7 @@ use super::{Sensor, SensorError};
 /// via sysfs at `/sys/class/powercap/intel-rapl:0/`.
 pub struct LinuxCPUSensor {
     rapl_path: String,
-    last_reading: RefCell<Option<f64>>,
+    last_reading: RefCell<Option<u64>>,
 }
 
 impl LinuxCPUSensor {
@@ -25,12 +25,12 @@ impl LinuxCPUSensor {
     }
 
     /// Reads the cumulative energy counter in microjoules.
-    fn read_energy_uj(&self) -> Result<f64, SensorError> {
+    fn read_energy_uj(&self) -> Result<u64, SensorError> {
         let path = format!("{}/energy_uj", self.rapl_path);
         std::fs::read_to_string(&path)
             .map_err(|e| SensorError::ReadError(format!("Failed to read RAPL: {}", e)))?
             .trim()
-            .parse::<f64>()
+            .parse::<u64>()
             .map_err(|e| SensorError::ReadError(format!("Failed to parse RAPL value: {}", e)))
     }
 }
@@ -52,10 +52,7 @@ impl Sensor for LinuxCPUSensor {
             }
             None => None,
         };
-        let total_consumption = energy_uj.map(|e| ConsumptionMetric {
-            value: e,
-            unit: ConsumptionUnit::Energy(common::EnergyUnit::UJoul),
-        });
+        let total_consumption = energy_uj.map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e)));
         *self.last_reading.borrow_mut() = Some(current_uj);
 
         Ok(SensorData::CPU(CPUData {

@@ -184,7 +184,7 @@ impl GPUSensor {
 #[cfg(target_os = "windows")]
 mod amd_gpu {
     use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
-    use common::{ConsumptionUnit, PowerUnit};
+    use common::{ConsumptionUnit, EnergyMetric, PowerUnit};
 
     use super::{Sensor, SensorError};
     use crate::database::{GPUData, SensorData};
@@ -232,10 +232,7 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(ConsumptionMetric {
-                    value: power_mw as f64 / 1000.0,
-                    unit: ConsumptionUnit::Power(PowerUnit::Watt),
-                }),
+                total_consumption: Some(ConsumptionMetric::Power(PowerMetric::Watt(power_mw as f64 / 1000.0))),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
@@ -249,7 +246,7 @@ mod amd_gpu {
 mod nvidia_gpu {
     use std::{cell::RefCell, collections::HashMap};
 
-    use common::{ConsumptionMetric, GPUData, SensorData};
+    use common::{ConsumptionMetric, EnergyMetric, GPUData, SensorData};
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
@@ -348,9 +345,9 @@ mod nvidia_gpu {
                 .map_err(|_| SensorError::ReadError("Failed to borrow last_energy".to_string()))?;
 
             let energy_uj = if *last_energy == 0 {
-                0.0
+                0
             } else {
-                current_energy_mj.saturating_sub((*last_energy) as u64) as f64 * 1_000.0 // mJ -> uj
+                current_energy_mj.saturating_sub((*last_energy) as u64) * 1_000 // mJ -> uj
             };
 
             *last_energy = current_energy_mj;
@@ -360,10 +357,7 @@ mod nvidia_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(ConsumptionMetric {
-                    value: energy_uj,
-                    unit: common::ConsumptionUnit::Energy(common::EnergyUnit::UJoul),
-                }),
+                total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(energy_uj))),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
             };

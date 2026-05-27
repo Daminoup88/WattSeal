@@ -233,28 +233,21 @@ pub struct BatteryInfo {
 
 /// Possible energy unit of sensors results.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum EnergyUnit {
-    WattHour,
-    UJoul,
+pub enum EnergyMetric {
+    WattHour(f64),
+    UJoul(u64),
 }
 
 /// Possible power unit of sensors results.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum PowerUnit {
-    Watt,
-}
-
-/// Possible consumption unit of sensors results.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum ConsumptionUnit {
-    Energy(EnergyUnit),
-    Power(PowerUnit),
+pub enum PowerMetric {
+    Watt(f64),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub struct ConsumptionMetric {
-    pub value: f64,
-    pub unit: ConsumptionUnit,
+pub enum ConsumptionMetric {
+    Energy(EnergyMetric),
+    Power(PowerMetric),
 }
 
 #[derive(Debug, PartialEq)]
@@ -273,101 +266,140 @@ impl Display for ConsumptionMetricError {
 }
 
 impl ConsumptionMetric {
-    pub fn new(value: f64, unit: ConsumptionUnit) -> Self {
-        Self { value, unit }
-    }
-
-    fn has_same_unit(&self, other: &Self) -> bool {
-        self.unit == other.unit
-    }
-
-    pub fn add(self, el: Self) -> Result<Self, ConsumptionMetricError> {
-        if !self.has_same_unit(&el) {
-            return Err(ConsumptionMetricError::UnitMismatch);
-        }
-        Ok(Self {
-            value: self.value + el.value,
-            unit: self.unit,
-        })
-    }
-
-    pub fn sub(self, el: Self) -> Result<Self, ConsumptionMetricError> {
-        if !self.has_same_unit(&el) {
-            return Err(ConsumptionMetricError::UnitMismatch);
-        }
-        Ok(Self {
-            value: self.value - el.value,
-            unit: self.unit,
-        })
-    }
-
-    pub fn mul(self, el: Self) -> Result<Self, ConsumptionMetricError> {
-        if !self.has_same_unit(&el) {
-            return Err(ConsumptionMetricError::UnitMismatch);
-        }
-        Ok(Self {
-            value: self.value * el.value,
-            unit: self.unit,
-        })
-    }
-
-    pub fn mul_scalar(self, fact: f64) -> Self {
-        Self {
-            value: self.value * fact,
-            unit: self.unit,
+    pub fn is_null(&self) -> bool {
+        match self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => *v == 0,
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => *v == 0.0,
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => *v == 0.0,
         }
     }
 
-    pub fn div_scalar(self, fact: f64) -> Result<Self, ConsumptionMetricError> {
+    pub fn add(&self, el: &Self) -> Result<Self, ConsumptionMetricError> {
+        match (self, el) {
+            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
+                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a + b)))
+            }
+            (
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
+            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a + b))),
+            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
+                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a + b)))
+            }
+            _ => Err(ConsumptionMetricError::UnitMismatch),
+        }
+    }
+
+    pub fn sub(&self, el: Self) -> Result<Self, ConsumptionMetricError> {
+        match (self, el) {
+            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
+                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a - b)))
+            }
+            (
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
+            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a - b))),
+            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
+                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a - b)))
+            }
+            _ => Err(ConsumptionMetricError::UnitMismatch),
+        }
+    }
+
+    pub fn mul(&self, el: Self) -> Result<Self, ConsumptionMetricError> {
+        match (self, el) {
+            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
+                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a * b)))
+            }
+            (
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
+            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a * b))),
+            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
+                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a * b)))
+            }
+            _ => Err(ConsumptionMetricError::UnitMismatch),
+        }
+    }
+
+    pub fn div(&self, rhs: Self) -> Result<f64, ConsumptionMetricError> {
+        match (self, rhs) {
+            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
+                if b == 0 {
+                    return Err(ConsumptionMetricError::DivisionByZero);
+                }
+                Ok(*a as f64 / b as f64)
+            }
+            (
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
+            ) => {
+                if b == 0.0 {
+                    return Err(ConsumptionMetricError::DivisionByZero);
+                }
+                Ok(a / b)
+            }
+            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
+                if b == 0.0 {
+                    return Err(ConsumptionMetricError::DivisionByZero);
+                }
+                Ok(a / b)
+            }
+            _ => Err(ConsumptionMetricError::UnitMismatch),
+        }
+    }
+
+    pub fn mul_scalar(&self, fact: f64) -> Self {
+        match self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => {
+                ConsumptionMetric::Energy(EnergyMetric::UJoul((*v as f64 * fact) as u64))
+            }
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => {
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(v * fact))
+            }
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => ConsumptionMetric::Power(PowerMetric::Watt(v * fact)),
+        }
+    }
+
+    pub fn div_scalar(&self, fact: f64) -> Result<Self, ConsumptionMetricError> {
         if fact == 0.0 {
             return Err(ConsumptionMetricError::DivisionByZero);
         }
-        Ok(Self {
-            value: self.value / fact,
-            unit: self.unit,
+        Ok(match self {
+            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => {
+                ConsumptionMetric::Energy(EnergyMetric::UJoul((*v as f64 / fact) as u64))
+            }
+            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => {
+                ConsumptionMetric::Energy(EnergyMetric::WattHour(v / fact))
+            }
+            ConsumptionMetric::Power(PowerMetric::Watt(v)) => ConsumptionMetric::Power(PowerMetric::Watt(v / fact)),
         })
     }
-
-    pub fn div(self, rhs: Self) -> Result<f64, ConsumptionMetricError> {
-        if !self.has_same_unit(&rhs) {
-            return Err(ConsumptionMetricError::UnitMismatch);
-        }
-        if rhs.value == 0.0 {
-            return Err(ConsumptionMetricError::DivisionByZero);
-        }
-        Ok(self.value / rhs.value)
-    }
 }
 
-impl Display for EnergyUnit {
+impl Display for EnergyMetric {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            EnergyUnit::WattHour => write!(f, "Wh"),
-            EnergyUnit::UJoul => write!(f, "uj"),
+            EnergyMetric::WattHour(v) => write!(f, "{} Wh", v),
+            EnergyMetric::UJoul(v) => write!(f, "{} uj", v),
         }
     }
 }
 
-impl Display for PowerUnit {
+impl Display for PowerMetric {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            PowerUnit::Watt => write!(f, "W"),
-        }
-    }
-}
-
-impl Display for ConsumptionUnit {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConsumptionUnit::Energy(e) => write!(f, "{}", e),
-            ConsumptionUnit::Power(p) => write!(f, "{}", p),
+            PowerMetric::Watt(v) => write!(f, "{} W", v),
         }
     }
 }
 
 impl Display for ConsumptionMetric {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} {}", self.value, self.unit)
+        match self {
+            ConsumptionMetric::Energy(e) => write!(f, "{}", e),
+            ConsumptionMetric::Power(p) => write!(f, "{}", p),
+        }
     }
 }
 

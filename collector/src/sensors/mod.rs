@@ -13,7 +13,7 @@ pub use common::{
         BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
     },
 };
-use common::{ConsumptionMetric, ConsumptionUnit, PowerUnit};
+use common::{ConsumptionMetric, PowerMetric};
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
@@ -110,7 +110,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event<Consumption
                 if let SensorData::CPU(ref mut cpu) = d {
                     if let Some(pp1) = cpu.pp1_consumption.take() {
                         has_pp1_source = true;
-                        if pp1.value > 0.0 {
+                        if pp1.is_null() {
                             if let Some(ref mut total) = cpu.total_consumption {
                                 let sub = total.sub(pp1).unwrap_or(*total);
                                 *total = sub;
@@ -164,10 +164,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event<Consumption
                 if gpu.total_consumption.is_none() {
                     if let Some(usage) = gpu.usage_percent {
                         let estimated = cpu::estimate_igpu_power(usage);
-                        gpu.total_consumption = Some(ConsumptionMetric {
-                            value: estimated,
-                            unit: ConsumptionUnit::Power(PowerUnit::Watt),
-                        });
+                        gpu.total_consumption = Some(ConsumptionMetric::Power(PowerMetric::Watt(estimated)));
                     }
                 }
             }

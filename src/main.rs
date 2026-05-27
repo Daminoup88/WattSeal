@@ -9,8 +9,8 @@ use std::{
 };
 
 use bpaf::{OptionParser, Parser, construct, long, short};
-use collector::{CollectorApp, MQTTInfos};
-use common::{ConsumptionUnit, EnergyUnit, PowerUnit, WINDOW_ICON_BYTES};
+use collector::{CollectorApp, ConsumptionUnit, MQTTInfos};
+use common::WINDOW_ICON_BYTES;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -76,9 +76,9 @@ fn options() -> OptionParser<Options> {
         )
         .argument::<String>("UNIT")
         .parse(|s| match s.as_str() {
-            "uj" => Ok(ConsumptionUnit::Energy(EnergyUnit::UJoul)),
-            "wh" => Ok(ConsumptionUnit::Energy(EnergyUnit::WattHour)),
-            "w" => Ok(ConsumptionUnit::Power(PowerUnit::Watt)),
+            "uj" => Ok(ConsumptionUnit::UJoul),
+            "wh" => Ok(ConsumptionUnit::WattHour),
+            "w" => Ok(ConsumptionUnit::Watt),
             other => Err(format!(
                 "Unknown returns unit '{}' for MQTT: expected uj, w or wh.",
                 other

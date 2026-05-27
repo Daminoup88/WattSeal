@@ -1,7 +1,7 @@
 use std::{cell::RefCell, rc::Rc, time::Instant};
 
 use common::{
-    ConsumptionMetric, ConsumptionUnit, EnergyUnit, RamData, SensorData,
+    ConsumptionMetric, EnergyMetric, RamData, SensorData,
     types::{InitialInfo, MemoryInfo},
 };
 
@@ -41,15 +41,12 @@ impl Sensor for RamSensor {
             0.0
         };
 
-        let energy_uj = 5.0 * duration * 1_000_000.0;
+        let energy_uj = (5.0 * duration * 1_000_000.0) as u64;
 
         *self.last_reading.borrow_mut() = now;
 
         Ok(SensorData::Ram(RamData {
-            total_consumption: Some(ConsumptionMetric {
-                value: energy_uj,
-                unit: ConsumptionUnit::Energy(EnergyUnit::UJoul),
-            }),
+            total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(energy_uj))),
             usage_percent: Some(usage_percent),
         }))
     }
