@@ -1,9 +1,9 @@
 use std::{cell::RefCell, time::Instant};
 
+use common::{CPUData, ConsumptionMetric, SensorData};
 use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
-use crate::database::{CPUData, ConsumptionMetric, SensorData};
 
 mod driver;
 
@@ -128,7 +128,8 @@ impl WindowsCPUSensor {
                 .last_energy_measurement
                 .try_borrow()
                 .map_err(|e| SensorError::ReadError(format!("Failed to borrow last energy measurement: {}", e)))?;
-            self.msr_reader.calculate_delta_energy(&current_energy, &last_energy)
+            self.msr_reader
+                .compute_component_delta_energy(&current_energy, &last_energy)
         };
 
         let mut last_energy_mut = self
@@ -201,19 +202,19 @@ impl MSRReader {
         let duration: f64 = current_energy.instant.duration_since(last_energy.instant).as_secs_f64();
 
         let pp1_value = self
-            .calculate_component_delta_energy(current_energy.cpu_energy_values.pp1, last_energy.cpu_energy_values.pp1);
+            .compute_component_delta_energy(current_energy.cpu_energy_values.pp1, last_energy.cpu_energy_values.pp1);
 
         let pkg_value = self
-            .calculate_component_delta_energy(current_energy.cpu_energy_values.pkg, last_energy.cpu_energy_values.pkg);
+            .compute_component_delta_energy(current_energy.cpu_energy_values.pkg, last_energy.cpu_energy_values.pkg);
 
         CPUValues {
             pkg: pkg_value,
-            pp0: self.calculate_component_delta_energy(
+            pp0: self.compute_component_delta_energy(
                 current_energy.cpu_energy_values.pp0,
                 last_energy.cpu_energy_values.pp0,
             ),
             pp1: pp1_value,
-            dram: self.calculate_component_delta_energy(
+            dram: self.compute_component_delta_energy(
                 current_energy.cpu_energy_values.dram,
                 last_energy.cpu_energy_values.dram,
             ),
@@ -222,9 +223,9 @@ impl MSRReader {
 
     fn compute_component_delta_energy(
         &self,
-        current_energy_value: Option<f64>,
-        last_energy_value: Option<f64>,
-    ) -> Option<f64> {
+        current_energy_value: Option<u64>,
+        last_energy_value: Option<u64>,
+    ) -> Option<u64> {
         match (current_energy_value, last_energy_value) {
             (Some(current), Some(last)) => {
                 let energy_diff = (current as u64).saturating_sub(last as u64);

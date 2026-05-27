@@ -184,10 +184,9 @@ impl GPUSensor {
 #[cfg(target_os = "windows")]
 mod amd_gpu {
     use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
-    use common::{ConsumptionUnit, EnergyMetric, PowerUnit};
+    use common::{ConsumptionMetric, GPUData, PowerMetric, SensorData};
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     pub struct AmdGPUSensor {
         _helper: AdlxHelper,
@@ -216,7 +215,7 @@ mod amd_gpu {
     }
 
     impl Sensor for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<f64>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
