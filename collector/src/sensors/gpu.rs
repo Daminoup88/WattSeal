@@ -370,6 +370,7 @@ mod nvidia_gpu {
 mod intel_gpu {
     use std::slice;
 
+    use common::{GPUData, SensorData};
     use windows::{
         Win32::System::Performance::{
             PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW,
@@ -379,7 +380,6 @@ mod intel_gpu {
     };
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     const PDH_MORE_DATA: u32 = 0x800007D2;
 
