@@ -3,10 +3,9 @@ use std::{fmt::Display, time::SystemTime};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, GeneralData, NetworkData, RamData, SensorData, SensorKind,
+    AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, GeneralData, NetworkData, PowerWatt, RamData, SensorData,
+    SensorKind,
 };
-
-pub type PowerWatt = f64;
 
 /// Sensors data for database
 pub struct EventDB {

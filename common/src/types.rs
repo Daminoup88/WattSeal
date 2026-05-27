@@ -231,17 +231,21 @@ pub struct BatteryInfo {
     pub cycle_count: Option<u32>,
 }
 
+pub type PowerWatt = f64;
+pub type EnergyWH = f64;
+pub type EnergyUJ = u64;
+
 /// Possible energy unit of sensors results.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum EnergyMetric {
-    WattHour(f64),
-    UJoul(u64),
+    WattHour(EnergyWH),
+    UJoul(EnergyUJ),
 }
 
 /// Possible power unit of sensors results.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
 pub enum PowerMetric {
-    Watt(f64),
+    Watt(PowerWatt),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Serialize)]
