@@ -417,7 +417,7 @@ impl Display for TotalDataDB {
 #[derive(Default, Debug, Clone, Copy, PartialEq)]
 pub enum MetricKindDB {
     #[default]
-    Power,
+    Energy,
     Usage,
     Speed,
 }
@@ -425,7 +425,7 @@ pub enum MetricKindDB {
 impl Display for MetricKindDB {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricKindDB::Power => write!(f, "Power"),
+            MetricKindDB::Energy => write!(f, "Energy"),
             MetricKindDB::Usage => write!(f, "Usage"),
             MetricKindDB::Speed => write!(f, "Speed"),
         }
@@ -436,7 +436,7 @@ impl MetricKindDB {
     /// Returns the human-readable label.
     pub fn label(&self) -> &'static str {
         match self {
-            MetricKindDB::Power => "Power",
+            MetricKindDB::Energy => "Energy",
             MetricKindDB::Usage => "Usage",
             MetricKindDB::Speed => "Speed",
         }
@@ -445,7 +445,7 @@ impl MetricKindDB {
     /// Returns the measurement unit string.
     pub fn unit_label(&self) -> &'static str {
         match self {
-            MetricKindDB::Power => "W",
+            MetricKindDB::Energy => "Wh",
             MetricKindDB::Usage => "%",
             MetricKindDB::Speed => "MB/s",
         }
@@ -458,8 +458,8 @@ impl MetricKindDB {
 
     /// Returns the display unit, swapping uj for Wh when energy mode, and W otherwise.
     pub fn effective_unit(&self, energy_mode: bool) -> &'static str {
-        if *self == MetricKindDB::Power {
-            if energy_mode { "W" } else { "Wh" }
+        if *self == MetricKindDB::Energy {
+            if energy_mode { "Wh" } else { "W" }
         } else {
             self.unit_label()
         }

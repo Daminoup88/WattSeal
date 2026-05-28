@@ -194,7 +194,7 @@ impl ComponentState {
             .chart
             .set_y_axis_unit(metric_kind.effective_unit(energy_mode));
         match metric_kind {
-            MetricKindDB::Power => {
+            MetricKindDB::Energy => {
                 let key = metric_kind.legend(display_name);
                 let display = metric_kind_name(language, metric_kind);
                 self.power_graph.chart.add_series(
@@ -456,10 +456,10 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
-                if s.metric_kind == MetricKindDB::Power {
+                if s.metric_kind == MetricKindDB::Energy {
                     s.power_graph
                         .chart
-                        .set_y_axis_unit(MetricKindDB::Power.effective_unit(energy_mode));
+                        .set_y_axis_unit(MetricKindDB::Energy.effective_unit(energy_mode));
                     s.power_graph
                         .chart
                         .set_all_display_labels(power_or_energy(self.language, energy_mode));
@@ -469,7 +469,7 @@ impl SensorState {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
                 s.power_graph
                     .chart
-                    .set_y_axis_unit(MetricKindDB::Power.effective_unit(energy_mode));
+                    .set_y_axis_unit(MetricKindDB::Energy.effective_unit(energy_mode));
                 s.power_graph.chart.set_all_line_types(line_type);
                 s.power_graph
                     .chart

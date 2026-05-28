@@ -536,7 +536,7 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
 
 pub fn metric_kind_name(language: AppLanguage, metric: MetricKindDB) -> &'static str {
     match metric {
-        MetricKindDB::Power => metric_power(language),
+        MetricKindDB::Energy => metric_power(language),
         MetricKindDB::Usage => metric_usage(language),
         MetricKindDB::Speed => metric_speed(language),
     }
