@@ -4,7 +4,10 @@ pub mod gpu;
 pub mod network;
 pub mod ram;
 
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
 
 use battery::Manager;
 pub use common::{
@@ -13,7 +16,7 @@ pub use common::{
         BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
     },
 };
-use common::{ConsumptionMetric, PowerMetric};
+use common::{ConsumptionMetric, EnergyMetric};
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
@@ -96,7 +99,7 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event<ConsumptionMetric> {
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) -> Event<ConsumptionMetric> {
     let time = SystemTime::now();
     let mut data: Vec<SensorData<ConsumptionMetric>> = Vec::new();
 
@@ -163,8 +166,8 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>) -> Event<Consumption
             if let SensorData::GPU(ref mut gpu) = data[idx] {
                 if gpu.total_consumption.is_none() {
                     if let Some(usage) = gpu.usage_percent {
-                        let estimated = cpu::estimate_igpu_power(usage);
-                        gpu.total_consumption = Some(ConsumptionMetric::Power(PowerMetric::Watt(estimated)));
+                        let estimated = cpu::estimate_igpu_energy(usage, duration);
+                        gpu.total_consumption = Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(estimated)));
                     }
                 }
             }

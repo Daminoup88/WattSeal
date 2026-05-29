@@ -231,7 +231,7 @@ impl CollectorApp {
             #[cfg(debug_assertions)]
             println!("\n--- Iteration {} ---", self.iteration);
 
-            let event = create_event_from_sensors(&self.sensors);
+            let event = create_event_from_sensors(&self.sensors, since_last_update);
 
             let proc_gpu_usage = get_process_gpu_usage(&self.sensors);
 

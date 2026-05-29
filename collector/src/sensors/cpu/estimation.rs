@@ -110,6 +110,11 @@ pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Durati
     (estimate_power(tdp, usage_percent) * duration.as_secs_f64() * 1_000_000.0) as u64
 }
 
+/// Estimates integrate-GPU energy in µJ directly from usage and elapsed duration.
+pub fn estimate_igpu_energy(usage_percent: f64, duration: std::time::Duration) -> u64 {
+    (estimate_igpu_power(usage_percent) * duration.as_secs_f64() * 1_000_000.0) as u64
+}
+
 /// TDP-based CPU power estimator.
 pub struct EstimationCPUSensor {
     tdp: f64,

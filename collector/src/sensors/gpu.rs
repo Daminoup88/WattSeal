@@ -183,14 +183,17 @@ impl GPUSensor {
 
 #[cfg(target_os = "windows")]
 mod amd_gpu {
+    use std::{cell::RefCell, time::Instant};
+
     use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
-    use common::{ConsumptionMetric, GPUData, PowerMetric, SensorData};
+    use common::{ConsumptionMetric, EnergyMetric, GPUData, SensorData};
 
     use super::{Sensor, SensorError};
 
     pub struct AmdGPUSensor {
         _helper: AdlxHelper,
         gpu_metrics: GpuMetrics,
+        last_reading: RefCell<Instant>,
     }
 
     impl AmdGPUSensor {
@@ -210,17 +213,24 @@ mod amd_gpu {
             Ok(AmdGPUSensor {
                 _helper: helper,
                 gpu_metrics,
+                last_reading: RefCell::new(Instant::now()),
             })
         }
     }
 
     impl Sensor for AmdGPUSensor {
         fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+            let now = Instant::now();
+            let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+
             // Read AMD GPU data here
             let power_mw = self
                 .gpu_metrics
                 .power()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
+
+            let energy_uj = (power_mw * duration * 1000.0) as u64; // UJ = MW * t * 1000.0 
+
             let usage = self
                 .gpu_metrics
                 .usage()
@@ -231,7 +241,7 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(ConsumptionMetric::Power(PowerMetric::Watt(power_mw as f64 / 1000.0))),
+                total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(energy_uj))),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
