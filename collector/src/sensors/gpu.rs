@@ -380,7 +380,7 @@ mod nvidia_gpu {
 mod intel_gpu {
     use std::slice;
 
-    use common::{GPUData, SensorData};
+    use common::{EnergyUJ, GPUData, SensorData};
     use windows::{
         Win32::System::Performance::{
             PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW,
@@ -434,7 +434,7 @@ mod intel_gpu {
     }
 
     impl Sensor for IntelGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
             unsafe {
                 PdhCollectQueryData(self.query);
                 if !self.initialized.get() {
