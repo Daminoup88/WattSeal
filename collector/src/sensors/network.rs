@@ -1,6 +1,6 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{ConsumptionMetric, EnergyMetric, NetworkData, SensorData};
+use common::{EnergyUJ, NetworkData, SensorData};
 use sysinfo::Networks;
 
 use crate::sensors::{Sensor, SensorError};
@@ -26,7 +26,7 @@ impl NetworkSensor {
 }
 
 impl Sensor for NetworkSensor {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         let now = Instant::now();
         let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
 
@@ -53,7 +53,7 @@ impl Sensor for NetworkSensor {
         *self.last_reading.borrow_mut() = now;
 
         Ok(SensorData::Network(NetworkData {
-            total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(total_energy_uj))),
+            total_consumption: Some(total_energy_uj),
             download_speed_mb_s,
             upload_speed_mb_s,
         }))

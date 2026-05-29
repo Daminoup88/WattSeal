@@ -1,6 +1,6 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{ConsumptionMetric, EnergyMetric};
+use common::EnergyUJ;
 
 static TDP_TABLE: &[(&str, f64)] = &[
     // Intel Desktop (12th–14th gen)
@@ -131,11 +131,10 @@ impl EstimationCPUSensor {
     }
 
     /// Returns energy in µJ consumed since the last call.
-    pub fn estimate(&self, usage_percent: f64) -> ConsumptionMetric {
+    pub fn estimate(&self, usage_percent: f64) -> EnergyUJ {
         let now = Instant::now();
         let duration = now.duration_since(*self.last_reading.borrow());
         *self.last_reading.borrow_mut() = now;
-        let energy = estimate_energy(self.tdp, usage_percent, duration);
-        ConsumptionMetric::Energy(EnergyMetric::UJoul(energy))
+        estimate_energy(self.tdp, usage_percent, duration)
     }
 }

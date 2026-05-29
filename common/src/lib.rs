@@ -24,8 +24,8 @@ pub use database::{
 };
 pub use singleton::SingletonGuard;
 pub use types::{
-    AllTimeData, CPUData, ConsumptionMetric, DiskData, EnergyMetric, EnergyUJ, EnergyWH, Event, GPUData, GeneralData,
-    HardwareInfo, NetworkData, PowerMetric, PowerWatt, RamData, SensorData, SensorKind,
+    AllTimeData, CPUData, DiskData, EnergyUJ, EnergyWH, Event, GPUData, GeneralData, HardwareInfo, NetworkData,
+    PowerWatt, RamData, SensorData, SensorKind,
 };
 pub use utils::set_current_dir_to_exe_dir;
 

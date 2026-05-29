@@ -10,13 +10,13 @@ use std::{
 };
 
 use battery::Manager;
+use common::EnergyUJ;
 pub use common::{
     AllTimeData, Event, GPUData, GeneralData, SensorData,
     types::{
         BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
     },
 };
-use common::{ConsumptionMetric, EnergyMetric};
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
@@ -48,7 +48,7 @@ impl SensorType {
 }
 
 impl Sensor for SensorType {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
@@ -82,7 +82,7 @@ impl Sensor for SensorType {
 /// Common interface for hardware sensors.
 pub trait Sensor {
     /// Reads current power, usage, and throughput data.
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError>;
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError>;
     /// Returns static hardware specs (model, capacity, etc.).
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
         Err(SensorError::NotSupported)
@@ -99,11 +99,11 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) -> Event<ConsumptionMetric> {
+pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) -> Event<EnergyUJ> {
     let time = SystemTime::now();
-    let mut data: Vec<SensorData<ConsumptionMetric>> = Vec::new();
+    let mut data: Vec<SensorData<EnergyUJ>> = Vec::new();
 
-    let mut integrated_gpu_consumption: Option<ConsumptionMetric> = None;
+    let mut integrated_gpu_consumption: Option<EnergyUJ> = None;
     let mut has_pp1_source = false;
     let mut integrated_gpu_indices: Vec<usize> = Vec::new();
     for sensor in sensors {
@@ -113,10 +113,9 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) 
                 if let SensorData::CPU(ref mut cpu) = d {
                     if let Some(pp1) = cpu.pp1_consumption.take() {
                         has_pp1_source = true;
-                        if pp1.is_null() {
+                        if pp1 == 0 {
                             if let Some(ref mut total) = cpu.total_consumption {
-                                let sub = total.sub(pp1).unwrap_or(*total);
-                                *total = sub;
+                                *total = *total - pp1;
                             }
                             integrated_gpu_consumption = Some(pp1);
                         }
@@ -167,7 +166,7 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) 
                 if gpu.total_consumption.is_none() {
                     if let Some(usage) = gpu.usage_percent {
                         let estimated = cpu::estimate_igpu_energy(usage, duration);
-                        gpu.total_consumption = Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(estimated)));
+                        gpu.total_consumption = Some(estimated);
                     }
                 }
             }

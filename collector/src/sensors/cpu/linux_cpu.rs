@@ -1,6 +1,6 @@
 use std::cell::RefCell;
 
-use common::{CPUData, ConsumptionMetric, EnergyMetric, SensorData};
+use common::{CPUData, EnergyUJ, SensorData};
 
 use super::{Sensor, SensorError};
 
@@ -25,7 +25,7 @@ impl LinuxCPUSensor {
     }
 
     /// Reads the cumulative energy counter in microjoules.
-    fn read_energy_uj(&self) -> Result<u64, SensorError> {
+    fn read_energy_uj(&self) -> Result<EnergyUJ, SensorError> {
         let path = format!("{}/energy_uj", self.rapl_path);
         std::fs::read_to_string(&path)
             .map_err(|e| SensorError::ReadError(format!("Failed to read RAPL: {}", e)))?
@@ -36,7 +36,7 @@ impl LinuxCPUSensor {
 }
 
 impl Sensor for LinuxCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         let current_uj = self.read_energy_uj()?;
 
         let last = self.last_reading.borrow();
@@ -52,11 +52,10 @@ impl Sensor for LinuxCPUSensor {
             }
             None => None,
         };
-        let total_consumption = energy_uj.map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e)));
         *self.last_reading.borrow_mut() = Some(current_uj);
 
         Ok(SensorData::CPU(CPUData {
-            total_consumption: total_consumption,
+            total_consumption: energy_uj,
             pp0_consumption: None,
             pp1_consumption: None,
             dram_consumption: None,

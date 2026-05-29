@@ -3,8 +3,8 @@ use std::{fmt::Display, time::SystemTime};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    AllTimeData, CPUData, DatabaseEntry, DiskData, GPUData, GeneralData, NetworkData, PowerWatt, RamData, SensorData,
-    SensorKind,
+    AllTimeData, CPUData, DatabaseEntry, DiskData, EnergyUJ, EnergyWH, GPUData, GeneralData, NetworkData, PowerWatt,
+    RamData, SensorData, SensorKind,
 };
 
 /// Sensors data for database
@@ -13,13 +13,13 @@ pub struct EventDB {
     data: Vec<DataDB>,
 }
 
-pub type CPUDataDB = CPUData<PowerWatt>;
-pub type GPUDataDB = GPUData<PowerWatt>;
-pub type RamDataDB = RamData<PowerWatt>;
-pub type DiskDataDB = DiskData<PowerWatt>;
-pub type NetworkDataDB = NetworkData<PowerWatt>;
-pub type SensorDataDB = SensorData<PowerWatt>;
-pub type AllTimeDataDB = AllTimeData<PowerWatt>;
+pub type CPUDataDB = CPUData<EnergyWH>;
+pub type GPUDataDB = GPUData<EnergyWH>;
+pub type RamDataDB = RamData<EnergyWH>;
+pub type DiskDataDB = DiskData<EnergyWH>;
+pub type NetworkDataDB = NetworkData<EnergyWH>;
+pub type SensorDataDB = SensorData<EnergyWH>;
+pub type AllTimeDataDB = AllTimeData<EnergyWH>;
 
 // Sensors dependant data used in database.
 #[derive(Debug, Clone)]
@@ -42,7 +42,7 @@ pub struct IconData {
 pub struct ProcessDataDB {
     pub app_name: String,
     pub process_exe_path: Option<String>,
-    pub process_consumption: PowerWatt,
+    pub process_consumption: EnergyWH,
     pub process_cpu_usage: f64,
     pub process_gpu_usage: Option<f64>,
     pub process_mem_usage: f64,
@@ -55,7 +55,7 @@ pub struct ProcessDataDB {
 /// Aggregated total consumption across all components.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TotalDataDB {
-    pub total_consumption: PowerWatt,
+    pub total_consumption: EnergyWH,
     pub period_type: String,
 }
 
@@ -148,6 +148,12 @@ impl From<ProcessDataDB> for DataDB {
 impl From<TotalDataDB> for DataDB {
     fn from(data: TotalDataDB) -> Self {
         DataDB::Total(data)
+    }
+}
+
+impl From<&SensorData<EnergyUJ>> for DataDB {
+    fn from(sensor_data: &SensorData<EnergyUJ>) -> Self {
+        DataDB::Sensor(sensor_data.to_wh())
     }
 }
 

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::{ConsumptionMetric, SensorData, types::InitialInfo};
+use common::{EnergyUJ, SensorData, types::InitialInfo};
 
 use super::{Sensor, SensorError, SensorType};
 
@@ -104,7 +104,7 @@ pub enum GPUSensor {
 }
 
 impl Sensor for GPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         match self {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensor::Nvidia(sensor) => sensor.read_full_data(),
@@ -186,7 +186,7 @@ mod amd_gpu {
     use std::{cell::RefCell, time::Instant};
 
     use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
-    use common::{ConsumptionMetric, EnergyMetric, GPUData, SensorData};
+    use common::{EnergyUJ, GPUData, SensorData};
 
     use super::{Sensor, SensorError};
 
@@ -219,7 +219,7 @@ mod amd_gpu {
     }
 
     impl Sensor for AmdGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
             let now = Instant::now();
             let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
 
@@ -241,7 +241,7 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(energy_uj))),
+                total_consumption: Some(energy_uj),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
@@ -255,7 +255,7 @@ mod amd_gpu {
 mod nvidia_gpu {
     use std::{cell::RefCell, collections::HashMap};
 
-    use common::{ConsumptionMetric, EnergyMetric, GPUData, SensorData};
+    use common::{EnergyUJ, GPUData, SensorData};
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
@@ -338,7 +338,7 @@ mod nvidia_gpu {
     }
 
     impl Sensor for NvidiaGPUSensor {
-        fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+        fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
             // Read NVIDIA GPU data here
             let device = self
                 .nvml
@@ -366,7 +366,7 @@ mod nvidia_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(energy_uj))),
+                total_consumption: Some(energy_uj),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
             };

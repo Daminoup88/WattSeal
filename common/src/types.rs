@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display, time::SystemTime};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, SystemTime},
+};
 
 use serde::{Deserialize, Serialize};
 
@@ -235,178 +239,6 @@ pub type PowerWatt = f64;
 pub type EnergyWH = f64;
 pub type EnergyUJ = u64;
 
-/// Possible energy unit of sensors results.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum EnergyMetric {
-    WattHour(EnergyWH),
-    UJoul(EnergyUJ),
-}
-
-/// Possible power unit of sensors results.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum PowerMetric {
-    Watt(PowerWatt),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Serialize)]
-pub enum ConsumptionMetric {
-    Energy(EnergyMetric),
-    Power(PowerMetric),
-}
-
-#[derive(Debug, PartialEq)]
-pub enum ConsumptionMetricError {
-    UnitMismatch,
-    DivisionByZero,
-}
-
-impl Display for ConsumptionMetricError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::UnitMismatch => write!(f, "Cannot operate on different units"),
-            Self::DivisionByZero => write!(f, "Division by zero"),
-        }
-    }
-}
-
-impl ConsumptionMetric {
-    pub fn is_null(&self) -> bool {
-        match self {
-            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => *v == 0,
-            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => *v == 0.0,
-            ConsumptionMetric::Power(PowerMetric::Watt(v)) => *v == 0.0,
-        }
-    }
-
-    pub fn add(&self, el: &Self) -> Result<Self, ConsumptionMetricError> {
-        match (self, el) {
-            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
-                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a + b)))
-            }
-            (
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
-            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a + b))),
-            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
-                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a + b)))
-            }
-            _ => Err(ConsumptionMetricError::UnitMismatch),
-        }
-    }
-
-    pub fn sub(&self, el: Self) -> Result<Self, ConsumptionMetricError> {
-        match (self, el) {
-            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
-                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a - b)))
-            }
-            (
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
-            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a - b))),
-            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
-                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a - b)))
-            }
-            _ => Err(ConsumptionMetricError::UnitMismatch),
-        }
-    }
-
-    pub fn mul(&self, el: Self) -> Result<Self, ConsumptionMetricError> {
-        match (self, el) {
-            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
-                Ok(ConsumptionMetric::Energy(EnergyMetric::UJoul(a * b)))
-            }
-            (
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
-            ) => Ok(ConsumptionMetric::Energy(EnergyMetric::WattHour(a * b))),
-            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
-                Ok(ConsumptionMetric::Power(PowerMetric::Watt(a * b)))
-            }
-            _ => Err(ConsumptionMetricError::UnitMismatch),
-        }
-    }
-
-    pub fn div(&self, rhs: Self) -> Result<f64, ConsumptionMetricError> {
-        match (self, rhs) {
-            (ConsumptionMetric::Energy(EnergyMetric::UJoul(a)), ConsumptionMetric::Energy(EnergyMetric::UJoul(b))) => {
-                if b == 0 {
-                    return Err(ConsumptionMetricError::DivisionByZero);
-                }
-                Ok(*a as f64 / b as f64)
-            }
-            (
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(a)),
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(b)),
-            ) => {
-                if b == 0.0 {
-                    return Err(ConsumptionMetricError::DivisionByZero);
-                }
-                Ok(a / b)
-            }
-            (ConsumptionMetric::Power(PowerMetric::Watt(a)), ConsumptionMetric::Power(PowerMetric::Watt(b))) => {
-                if b == 0.0 {
-                    return Err(ConsumptionMetricError::DivisionByZero);
-                }
-                Ok(a / b)
-            }
-            _ => Err(ConsumptionMetricError::UnitMismatch),
-        }
-    }
-
-    pub fn mul_scalar(&self, fact: f64) -> Self {
-        match self {
-            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => {
-                ConsumptionMetric::Energy(EnergyMetric::UJoul((*v as f64 * fact) as u64))
-            }
-            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => {
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(v * fact))
-            }
-            ConsumptionMetric::Power(PowerMetric::Watt(v)) => ConsumptionMetric::Power(PowerMetric::Watt(v * fact)),
-        }
-    }
-
-    pub fn div_scalar(&self, fact: f64) -> Result<Self, ConsumptionMetricError> {
-        if fact == 0.0 {
-            return Err(ConsumptionMetricError::DivisionByZero);
-        }
-        Ok(match self {
-            ConsumptionMetric::Energy(EnergyMetric::UJoul(v)) => {
-                ConsumptionMetric::Energy(EnergyMetric::UJoul((*v as f64 / fact) as u64))
-            }
-            ConsumptionMetric::Energy(EnergyMetric::WattHour(v)) => {
-                ConsumptionMetric::Energy(EnergyMetric::WattHour(v / fact))
-            }
-            ConsumptionMetric::Power(PowerMetric::Watt(v)) => ConsumptionMetric::Power(PowerMetric::Watt(v / fact)),
-        })
-    }
-}
-
-impl Display for EnergyMetric {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            EnergyMetric::WattHour(v) => write!(f, "{} Wh", v),
-            EnergyMetric::UJoul(v) => write!(f, "{} uj", v),
-        }
-    }
-}
-
-impl Display for PowerMetric {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            PowerMetric::Watt(v) => write!(f, "{} W", v),
-        }
-    }
-}
-
-impl Display for ConsumptionMetric {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ConsumptionMetric::Energy(e) => write!(f, "{}", e),
-            ConsumptionMetric::Power(p) => write!(f, "{}", p),
-        }
-    }
-}
-
 impl<T: Clone> SensorData<T> {
     /// Returns the sensor kind of this sensor variant.
     pub fn sensor_kind(&self) -> SensorKind {
@@ -591,5 +423,129 @@ impl<T> From<DiskData<T>> for SensorData<T> {
 impl<T> From<NetworkData<T>> for SensorData<T> {
     fn from(data: NetworkData<T>) -> Self {
         SensorData::Network(data)
+    }
+}
+
+fn uj_to_wh(uj: EnergyUJ) -> EnergyWH {
+    (uj as f64) / 3_600_000_000.0
+}
+
+fn uj_to_watts(uj: u64, duration: Duration) -> f64 {
+    let j = (uj as f64) / 1_000_000.0;
+    let secs = duration.as_secs_f64().max(0.001);
+    j / secs
+}
+
+impl CPUData<EnergyUJ> {
+    fn to_watts(&self, d: Duration) -> CPUData<PowerWatt> {
+        CPUData {
+            total_consumption: self.total_consumption.map(|t| uj_to_watts(t, d)),
+            pp0_consumption: self.pp0_consumption.map(|pp0| uj_to_watts(pp0, d)),
+            pp1_consumption: self.pp1_consumption.map(|pp1| uj_to_watts(pp1, d)),
+            dram_consumption: self.dram_consumption.map(|dram| uj_to_watts(dram, d)),
+            usage_percent: self.usage_percent,
+        }
+    }
+
+    fn to_wh(&self) -> CPUData<EnergyWH> {
+        CPUData {
+            total_consumption: self.total_consumption.map(|t| uj_to_wh(t)),
+            pp0_consumption: self.pp0_consumption.map(|pp0| uj_to_wh(pp0)),
+            pp1_consumption: self.pp1_consumption.map(|pp1| uj_to_wh(pp1)),
+            dram_consumption: self.dram_consumption.map(|dram| uj_to_wh(dram)),
+            usage_percent: self.usage_percent,
+        }
+    }
+}
+
+impl GPUData<EnergyUJ> {
+    fn to_watts(&self, d: Duration) -> GPUData<PowerWatt> {
+        GPUData {
+            total_consumption: self.total_consumption.map(|t| uj_to_watts(t, d)),
+            usage_percent: self.usage_percent,
+            vram_usage_percent: self.vram_usage_percent,
+        }
+    }
+
+    fn to_wh(&self) -> GPUData<EnergyWH> {
+        GPUData {
+            total_consumption: self.total_consumption.map(|t| uj_to_wh(t)),
+            usage_percent: self.usage_percent,
+            vram_usage_percent: self.vram_usage_percent,
+        }
+    }
+}
+
+impl RamData<EnergyUJ> {
+    fn to_watts(&self, d: Duration) -> RamData<PowerWatt> {
+        RamData {
+            total_consumption: self.total_consumption.map(|t| uj_to_watts(t, d)),
+            usage_percent: self.usage_percent,
+        }
+    }
+
+    fn to_wh(&self) -> RamData<EnergyWH> {
+        RamData {
+            total_consumption: self.total_consumption.map(|t| uj_to_wh(t)),
+            usage_percent: self.usage_percent,
+        }
+    }
+}
+
+impl DiskData<EnergyUJ> {
+    fn to_watts(&self, d: Duration) -> DiskData<PowerWatt> {
+        DiskData {
+            total_consumption: self.total_consumption.map(|t| uj_to_watts(t, d)),
+            read_usage_mb_s: self.read_usage_mb_s,
+            write_usage_mb_s: self.write_usage_mb_s,
+        }
+    }
+
+    fn to_wh(&self) -> DiskData<EnergyWH> {
+        DiskData {
+            total_consumption: self.total_consumption.map(|t| uj_to_wh(t)),
+            read_usage_mb_s: self.read_usage_mb_s,
+            write_usage_mb_s: self.write_usage_mb_s,
+        }
+    }
+}
+
+impl NetworkData<EnergyUJ> {
+    fn to_watts(&self, d: Duration) -> NetworkData<PowerWatt> {
+        NetworkData {
+            total_consumption: self.total_consumption.map(|t| uj_to_watts(t, d)),
+            download_speed_mb_s: self.download_speed_mb_s,
+            upload_speed_mb_s: self.upload_speed_mb_s,
+        }
+    }
+
+    fn to_wh(&self) -> NetworkData<EnergyWH> {
+        NetworkData {
+            total_consumption: self.total_consumption.map(|t| uj_to_wh(t)),
+            download_speed_mb_s: self.download_speed_mb_s,
+            upload_speed_mb_s: self.upload_speed_mb_s,
+        }
+    }
+}
+
+impl SensorData<EnergyUJ> {
+    pub fn to_watts(&self, d: Duration) -> SensorData<PowerWatt> {
+        match self {
+            SensorData::CPU(cpudata) => SensorData::CPU(cpudata.to_watts(d)),
+            SensorData::GPU(gpudata) => SensorData::GPU(gpudata.to_watts(d)),
+            SensorData::Ram(ramdata) => SensorData::Ram(ramdata.to_watts(d)),
+            SensorData::Disk(diskdata) => SensorData::Disk(diskdata.to_watts(d)),
+            SensorData::Network(networkdata) => SensorData::Network(networkdata.to_watts(d)),
+        }
+    }
+
+    pub fn to_wh(&self) -> SensorData<EnergyWH> {
+        match self {
+            SensorData::CPU(cpudata) => SensorData::CPU(cpudata.to_wh()),
+            SensorData::GPU(gpudata) => SensorData::GPU(gpudata.to_wh()),
+            SensorData::Ram(ramdata) => SensorData::Ram(ramdata.to_wh()),
+            SensorData::Disk(diskdata) => SensorData::Disk(diskdata.to_wh()),
+            SensorData::Network(networkdata) => SensorData::Network(networkdata.to_wh()),
+        }
     }
 }

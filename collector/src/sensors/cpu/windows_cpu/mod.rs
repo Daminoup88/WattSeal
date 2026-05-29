@@ -1,6 +1,6 @@
 use std::{cell::RefCell, time::Instant};
 
-use common::{CPUData, ConsumptionMetric, EnergyMetric, SensorData};
+use common::{CPUData, EnergyUJ, SensorData};
 use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
@@ -145,22 +145,14 @@ impl WindowsCPUSensor {
 }
 
 impl Sensor for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         let cpu_energy_values = self.read_raw_energy()?;
 
         let data = CPUData {
-            total_consumption: cpu_energy_values
-                .pkg
-                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
-            pp0_consumption: cpu_energy_values
-                .pp0
-                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
-            pp1_consumption: cpu_energy_values
-                .pp1
-                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
-            dram_consumption: cpu_energy_values
-                .dram
-                .map(|e| ConsumptionMetric::Energy(EnergyMetric::UJoul(e))),
+            total_consumption: cpu_energy_values.pkg,
+            pp0_consumption: cpu_energy_values.pp0,
+            pp1_consumption: cpu_energy_values.pp1,
+            dram_consumption: cpu_energy_values.dram,
             usage_percent: None,
         };
         Ok(data.into())

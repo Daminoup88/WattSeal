@@ -1,7 +1,7 @@
 use std::{cell::RefCell, time::Instant};
 
 use common::{
-    ConsumptionMetric, DiskData, EnergyMetric, SensorData,
+    DiskData, EnergyUJ, SensorData,
     types::{DiskInfo, InitialInfo},
 };
 use sysinfo::Disks;
@@ -33,7 +33,7 @@ impl DiskSensor {
 }
 
 impl Sensor for DiskSensor {
-    fn read_full_data(&self) -> Result<SensorData<ConsumptionMetric>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
         let now = Instant::now();
         let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
 
@@ -67,7 +67,7 @@ impl Sensor for DiskSensor {
         *self.last_reading.borrow_mut() = now;
 
         Ok(SensorData::Disk(DiskData {
-            total_consumption: Some(ConsumptionMetric::Energy(EnergyMetric::UJoul(total_energy_uj))),
+            total_consumption: Some(total_energy_uj),
             read_usage_mb_s: read_speed,
             write_usage_mb_s: write_speed,
         }))
