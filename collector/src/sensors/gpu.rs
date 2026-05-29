@@ -380,7 +380,7 @@ mod nvidia_gpu {
 mod intel_gpu {
     use std::slice;
 
-    use common::{ConsumptionMetric, GPUData, SensorData};
+    use common::{GPUData, SensorData};
     use windows::{
         Win32::System::Performance::{
             PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW,
