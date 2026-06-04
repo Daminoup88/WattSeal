@@ -25,6 +25,6 @@ common = { path = "../common" }
 mqtt = { path = "../mqtt" }
 display-info = "0.5.9"
 chrono = "0.4.44"
-sysinfo = "0.39.2"
+sysinfo = "0.39.3"
 battery = "0.7.8"
 rumqttc = "0.25.1"
