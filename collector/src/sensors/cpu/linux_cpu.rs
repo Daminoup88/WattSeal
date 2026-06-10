@@ -1,4 +1,4 @@
-use std::{cell::RefCell, time::Instant};
+use std::cell::RefCell;
 
 use common::types::EnergyUj;
 
@@ -54,7 +54,7 @@ impl Sensor for LinuxCPUSensor {
                 } else {
                     self.max_energy_uj.saturating_sub(last_uj) + current_uj
                 };
-                EnergyUj::from_u64(delta)
+                Some(EnergyUj::from_u64(delta))
             }
             None => None,
         };
