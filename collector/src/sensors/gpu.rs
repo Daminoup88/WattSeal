@@ -33,9 +33,13 @@ impl GPUVendor {
 /// Returns the list of GPU adapter names detected on this system.
 #[cfg(target_os = "windows")]
 pub fn get_gpu_list() -> Vec<String> {
+    use std::collections::HashSet;
+
     use windows::Win32::Graphics::Dxgi::*;
 
     let mut list = Vec::new();
+    // Use a HashSet to track the unique identifiers of the GPUs we've seen
+    let mut seen_luids: HashSet<u64> = HashSet::new();
 
     unsafe {
         let factory: IDXGIFactory1 = match CreateDXGIFactory1() {
@@ -51,6 +55,13 @@ pub fn get_gpu_list() -> Vec<String> {
             };
 
             if let Ok(desc) = adapter.GetDesc1() {
+                let luid_u64 = ((desc.AdapterLuid.HighPart as u64) << 32) | (desc.AdapterLuid.LowPart as u64);
+
+                if !seen_luids.insert(luid_u64) {
+                    i += 1;
+                    continue;
+                }
+
                 let name = String::from_utf16_lossy(
                     &desc
                         .Description
