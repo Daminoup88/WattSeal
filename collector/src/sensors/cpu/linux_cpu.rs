@@ -1,5 +1,7 @@
 use std::{cell::RefCell, time::Instant};
 
+use common::types::EnergyUj;
+
 use super::{Sensor, SensorError};
 use crate::database::{CPUData, SensorData};
 
@@ -48,7 +50,7 @@ impl Sensor for LinuxCPUSensor {
         let delta_uj = match last {
             Some(last_uj) => {
                 let delta = if current_uj >= last_uj {
-                    *current_uj - last_uj
+                    current_uj - last_uj
                 } else {
                     self.max_energy_uj.saturating_sub(last_uj) + current_uj
                 };
