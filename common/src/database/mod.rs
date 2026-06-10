@@ -778,8 +778,8 @@ impl Database {
                      COALESCE(p.process_cpu_usage, 0.0) * ?6 AS cpu_contrib, \
                      COALESCE(p.process_gpu_usage, 0.0) * ?6 AS gpu_contrib, \
                      COALESCE(p.process_mem_usage, 0.0) * ?6 AS mem_contrib, \
-                     COALESCE(p.read_bytes, 0) * ?6 AS read_contrib, \
-                     COALESCE(p.written_bytes, 0) * ?6 AS write_contrib, \
+                     COALESCE(p.read_bytes, 0) AS read_contrib, \
+                     COALESCE(p.written_bytes, 0) AS write_contrib, \
                      p.subprocess_count \
                  FROM timestamp t JOIN process_data p ON t.id = p.timestamp_id \
                  WHERE t.sampling_period = ?6 \
