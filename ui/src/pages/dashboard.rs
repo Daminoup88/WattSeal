@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use common::{AllTimeDataDB, DatabaseEntry, ProcessDataDB, TotalDataDB};
+use common::{AllTimeData, DatabaseEntry, ProcessData, TotalData};
 use iced::{
     Alignment, Element, Length, Padding,
     alignment::{Horizontal, Vertical},
@@ -32,7 +32,7 @@ impl DashboardPage {
     pub fn view<'a>(
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
-        all_time_data: &'a AllTimeDataDB,
+        all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
         kwh_cost_per_kwh: f64,
@@ -49,7 +49,7 @@ impl DashboardPage {
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.chart_or_placeholder(sensors, None, TotalDataDB::table_name_static(), 300.0, false, language))
+            .push(self.chart_or_placeholder(sensors, None, TotalData::table_name_static(), 300.0, false, language))
             .push(self.view_process_summary(sensors, language))
             .push(self.view_component_cards(sensors));
 
@@ -66,7 +66,7 @@ impl DashboardPage {
     fn view_power_summary<'a>(
         &'a self,
         sensors: &'a HashMap<String, SensorState>,
-        all_time_data: &'a AllTimeDataDB,
+        all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
         kwh_cost_per_kwh: f64,
@@ -74,9 +74,10 @@ impl DashboardPage {
         let power_value = format!(
             "{:.1}",
             sensors
-                .get(TotalDataDB::table_name_static())
+                .get(TotalData::table_name_static())
                 .and_then(|c| c.get_latest_reading())
-                .and_then(|data| data.total_consumption())
+                .and_then(|data| data.total_energy())
+                .map(|energy| energy.as_watts_for_seconds(1.0))
                 .unwrap_or(0.0)
         );
 
@@ -103,14 +104,15 @@ impl DashboardPage {
                     .push(Text::new("W").size(FONT_SIZE_TITLE).class(TextStyle::Muted)),
             );
 
-        let total_consumption = all_time_data
+        let total_energy_wh = all_time_data
             .components
-            .get(TotalDataDB::table_name_static())
+            .get(TotalData::table_name_static())
             .copied()
+            .map(|energy| energy.as_watt_hours())
             .unwrap_or(0.0);
 
-        let carbon_grams = wh_to_co2_grams(total_consumption, carbon_intensity.g_per_kwh);
-        let bill_usd = total_consumption / 1000.0 * kwh_cost_per_kwh;
+        let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
+        let bill_usd = total_energy_wh / 1000.0 * kwh_cost_per_kwh;
 
         let help_button = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
@@ -124,7 +126,7 @@ impl DashboardPage {
                 Row::new()
                     .push(metric_tile(
                         all_time(language),
-                        format_wh(total_consumption),
+                        format_wh(total_energy_wh),
                         "Wh",
                         TextStyle::Secondary,
                     ))
@@ -189,7 +191,7 @@ impl DashboardPage {
         sensors: &'a HashMap<String, SensorState>,
         language: AppLanguage,
     ) -> Element<'a, Message, AppTheme> {
-        let process_data = sensors.get(ProcessDataDB::table_name_static());
+        let process_data = sensors.get(ProcessData::table_name_static());
 
         if let Some(process_card) = process_data.and_then(|p| Some(p.sensor_visual_card(None, 300.0, false))) {
             process_card
@@ -204,7 +206,7 @@ impl DashboardPage {
         let mut sensors: Vec<(&String, &SensorState)> = sensors
             .iter()
             .filter(|(table_name, _)| {
-                *table_name != TotalDataDB::table_name_static() && *table_name != ProcessDataDB::table_name_static()
+                *table_name != TotalData::table_name_static() && *table_name != ProcessData::table_name_static()
             })
             .collect();
 
@@ -310,12 +312,12 @@ fn metric_tile<'a>(
     .into()
 }
 
-fn wh_to_co2_grams(total_consumption: f64, intensity_g_per_kwh: f64) -> f64 {
-    (total_consumption / 1000.0) * intensity_g_per_kwh
+fn wh_to_co2_grams(energy_wh: f64, intensity_g_per_kwh: f64) -> f64 {
+    (energy_wh / 1000.0) * intensity_g_per_kwh
 }
 
-fn format_wh(total_consumption: f64) -> String {
-    format!("{:.1}", total_consumption.max(0.0))
+fn format_wh(energy_wh: f64) -> String {
+    format!("{:.1}", energy_wh.max(0.0))
 }
 
 fn format_grams(co2_grams: f64) -> String {

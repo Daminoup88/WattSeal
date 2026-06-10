@@ -2,59 +2,52 @@ pub mod cpu;
 pub mod disk;
 pub mod gpu;
 pub mod network;
+pub mod process;
 pub mod ram;
 
 use std::{
+    cell::RefCell,
     collections::HashMap,
+    rc::Rc,
     time::{Duration, SystemTime},
 };
 
 use battery::Manager;
-use common::EnergyUJ;
+use common::types::EnergyUj;
 pub use common::{
-    AllTimeData, Event, GPUData, GeneralData, SensorData,
-    types::{
-        BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SensorKind, SystemInfo,
-    },
+    AllTimeData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
+    types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
 pub use gpu::{GPUSensor, get_gpu_list};
 pub use network::NetworkSensor;
+pub use process::get_processes;
 pub use ram::RamSensor;
 use sysinfo::System;
 
-/// Variant wrapper for all supported sensor.
+/// Variant wrapper for all supported sensor types.
 pub enum SensorType {
     CPU(CPUSensor),
     GPU(GPUSensor),
     RAM(RamSensor),
     Disk(DiskSensor),
     Network(NetworkSensor),
-}
-
-impl SensorType {
-    /// Returns the sensor kind of this sensor variant.
-    pub fn sensor_kind(&self) -> SensorKind {
-        match self {
-            SensorType::CPU(_) => SensorKind::CPU,
-            SensorType::GPU(_) => SensorKind::GPU,
-            SensorType::RAM(_) => SensorKind::Ram,
-            SensorType::Disk(_) => SensorKind::Disk,
-            SensorType::Network(_) => SensorKind::Network,
-        }
-    }
+    Process,
+    Total,
 }
 
 impl Sensor for SensorType {
-    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData, SensorError> {
         match self {
             SensorType::CPU(sensor) => sensor.read_full_data(),
             SensorType::GPU(sensor) => sensor.read_full_data(),
             SensorType::RAM(sensor) => sensor.read_full_data(),
             SensorType::Disk(sensor) => sensor.read_full_data(),
             SensorType::Network(sensor) => sensor.read_full_data(),
+            SensorType::Process => Err(SensorError::NotSupported),
+            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 
@@ -65,6 +58,8 @@ impl Sensor for SensorType {
             SensorType::RAM(sensor) => sensor.read_initial_info(),
             SensorType::Disk(sensor) => sensor.read_initial_info(),
             SensorType::Network(_) => Err(SensorError::NotSupported),
+            SensorType::Process => Err(SensorError::NotSupported),
+            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 
@@ -75,14 +70,16 @@ impl Sensor for SensorType {
             SensorType::Disk(sensor) => sensor.read_name(),
             SensorType::Network(sensor) => sensor.read_name(),
             SensorType::RAM(_) => Err(SensorError::NotSupported),
+            SensorType::Process => Err(SensorError::NotSupported),
+            SensorType::Total => Err(SensorError::NotSupported),
         }
     }
 }
 
 /// Common interface for hardware sensors.
 pub trait Sensor {
-    /// Reads current power, usage, and throughput data.
-    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError>;
+    /// Reads energy consumption since last call, usage, and throughput data.
+    fn read_full_data(&self) -> Result<SensorData, SensorError>;
     /// Returns static hardware specs (model, capacity, etc.).
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
         Err(SensorError::NotSupported)
@@ -99,26 +96,68 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) -> Event<EnergyUJ> {
+pub fn create_event_from_sensors(
+    sensors: &Vec<SensorType>,
+    system: Rc<RefCell<System>>,
+    since_last_update: Duration,
+) -> Event {
     let time = SystemTime::now();
-    let mut data: Vec<SensorData<EnergyUJ>> = Vec::new();
+    let mut data: Vec<SensorData> = Vec::new();
 
-    let mut integrated_gpu_consumption: Option<EnergyUJ> = None;
+    let (mut cpu_energy, mut cpu_usage, mut nb_cpus) = (EnergyUj::from_u64(0), 0.0, 0);
+    let (mut gpu_energy, mut gpu_usage, mut nb_gpus) = (EnergyUj::from_u64(0), 0.0, 0);
+
+    let mut total_energy = EnergyUj::from_u64(0);
+    let mut integrated_gpu_energy: Option<EnergyUj> = None;
     let mut has_pp1_source = false;
     let mut integrated_gpu_indices: Vec<usize> = Vec::new();
+    let mut proc_gpu_usage = HashMap::new();
     for sensor in sensors {
+        match sensor {
+            SensorType::Process | SensorType::Total => continue,
+            SensorType::GPU(gpu_sensor) => {
+                if let Ok(gpu_process_usage) = gpu_sensor.get_process_gpu_usage(
+                    time.duration_since(SystemTime::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs(),
+                ) {
+                    proc_gpu_usage.extend(gpu_process_usage);
+                }
+            }
+            _ => {}
+        }
+        if let SensorType::Total | SensorType::Process = sensor {
+            continue;
+        }
+
         let sensor_data = sensor.read_full_data();
         match sensor_data {
             Ok(mut d) => {
                 if let SensorData::CPU(ref mut cpu) = d {
-                    if let Some(pp1) = cpu.pp1_consumption.take() {
+                    if let Some(pp1) = cpu.pp1_energy.take() {
                         has_pp1_source = true;
-                        if pp1 == 0 {
-                            if let Some(ref mut total) = cpu.total_consumption {
-                                *total = *total - pp1;
+                        if pp1 > 0.0 {
+                            if let Some(ref mut total) = cpu.total_energy {
+                                *total -= pp1;
                             }
-                            integrated_gpu_consumption = Some(pp1);
+                            integrated_gpu_energy = Some(pp1);
                         }
+                    }
+                }
+
+                if let Some(energy) = d.total_energy() {
+                    total_energy += energy;
+
+                    if let SensorData::CPU(cpu) = &d {
+                        cpu_energy += energy;
+                        cpu_usage += cpu.usage_percent.unwrap_or(0.0);
+                        nb_cpus += 1;
+                    }
+
+                    if let SensorData::GPU(gpu) = &d {
+                        gpu_energy += energy;
+                        gpu_usage += gpu.usage_percent.unwrap_or(0.0);
+                        nb_gpus += 1;
                     }
                 }
 
@@ -138,13 +177,13 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) 
         }
     }
 
-    // --- Integrated-GPU power resolution ---
+    // --- Integrated-GPU energy resolution ---
     // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
-    if let Some(igpu_consumption) = integrated_gpu_consumption {
+    if let Some(igpu_energy) = integrated_gpu_energy {
         let merged = data.iter_mut().any(|d| {
             if let SensorData::GPU(gpu) = d {
-                if gpu.total_consumption.is_none() {
-                    gpu.total_consumption = Some(igpu_consumption);
+                if gpu.total_energy.is_none() {
+                    gpu.total_energy = Some(igpu_energy);
                     return true;
                 }
             }
@@ -152,38 +191,60 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, duration: Duration) 
         });
         if !merged {
             data.push(SensorData::GPU(GPUData {
-                total_consumption: Some(igpu_consumption),
+                total_energy: Some(igpu_energy),
                 usage_percent: None,
                 vram_usage_percent: None,
             }));
+            nb_gpus += 1;
         }
+        gpu_energy += igpu_energy;
+        total_energy += igpu_energy;
     }
 
-    // Priority 2: Estimate iGPU power from usage when PP1 is unavailable.
+    // Priority 2: Estimate iGPU energy from usage when PP1 is unavailable.
     if !has_pp1_source {
         for &idx in &integrated_gpu_indices {
             if let SensorData::GPU(ref mut gpu) = data[idx] {
-                if gpu.total_consumption.is_none() {
+                if gpu.total_energy.is_none() {
                     if let Some(usage) = gpu.usage_percent {
-                        let estimated = cpu::estimate_igpu_energy(usage, duration);
-                        gpu.total_consumption = Some(estimated);
+                        let estimated = cpu::estimate_igpu_energy(usage, since_last_update);
+                        gpu.total_energy = Some(estimated);
+                        gpu_energy += estimated;
                     }
                 }
             }
         }
     }
 
+    data.push(SensorData::Total(TotalData { total_energy }));
+
+    cpu_usage /= nb_cpus.max(1) as f64;
+    gpu_usage /= nb_gpus.max(1) as f64;
+
+    let top10_process_data: Vec<ProcessData> = get_processes(
+        system.clone(),
+        cpu_energy,
+        cpu_usage,
+        gpu_energy,
+        gpu_usage,
+        total_energy,
+        10,
+        proc_gpu_usage,
+    );
+    data.push(SensorData::Process(top10_process_data));
+
     return Event::new(time, data);
 }
 
 /// Collects hardware info (names + initial specs) from all sensors.
 pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
-    let mut sensors_kind: Vec<SensorKind> = Vec::new();
+    let mut tables: Vec<String> = Vec::new();
     let mut detected_materials: Vec<String> = Vec::new();
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
     for sensor in sensors {
-        sensors_kind.push(sensor.sensor_kind()); // Problem general data with entry
+        tables.push(sensor.table_name().to_string());
+
         match sensor.read_name() {
             Ok(name) => detected_materials.push(name),
             Err(SensorError::NotSupported) => {}
@@ -270,31 +331,9 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
     let hardware_info: HardwareInfo = sensors_info.into();
 
     let data = GeneralData {
-        sensors: sensors_kind,
-        hardware_info: hardware_info,
+        tables: tables.join(","),
+        hardware_info_serialized: hardware_info.serialized(),
     };
 
     return data;
-}
-
-pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
-    let time = SystemTime::now();
-    let mut proc_gpu_usage = HashMap::new();
-
-    for sensor in sensors {
-        match sensor {
-            SensorType::GPU(gpu_sensor) => {
-                if let Ok(gpu_process_usage) = gpu_sensor.get_process_gpu_usage(
-                    time.duration_since(SystemTime::UNIX_EPOCH)
-                        .unwrap_or_default()
-                        .as_secs(),
-                ) {
-                    proc_gpu_usage.extend(gpu_process_usage);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    proc_gpu_usage
 }

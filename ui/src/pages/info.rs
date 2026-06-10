@@ -1,4 +1,4 @@
-use common::{CPUDataDB, DatabaseEntry, DiskDataDB, GPUDataDB, HardwareInfo, RamDataDB};
+use common::{CPUData, DatabaseEntry, DiskData, GPUData, HardwareInfo, RamData};
 use iced::{
     Element, Length, Padding,
     widget::{Column, Container, Row, Scrollable},
@@ -48,7 +48,7 @@ impl InfoPage {
                 cores(language),
                 cores_and_threads(language, hw.cpu.physical_cores, hw.cpu.logical_cores),
             )),
-            Some(CPUDataDB::table_name_static().to_string()),
+            Some(CPUData::table_name_static().to_string()),
         ));
 
         if hw.gpus.is_empty() {
@@ -59,7 +59,7 @@ impl InfoPage {
                 graphics_information(language).to_string(),
                 InfoField::new(model(language), na(language)),
                 None,
-                Some(GPUDataDB::table_name_static().to_string()),
+                Some(GPUData::table_name_static().to_string()),
             ));
         } else {
             for (i, gpu) in hw.gpus.iter().enumerate() {
@@ -71,7 +71,7 @@ impl InfoPage {
                     subtitle,
                     InfoField::new(model(language), gpu.as_str()),
                     None,
-                    Some(GPUDataDB::table_name_static().to_string()),
+                    Some(GPUData::table_name_static().to_string()),
                 ));
             }
         }
@@ -89,7 +89,7 @@ impl InfoPage {
                 swap(language),
                 format_bytes_gb(hw.memory.total_swap_bytes, language),
             )),
-            Some(RamDataDB::table_name_static().to_string()),
+            Some(RamData::table_name_static().to_string()),
         ));
 
         specs.push(InfoCard::new(
@@ -110,7 +110,7 @@ impl InfoPage {
                 disk_information(language).to_string(),
                 InfoField::new(disk(language), na(language)),
                 Some(InfoField::new(space(language), na(language))),
-                Some(DiskDataDB::table_name_static().to_string()),
+                Some(DiskData::table_name_static().to_string()),
             ));
         } else {
             for (i, disk) in hw.disks.iter().enumerate() {
@@ -132,7 +132,7 @@ impl InfoPage {
                             format_bytes_gb(disk.total_bytes, language)
                         ),
                     )),
-                    Some(DiskDataDB::table_name_static().to_string()),
+                    Some(DiskData::table_name_static().to_string()),
                 ));
             }
         }

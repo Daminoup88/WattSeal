@@ -7,9 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DataDB, DatabaseEntry, DiskDataDB, IconData, MetricKindDB, NetworkDataDB, ProcessDataDB, RamDataDB,
-    SecondaryValues, TotalDataDB,
-    utils::{bytes_to_mb, load_icon_and_name},
+    DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData, SecondaryValues,
+    SensorData, TotalData, database::LIVE_SAMPLING_PERIOD_SECONDS, utils::load_icon_and_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
@@ -38,7 +37,7 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_kind_name, na,
+        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_type_name, na,
         power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
     },
     types::{AppLanguage, TimeRange},
@@ -74,12 +73,12 @@ impl PowerChartState {
     }
 
     fn init_power_series(&mut self, display_name: &str, language: AppLanguage) {
-        let metric_kind = MetricKindDB::default();
-        self.chart.set_y_axis_unit(metric_kind.unit_label());
-        let key = metric_kind.legend(display_name);
-        let display = metric_kind_name(language, metric_kind);
+        let metric_type = MetricKind::default();
+        self.chart.set_y_axis_unit(metric_type.unit());
+        let key = metric_type.legend(display_name);
+        let display = metric_type_name(language, metric_type);
         self.chart
-            .add_series(&key, display, self.line_type, Some(metric_kind as usize));
+            .add_series(&key, display, self.line_type, Some(metric_type as usize));
         self.chart.set_data(&key, self.power_history.clone());
     }
 
@@ -118,8 +117,8 @@ struct ComponentState {
     power_graph: PowerChartState,
     secondary_histories: Vec<HistoryRef>,
     _show_in_total: bool,
-    metric_kind: MetricKindDB,
-    pending_initial_metric: Option<MetricKindDB>,
+    metric_type: MetricKind,
+    pending_initial_metric: Option<MetricKind>,
 }
 
 impl ComponentState {
@@ -131,7 +130,7 @@ impl ComponentState {
             power_graph,
             secondary_histories: Vec::new(),
             _show_in_total: true,
-            metric_kind: MetricKindDB::default(),
+            metric_type: MetricKind::default(),
             pending_initial_metric: initial_metric_for_table(table_name),
         }
     }
@@ -142,9 +141,10 @@ impl ComponentState {
         }
     }
 
-    fn append(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
-        if let Some(power) = data.total_consumption() {
-            self.power_graph.append_power(timestamp, power as f32);
+    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+        if let Some(energy) = data.total_energy() {
+            self.power_graph
+                .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
         }
         if let Some(secondary_values) = data.secondary_values() {
             self.extend_secondary_histories(secondary_values.values.len());
@@ -180,28 +180,28 @@ impl ComponentState {
         }
     }
 
-    fn update_metric_kind(
+    fn update_metric_type(
         &mut self,
-        metric_kind: MetricKindDB,
+        metric_type: MetricKind,
         display_name: &str,
         language: AppLanguage,
         secondary_values: Option<SecondaryValues>,
         energy_mode: bool,
     ) {
-        self.metric_kind = metric_kind;
+        self.metric_type = metric_type;
         self.power_graph.chart.clear_all();
         self.power_graph
             .chart
-            .set_y_axis_unit(metric_kind.effective_unit(energy_mode));
-        match metric_kind {
-            MetricKindDB::Energy => {
-                let key = metric_kind.legend(display_name);
-                let display = metric_kind_name(language, metric_kind);
+            .set_y_axis_unit(metric_type.effective_unit(energy_mode));
+        match metric_type {
+            MetricKind::Power => {
+                let key = metric_type.legend(display_name);
+                let display = metric_type_name(language, metric_type);
                 self.power_graph.chart.add_series(
                     &key,
                     display,
                     self.power_graph.line_type,
-                    Some(metric_kind as usize),
+                    Some(metric_type as usize),
                 );
                 self.power_graph
                     .chart
@@ -228,15 +228,19 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&DataDB>) -> Vec<MetricKindDB> {
-        let mut metrics = vec![MetricKindDB::default()];
+    fn available_metrics(&self, latest: Option<&SensorData>) -> Vec<MetricKind> {
+        let mut metrics = vec![MetricKind::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
-            metrics.push(secondary_values.metric_kind);
+            metrics.push(secondary_values.metric_type);
         }
         metrics
     }
 
-    fn snapshot_row(&self, latest: Option<&DataDB>, language: AppLanguage) -> Option<Row<'static, Message, AppTheme>> {
+    fn snapshot_row(
+        &self,
+        latest: Option<&SensorData>,
+        language: AppLanguage,
+    ) -> Option<Row<'static, Message, AppTheme>> {
         let secondary_values = latest?.secondary_values()?;
         let mut col = Column::new().spacing(SPACING_SMALL);
         for (i, labeled_value) in secondary_values.values.into_iter().enumerate() {
@@ -257,7 +261,7 @@ impl ComponentState {
                                 .class(TextStyle::Muted),
                         )
                         .push(
-                            Text::new(format!("{:.1} {}", value, secondary_values.metric_kind.unit_label()))
+                            Text::new(format!("{:.1} {}", value, secondary_values.metric_type.unit()))
                                 .size(FONT_SIZE_BODY)
                                 .class(style)
                                 .font(FONT_BOLD),
@@ -284,9 +288,10 @@ impl TotalState {
         }
     }
 
-    fn append(&self, timestamp: DateTime<Local>, data: &DataDB) {
-        if let Some(power) = data.total_consumption() {
-            self.power_graph.append_power(timestamp, power as f32);
+    fn append(&self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+        if let Some(energy) = data.total_energy() {
+            self.power_graph
+                .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
         }
     }
 
@@ -306,7 +311,7 @@ impl TotalState {
 }
 
 struct ProcessesState {
-    top_processes: Vec<ProcessDataDB>,
+    top_processes: Vec<ProcessData>,
     icon_handles: HashMap<String, image::Handle>,
     icon_cache: HashMap<String, (Option<IconData>, Option<String>)>,
 }
@@ -320,7 +325,7 @@ impl ProcessesState {
         }
     }
 
-    fn update_from_snapshot(&mut self, processes: &[ProcessDataDB]) {
+    fn update_from_snapshot(&mut self, processes: &[ProcessData]) {
         let mut next_top = processes.to_vec();
 
         for process in &mut next_top {
@@ -362,7 +367,7 @@ impl ProcessesState {
         self.icon_handles.clear();
     }
 
-    fn icon_handle_for(&self, process: &ProcessDataDB) -> Option<image::Handle> {
+    fn icon_handle_for(&self, process: &ProcessData) -> Option<image::Handle> {
         self.icon_handles.get(&process_identity(process)).cloned()
     }
 }
@@ -378,7 +383,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<DataDB>,
+    latest_reading: Option<SensorData>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -386,9 +391,9 @@ pub struct SensorState {
 impl SensorState {
     /// Creates a sensor state for the given table and display name.
     pub fn new(table_name: String, display_name: String, theme: AppTheme, language: AppLanguage) -> Self {
-        let sensor_category = if table_name == TotalDataDB::table_name_static() {
+        let sensor_category = if table_name == TotalData::table_name_static() {
             SensorCategory::Total(TotalState::new(theme, &display_name, language))
-        } else if table_name == ProcessDataDB::table_name_static() {
+        } else if table_name == ProcessData::table_name_static() {
             SensorCategory::Processes(ProcessesState::new())
         } else {
             SensorCategory::Component(ComponentState::new(theme, &display_name, language, &table_name))
@@ -417,12 +422,12 @@ impl SensorState {
     }
 
     /// Returns the most recent sensor reading.
-    pub fn get_latest_reading(&self) -> Option<&DataDB> {
+    pub fn get_latest_reading(&self) -> Option<&SensorData> {
         self.latest_reading.as_ref()
     }
 
     /// Returns the highest-power process, if this is a process sensor.
-    pub fn get_top_process(&self) -> Option<&ProcessDataDB> {
+    pub fn get_top_process(&self) -> Option<&ProcessData> {
         if let SensorCategory::Processes(state) = &self.sensor_category {
             state.top_processes.first()
         } else {
@@ -431,7 +436,7 @@ impl SensorState {
     }
 
     /// Returns the cached icon handle for a process.
-    pub fn get_process_icon(&self, process: &ProcessDataDB) -> Option<image::Handle> {
+    pub fn get_process_icon(&self, process: &ProcessData) -> Option<image::Handle> {
         if let SensorCategory::Processes(state) = &self.sensor_category {
             state.icon_handle_for(process)
         } else {
@@ -456,10 +461,10 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
-                if s.metric_kind == MetricKindDB::Energy {
+                if s.metric_type == MetricKind::Power {
                     s.power_graph
                         .chart
-                        .set_y_axis_unit(MetricKindDB::Energy.effective_unit(energy_mode));
+                        .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
                     s.power_graph
                         .chart
                         .set_all_display_labels(power_or_energy(self.language, energy_mode));
@@ -469,7 +474,7 @@ impl SensorState {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
                 s.power_graph
                     .chart
-                    .set_y_axis_unit(MetricKindDB::Energy.effective_unit(energy_mode));
+                    .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
                 s.power_graph.chart.set_all_line_types(line_type);
                 s.power_graph
                     .chart
@@ -493,11 +498,11 @@ impl SensorState {
     }
 
     /// Switches the displayed metric (power, usage, or speed).
-    pub fn set_metric_kind(&mut self, metric_kind: MetricKindDB) {
+    pub fn set_metric_type(&mut self, metric_type: MetricKind) {
         if let SensorCategory::Component(state) = &mut self.sensor_category {
             let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-            state.update_metric_kind(
-                metric_kind,
+            state.update_metric_type(
+                metric_type,
                 &self.display_name,
                 self.language,
                 secondary_values,
@@ -507,7 +512,7 @@ impl SensorState {
     }
 
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
@@ -519,14 +524,14 @@ impl SensorState {
             match &mut self.sensor_category {
                 SensorCategory::Component(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data);
+                        state.append(timestamp, data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
                 }
                 SensorCategory::Total(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data);
+                        state.append(timestamp, data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
@@ -537,19 +542,19 @@ impl SensorState {
     }
 
     /// Adds a data point to history without updating the latest reading.
-    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &DataDB) {
+    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         match &mut self.sensor_category {
-            SensorCategory::Component(state) => state.append(timestamp, data),
-            SensorCategory::Total(state) => state.append(timestamp, data),
+            SensorCategory::Component(state) => state.append(timestamp, data, &self.time_range),
+            SensorCategory::Total(state) => state.append(timestamp, data, &self.time_range),
             SensorCategory::Processes(_) => {}
         }
     }
 
     /// Replaces chart data with a full history batch.
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, DataDB)]) {
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorData)]) {
         if let SensorCategory::Processes(state) = &mut self.sensor_category {
-            if let Some((_, DataDB::Process(processes))) = data.last() {
+            if let Some((_, SensorData::Process(processes))) = data.last() {
                 state.update_from_snapshot(processes);
             }
             return;
@@ -559,7 +564,7 @@ impl SensorState {
             if let Some(initial_metric) = state.pending_initial_metric.take() {
                 if let Some((_, sensor_data)) = data.last() {
                     let secondary = sensor_data.secondary_values();
-                    state.update_metric_kind(
+                    state.update_metric_type(
                         initial_metric,
                         &self.display_name,
                         self.language,
@@ -593,8 +598,8 @@ impl SensorState {
             SensorCategory::Component(state) => {
                 state.power_graph.chart.update_language(language);
                 let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-                state.update_metric_kind(
-                    state.metric_kind,
+                state.update_metric_type(
+                    state.metric_type,
                     &self.display_name,
                     language,
                     secondary_values,
@@ -626,8 +631,8 @@ impl SensorState {
     }
 
     fn time_range_selector(&self) -> Element<'_, Message, AppTheme> {
-        let options = if self.table_name == TotalDataDB::table_name_static()
-            || self.table_name == ProcessDataDB::table_name_static()
+        let options = if self.table_name == TotalData::table_name_static()
+            || self.table_name == ProcessData::table_name_static()
         {
             TranslatedTimeRange::options_total(self.language)
         } else {
@@ -833,7 +838,11 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!("{:.1}{}", p.process_consumption, unit_str),
+                        format!(
+                            "{:.1}{}",
+                            process_power_or_energy(p.process_energy, &self.time_range),
+                            unit_str
+                        ),
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_POWER_WIDTH),
@@ -861,14 +870,14 @@ impl SensorState {
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", bytes_to_mb(p.read_bytes_per_sec)),
+                        format!("{:.1}MB/s", p.read_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_DISK_READ_WIDTH),
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", bytes_to_mb(p.written_bytes_per_sec)),
+                        format!("{:.1}MB/s", p.written_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Tertiary,
                         Length::Fixed(PROCESS_DISK_WRITE_WIDTH),
@@ -901,7 +910,11 @@ impl SensorState {
         height: f32,
         show_secondary: bool,
     ) -> Element<'b, Message, AppTheme> {
-        let power = self.latest_reading.as_ref().and_then(|d| d.total_consumption());
+        let power = self
+            .latest_reading
+            .as_ref()
+            .and_then(|d| d.total_energy())
+            .map(|energy| energy.as_watts_for_seconds(LIVE_SAMPLING_PERIOD_SECONDS as f64));
 
         match &self.sensor_category {
             SensorCategory::Component(state) => {
@@ -913,7 +926,7 @@ impl SensorState {
                             .into_iter()
                             .map(|m| TranslatedMetricType::new(m, self.language))
                             .collect();
-                        let selected = TranslatedMetricType::new(state.metric_kind, self.language);
+                        let selected = TranslatedMetricType::new(state.metric_type, self.language);
                         Some(
                             pick_list(translated, Some(selected), |tm: TranslatedMetricType| {
                                 Message::ChangeChartMetricType(self.table_name.clone(), tm.metric)
@@ -956,7 +969,23 @@ fn process_icon_cell(cached_handle: Option<image::Handle>) -> Element<'static, M
         .into()
 }
 
-fn process_identity(process: &ProcessDataDB) -> String {
+fn chart_power_or_energy(energy: EnergyUj, time_range: &TimeRange) -> f64 {
+    if time_range.is_energy_mode() {
+        energy.as_watts_for_seconds(1.0) * time_range.power_scale_factor()
+    } else {
+        energy.as_watts_for_seconds(1.0)
+    }
+}
+
+fn process_power_or_energy(energy: EnergyUj, time_range: &TimeRange) -> f64 {
+    if time_range.is_energy_mode() {
+        energy.as_watt_hours()
+    } else {
+        energy.as_watts_for_seconds(time_range.seconds() as f64)
+    }
+}
+
+fn process_identity(process: &ProcessData) -> String {
     process
         .process_exe_path
         .as_ref()
@@ -972,11 +1001,11 @@ fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
     }
 }
 
-fn initial_metric_for_table(table_name: &str) -> Option<MetricKindDB> {
-    if table_name == RamDataDB::table_name_static() {
-        Some(MetricKindDB::Usage)
-    } else if table_name == DiskDataDB::table_name_static() || table_name == NetworkDataDB::table_name_static() {
-        Some(MetricKindDB::Speed)
+fn initial_metric_for_table(table_name: &str) -> Option<MetricKind> {
+    if table_name == RamData::table_name_static() {
+        Some(MetricKind::Usage)
+    } else if table_name == DiskData::table_name_static() || table_name == NetworkData::table_name_static() {
+        Some(MetricKind::Speed)
     } else {
         None
     }

@@ -4,7 +4,7 @@ use std::path::Path;
 #[cfg(windows)]
 use pelite::{FileMap, PeFile};
 
-use crate::database::types::IconData;
+use crate::types::IconData;
 
 /// Load an icon and a friendly name from `path`.
 ///

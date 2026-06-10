@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use rusqlite::{Row, ToSql};
 
-use crate::database::types::{
-    AllTimeDataDB, CPUDataDB, DataDB, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, TotalDataDB,
-};
+use crate::types::{AllTimeData, CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
 
 /// Maps a data type to its SQLite table schema and row conversion.
 pub trait DatabaseEntry {
@@ -16,9 +14,9 @@ pub trait DatabaseEntry {
     where
         Self: Sized;
 
-    fn zero() -> DataDB
+    fn zero() -> SensorData
     where
-        Self: Default + Into<DataDB>,
+        Self: Default + Into<SensorData>,
     {
         Self::default().into()
     }
@@ -64,279 +62,154 @@ pub trait DatabaseEntry {
     }
 }
 
-impl DatabaseEntry for CPUDataDB {
-    fn generic_name() -> &'static str {
-        "CPU"
-    }
+macro_rules! impl_database_entry {
+    (
+        struct $type:ty {
+            generic_name: $generic_name:expr,
+            table_name: $table_name:expr,
+            mappings: {
+                $($field:ident : $col_name:literal => $sql_type:literal),* $(,)?
+            }
+            $(, extra_fields: { $($extra_field:ident : $extra_val:expr),* $(,)? } )?
+        }
+    ) => {
+        impl DatabaseEntry for $type {
+            fn generic_name() -> &'static str {
+                $generic_name
+            }
 
-    fn table_name_static() -> &'static str {
-        "cpu_data"
-    }
+            fn table_name_static() -> &'static str {
+                $table_name
+            }
 
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![
-            timestamp_id,
-            &self.total_consumption,
-            &self.pp0_consumption,
-            &self.pp1_consumption,
-            &self.dram_consumption,
-            &self.usage_percent,
-        ]
-    }
+            fn columns_static() -> &'static [(&'static str, &'static str)] {
+                &[ $(($col_name, $sql_type)),* ]
+            }
 
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("total_consumption", "REAL"),
-            ("pp0_consumption", "REAL"),
-            ("pp1_consumption", "REAL"),
-            ("dram_consumption", "REAL"),
-            ("usage_percent", "REAL"),
-        ]
-    }
+            fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+                let mut params: Vec<&'a dyn ToSql> = vec![timestamp_id];
+                $( params.push(&self.$field); )*
+                params
+            }
 
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(CPUDataDB {
-            total_consumption: row.get("total_consumption")?,
-            pp0_consumption: row.get("pp0_consumption")?,
-            pp1_consumption: row.get("pp1_consumption")?,
-            dram_consumption: row.get("dram_consumption")?,
-            usage_percent: row.get("usage_percent")?,
-        })
+            fn from_row(row: &Row) -> rusqlite::Result<Self> {
+                Ok(Self {
+                    $($field: row.get($col_name)?),*
+                    $(, $($extra_field: $extra_val),* )?
+                })
+            }
+        }
+    };
+}
+
+impl_database_entry! {
+    struct CPUData {
+        generic_name: "CPU",
+        table_name: "cpu_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+            pp0_energy: "pp0_energy_uj" => "INTEGER",
+            pp1_energy: "pp1_energy_uj" => "INTEGER",
+            dram_energy: "dram_energy_uj" => "INTEGER",
+            usage_percent: "usage_percent" => "REAL",
+        }
     }
 }
 
-impl DatabaseEntry for GPUDataDB {
-    fn generic_name() -> &'static str {
-        "GPU"
-    }
-
-    fn table_name_static() -> &'static str {
-        "gpu_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![
-            timestamp_id,
-            &self.total_consumption,
-            &self.usage_percent,
-            &self.vram_usage_percent,
-        ]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("total_consumption", "REAL"),
-            ("usage_percent", "REAL"),
-            ("vram_usage_percent", "REAL"),
-        ]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(GPUDataDB {
-            total_consumption: row.get("total_consumption")?,
-            usage_percent: row.get("usage_percent")?,
-            vram_usage_percent: row.get("vram_usage_percent")?,
-        })
+impl_database_entry! {
+    struct GPUData {
+        generic_name: "GPU",
+        table_name: "gpu_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+            usage_percent: "usage_percent" => "REAL",
+            vram_usage_percent: "vram_usage_percent" => "REAL",
+        }
     }
 }
 
-impl DatabaseEntry for DiskDataDB {
-    fn generic_name() -> &'static str {
-        "Disk"
-    }
-
-    fn table_name_static() -> &'static str {
-        "disk_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![
-            timestamp_id,
-            &self.total_consumption,
-            &self.read_usage_mb_s,
-            &self.write_usage_mb_s,
-        ]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("total_consumption", "REAL"),
-            ("read_usage_mb_s", "REAL"),
-            ("write_usage_mb_s", "REAL"),
-        ]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(DiskDataDB {
-            total_consumption: row.get("total_consumption")?,
-            read_usage_mb_s: row.get("read_usage_mb_s")?,
-            write_usage_mb_s: row.get("write_usage_mb_s")?,
-        })
+impl_database_entry! {
+    struct DiskData {
+        generic_name: "Disk",
+        table_name: "disk_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+            read_bytes: "read_bytes" => "INTEGER",
+            written_bytes: "written_bytes" => "INTEGER",
+        }
     }
 }
 
-impl DatabaseEntry for RamDataDB {
-    fn generic_name() -> &'static str {
-        "RAM"
-    }
-
-    fn table_name_static() -> &'static str {
-        "ram_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![timestamp_id, &self.total_consumption, &self.usage_percent]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_consumption", "REAL"), ("usage_percent", "REAL")]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(RamDataDB {
-            total_consumption: row.get("total_consumption")?,
-            usage_percent: row.get("usage_percent")?,
-        })
+impl_database_entry! {
+    struct RamData {
+        generic_name: "RAM",
+        table_name: "ram_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+            usage_percent: "usage_percent" => "REAL",
+        }
     }
 }
 
-impl DatabaseEntry for NetworkDataDB {
-    fn generic_name() -> &'static str {
-        "Network"
-    }
-
-    fn table_name_static() -> &'static str {
-        "network_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![
-            timestamp_id,
-            &self.total_consumption,
-            &self.download_speed_mb_s,
-            &self.upload_speed_mb_s,
-        ]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("total_consumption", "REAL"),
-            ("download_speed_mb_s", "REAL"),
-            ("upload_speed_mb_s", "REAL"),
-        ]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(NetworkDataDB {
-            total_consumption: row.get("total_consumption")?,
-            download_speed_mb_s: row.get("download_speed_mb_s")?,
-            upload_speed_mb_s: row.get("upload_speed_mb_s")?,
-        })
+impl_database_entry! {
+    struct NetworkData {
+        generic_name: "Network",
+        table_name: "network_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+            downloaded_bytes: "downloaded_bytes" => "INTEGER",
+            uploaded_bytes: "uploaded_bytes" => "INTEGER",
+        }
     }
 }
 
-impl DatabaseEntry for TotalDataDB {
-    fn generic_name() -> &'static str {
-        "Total"
-    }
-
-    fn table_name_static() -> &'static str {
-        "total_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![timestamp_id, &self.total_consumption, &self.period_type]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[("total_consumption", "REAL"), ("period_type", "TEXT NOT NULL")]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(TotalDataDB {
-            total_consumption: row.get("total_consumption")?,
-            period_type: row.get("period_type")?,
-        })
+impl_database_entry! {
+    struct TotalData {
+        generic_name: "Total",
+        table_name: "total_data",
+        mappings: {
+            total_energy: "total_energy_uj" => "INTEGER",
+        }
     }
 }
 
-impl DatabaseEntry for ProcessDataDB {
-    fn generic_name() -> &'static str {
-        "Processes"
-    }
-
-    fn table_name_static() -> &'static str {
-        "process_data"
-    }
-
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-        vec![
-            timestamp_id,
-            &self.app_name,
-            &self.process_exe_path,
-            &self.process_consumption,
-            &self.process_cpu_usage,
-            &self.process_gpu_usage,
-            &self.process_mem_usage,
-            &self.read_bytes_per_sec,
-            &self.written_bytes_per_sec,
-            &self.subprocess_count,
-        ]
-    }
-
-    fn columns_static() -> &'static [(&'static str, &'static str)] {
-        &[
-            ("app_name", "TEXT NOT NULL"),
-            ("process_exe_path", "TEXT"),
-            ("process_consumption", "REAL"),
-            ("process_cpu_usage", "REAL"),
-            ("process_gpu_usage", "REAL"),
-            ("process_mem_usage", "REAL"),
-            ("read_bytes_per_sec", "REAL"),
-            ("written_bytes_per_sec", "REAL"),
-            ("subprocess_count", "INTEGER"),
-        ]
-    }
-
-    fn from_row(row: &Row) -> rusqlite::Result<Self> {
-        Ok(ProcessDataDB {
-            app_name: row.get("app_name")?,
-            process_exe_path: row.get("process_exe_path")?,
-            process_consumption: row.get("process_consumption")?,
-            process_cpu_usage: row.get("process_cpu_usage")?,
-            process_gpu_usage: row.get("process_gpu_usage")?,
-            process_mem_usage: row.get("process_mem_usage")?,
-            read_bytes_per_sec: row.get("read_bytes_per_sec")?,
-            written_bytes_per_sec: row.get("written_bytes_per_sec")?,
-            subprocess_count: row.get("subprocess_count")?,
+impl_database_entry! {
+    struct ProcessData {
+        generic_name: "Processes",
+        table_name: "process_data",
+        mappings: {
+            app_name: "app_name" => "TEXT NOT NULL",
+            process_exe_path: "process_exe_path" => "TEXT",
+            process_energy: "process_energy_uj" => "INTEGER",
+            process_cpu_usage: "process_cpu_usage" => "REAL",
+            process_gpu_usage: "process_gpu_usage" => "REAL",
+            process_mem_usage: "process_mem_usage" => "REAL",
+            read_bytes: "read_bytes" => "INTEGER",
+            written_bytes: "written_bytes" => "INTEGER",
+            subprocess_count: "subprocess_count" => "INTEGER",
+        },
+        extra_fields: {
             icon: None,
-        })
-    }
-
-    fn zero() -> DataDB {
-        DataDB::Process(Vec::new())
+        }
     }
 }
 
-impl DatabaseEntry for AllTimeDataDB {
+// Manual fallback block preserved for custom structure handling
+impl DatabaseEntry for AllTimeData {
     fn generic_name() -> &'static str {
         "AllTime"
     }
-
     fn table_name_static() -> &'static str {
         "all_time_data"
     }
-
     fn insert_params<'a>(&'a self, _timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![]
     }
-
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[]
     }
-
     fn from_row(_: &Row) -> rusqlite::Result<Self> {
-        Ok(AllTimeDataDB {
+        Ok(AllTimeData {
             components: HashMap::new(),
         })
     }
@@ -344,29 +217,27 @@ impl DatabaseEntry for AllTimeDataDB {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        CPUDataDB, DataDB, DatabaseEntry, DiskDataDB, GPUDataDB, NetworkDataDB, ProcessDataDB, RamDataDB, TotalDataDB,
-    };
-    use crate::SensorDataDB;
+    use super::{CPUData, DatabaseEntry, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+    use crate::types::{Byte, EnergyUj};
 
     #[test]
     fn zero_defaults_are_zero_filled() {
         // CPU
-        match CPUDataDB::zero() {
-            DataDB::Sensor(SensorDataDB::CPU(cpu)) => {
-                assert_eq!(cpu.total_consumption, Some(0.0));
-                assert_eq!(cpu.pp0_consumption, Some(0.0));
-                assert_eq!(cpu.pp1_consumption, Some(0.0));
-                assert_eq!(cpu.dram_consumption, Some(0.0));
+        match CPUData::zero() {
+            SensorData::CPU(cpu) => {
+                assert_eq!(cpu.total_energy, Some(EnergyUj::from_u64(0)));
+                assert_eq!(cpu.pp0_energy, Some(EnergyUj::from_u64(0)));
+                assert_eq!(cpu.pp1_energy, Some(EnergyUj::from_u64(0)));
+                assert_eq!(cpu.dram_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.usage_percent, Some(0.0));
             }
             _ => panic!("CPUData::zero() returned wrong SensorData variant"),
         }
 
         // GPU
-        match GPUDataDB::zero() {
-            DataDB::Sensor(SensorDataDB::GPU(gpu)) => {
-                assert_eq!(gpu.total_consumption, Some(0.0));
+        match GPUData::zero() {
+            SensorData::GPU(gpu) => {
+                assert_eq!(gpu.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(gpu.usage_percent, Some(0.0));
                 assert_eq!(gpu.vram_usage_percent, Some(0.0));
             }
@@ -374,46 +245,45 @@ mod tests {
         }
 
         // RAM
-        match RamDataDB::zero() {
-            DataDB::Sensor(SensorDataDB::Ram(ram)) => {
-                assert_eq!(ram.total_consumption, Some(0.0));
+        match RamData::zero() {
+            SensorData::Ram(ram) => {
+                assert_eq!(ram.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(ram.usage_percent, Some(0.0));
             }
             _ => panic!("RamData::zero() returned wrong SensorData variant"),
         }
 
         // Disk
-        match DiskDataDB::zero() {
-            DataDB::Sensor(SensorDataDB::Disk(disk)) => {
-                assert_eq!(disk.total_consumption, Some(0.0));
-                assert_eq!(disk.read_usage_mb_s, 0.0);
-                assert_eq!(disk.write_usage_mb_s, 0.0);
+        match DiskData::zero() {
+            SensorData::Disk(disk) => {
+                assert_eq!(disk.total_energy, Some(EnergyUj::from_u64(0)));
+                assert_eq!(disk.read_bytes, Byte::from(0));
+                assert_eq!(disk.written_bytes, Byte::from(0));
             }
             _ => panic!("DiskData::zero() returned wrong SensorData variant"),
         }
 
         // Network
-        match NetworkDataDB::zero() {
-            DataDB::Sensor(SensorDataDB::Network(net)) => {
-                assert_eq!(net.total_consumption, Some(0.0));
-                assert_eq!(net.download_speed_mb_s, 0.0);
-                assert_eq!(net.upload_speed_mb_s, 0.0);
+        match NetworkData::zero() {
+            SensorData::Network(net) => {
+                assert_eq!(net.total_energy, Some(EnergyUj::from_u64(0)));
+                assert_eq!(net.downloaded_bytes, Byte::from(0));
+                assert_eq!(net.uploaded_bytes, Byte::from(0));
             }
             _ => panic!("NetworkData::zero() returned wrong SensorData variant"),
         }
 
         // Total
-        match TotalDataDB::zero() {
-            DataDB::Total(total) => {
-                assert_eq!(total.total_consumption, 0.0);
-                assert_eq!(total.period_type, "second");
+        match TotalData::zero() {
+            SensorData::Total(total) => {
+                assert_eq!(total.total_energy, EnergyUj::from_u64(0));
             }
             _ => panic!("TotalData::zero() returned wrong SensorData variant"),
         }
 
         // Process
-        match ProcessDataDB::zero() {
-            DataDB::Process(vec) => {
+        match ProcessData::zero() {
+            SensorData::Process(vec) => {
                 assert!(vec.is_empty());
             }
             _ => panic!("ProcessData::zero() returned wrong SensorData variant"),

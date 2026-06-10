@@ -9,7 +9,7 @@ use std::{
 };
 
 use bpaf::{OptionParser, Parser, construct, long, short};
-use collector::{CollectorApp, ConsumptionUnit, MQTTInfos};
+use collector::{CollectorApp, ConsumptionUnit, MQTTInfo};
 use common::WINDOW_ICON_BYTES;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
@@ -71,18 +71,14 @@ fn options() -> OptionParser<Options> {
     let mqtt_unit = long("mqtt-unit")
         .help(
             "Unit for collector consumption values published via MQTT. \
-       One of: uj (microjoules), w (watts), wh (watt-hours). \
-       If omitted, returns raw collector values with their original unit.",
+       One of: uj (microjoules), wh (watt-hours). \
+       If omitted, returns raw collector values with their original unit (uj).",
         )
         .argument::<String>("UNIT")
         .parse(|s| match s.as_str() {
             "uj" => Ok(ConsumptionUnit::UJoul),
             "wh" => Ok(ConsumptionUnit::WattHour),
-            "w" => Ok(ConsumptionUnit::Watt),
-            other => Err(format!(
-                "Unknown returns unit '{}' for MQTT: expected uj, w or wh.",
-                other
-            )),
+            other => Err(format!("Unknown returns unit '{}' for MQTT: expected uj or wh.", other)),
         })
         .optional();
 
@@ -258,7 +254,7 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
+fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfo>) -> Result<CollectorApp, String> {
     let mut app =
         CollectorApp::new(enable_save_db, mqtt_infos).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
@@ -328,7 +324,7 @@ fn main() {
     let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
         let unit = options.mqtt_unit;
-        Some(MQTTInfos::new(&id, &mqtt_addr, unit))
+        Some(MQTTInfo::new(&id, &mqtt_addr, unit))
     } else {
         None
     };

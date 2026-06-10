@@ -1,6 +1,4 @@
-use common::{
-    CPUDataDB, DatabaseEntry, DiskDataDB, GPUDataDB, MetricKindDB, NetworkDataDB, ProcessDataDB, RamDataDB, TotalDataDB,
-};
+use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData, ProcessData, RamData, TotalData};
 
 use crate::types::{AppLanguage, TimeRange};
 
@@ -71,6 +69,24 @@ pub fn current_power_consumption(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Current power consumption",
         AppLanguage::French => "Consommation actuelle",
+    }
+}
+
+pub fn database_migrating_title(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Preparing database",
+        AppLanguage::French => "Préparation de la base de données",
+    }
+}
+
+pub fn database_migrating_description(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => {
+            "WattSeal is waiting for the collector to finish migrating the database. Retrying every second…"
+        }
+        AppLanguage::French => {
+            "WattSeal attend que le collecteur termine la migration de la base de données. Nouvel essai chaque seconde…"
+        }
     }
 }
 
@@ -534,11 +550,11 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn metric_kind_name(language: AppLanguage, metric: MetricKindDB) -> &'static str {
+pub fn metric_type_name(language: AppLanguage, metric: MetricKind) -> &'static str {
     match metric {
-        MetricKindDB::Energy => metric_power(language),
-        MetricKindDB::Usage => metric_usage(language),
-        MetricKindDB::Speed => metric_speed(language),
+        MetricKind::Power => metric_power(language),
+        MetricKind::Usage => metric_usage(language),
+        MetricKind::Speed => metric_speed(language),
     }
 }
 
@@ -749,19 +765,19 @@ pub fn info_modal_coming_soon(language: AppLanguage) -> &'static str {
 }
 
 pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
-    if key == CPUDataDB::table_name_static() {
+    if key == CPUData::table_name_static() {
         return cpu(language).to_string();
-    } else if key == GPUDataDB::table_name_static() {
+    } else if key == GPUData::table_name_static() {
         return gpu(language).to_string();
-    } else if key == RamDataDB::table_name_static() {
+    } else if key == RamData::table_name_static() {
         return ram(language).to_string();
-    } else if key == DiskDataDB::table_name_static() {
+    } else if key == DiskData::table_name_static() {
         return disk(language).to_string();
-    } else if key == NetworkDataDB::table_name_static() {
+    } else if key == NetworkData::table_name_static() {
         return network(language).to_string();
-    } else if key == TotalDataDB::table_name_static() {
+    } else if key == TotalData::table_name_static() {
         return total(language).to_string();
-    } else if key == ProcessDataDB::table_name_static() {
+    } else if key == ProcessData::table_name_static() {
         return process(language).to_string();
     } else {
         return match key {
@@ -781,7 +797,7 @@ pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
 }
 
 pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str {
-    if key == CPUDataDB::table_name_static() {
+    if key == CPUData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "The CPU (Central Processing Unit) is the brain of your computer. \
@@ -802,7 +818,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Des tensions plus élevées (overclocking) augmentent la consommation"
             }
         };
-    } else if key == GPUDataDB::table_name_static() {
+    } else if key == GPUData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "The GPU (Graphics Processing Unit) handles graphics rendering and \
@@ -823,7 +839,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Utilisation élevée de la VRAM"
             }
         };
-    } else if key == RamDataDB::table_name_static() {
+    } else if key == RamData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "RAM (Random Access Memory) provides fast temporary storage for running \
@@ -844,7 +860,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Globalement, la RAM consomme de l'énergie tant que le système est allumé, même au repos."
             }
         };
-    } else if key == DiskDataDB::table_name_static() {
+    } else if key == DiskData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "Storage drives (SSD / HDD) provide permanent data storage for your \
@@ -865,7 +881,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Recherche et indexation sur le disque"
             }
         };
-    } else if key == NetworkDataDB::table_name_static() {
+    } else if key == NetworkData::table_name_static() {
         // Source for network emissions:
         // D. Al Kez, A. M. Foley, D. Laverty, D. F. Del Rio, and B. Sovacool, “Exploring the sustainability challenges facing digitalization and internet data centers,” Journal of Cleaner Production, vol. 371, no. 371, p. 133633, Aug. 2022, doi: https://doi.org/10.1016/j.jclepro.2022.133633.
         return match language {
@@ -890,7 +906,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Note : L'utilisation d'internet engendre des émissions indirectes dues aux infrastructures réseau et aux serveurs distants (28 à 63 g CO₂/Go), qui ne sont pas incluses dans les mesures de WattSeal pour votre PC."
             }
         };
-    } else if key == ProcessDataDB::table_name_static() {
+    } else if key == ProcessData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "Shows which applications consume the most power on your system.\n\n\
@@ -907,7 +923,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  contribuent aussi à la consommation totale."
             }
         };
-    } else if key == TotalDataDB::table_name_static() {
+    } else if key == TotalData::table_name_static() {
         return match language {
             AppLanguage::English => {
                 "Shows the total power consumption of your entire system.\n\n\
@@ -1112,19 +1128,19 @@ impl std::fmt::Display for TranslatedTimeRange {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslatedMetricType {
-    pub metric: MetricKindDB,
+    pub metric: MetricKind,
     language: AppLanguage,
 }
 
 impl TranslatedMetricType {
-    pub fn new(metric: MetricKindDB, language: AppLanguage) -> Self {
+    pub fn new(metric: MetricKind, language: AppLanguage) -> Self {
         Self { metric, language }
     }
 }
 
 impl std::fmt::Display for TranslatedMetricType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", metric_kind_name(self.language, self.metric))
+        write!(f, "{}", metric_type_name(self.language, self.metric))
     }
 }
 

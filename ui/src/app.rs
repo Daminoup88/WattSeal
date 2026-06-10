@@ -2,8 +2,8 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeDataDB, DataDB, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessDataDB, TotalDataDB,
-    UiSettings, generic_name_for_table,
+    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData, UiSettings,
+    generic_name_for_table,
 };
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
@@ -28,10 +28,11 @@ use crate::{
     themes::AppTheme,
     translations::{
         app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
-        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, info_modal_all_time_power,
-        info_modal_all_time_top_consumer, info_modal_current_power, info_modal_current_top_consumer,
-        info_modal_description, info_modal_title, info_modal_top_process, kwh_cost_invalid, modal_close, na,
-        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
+        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, database_migrating_description,
+        database_migrating_title, info_modal_all_time_power, info_modal_all_time_top_consumer,
+        info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
+        info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
+        setup_choose_language, setup_confirm, setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
 };
@@ -58,16 +59,25 @@ pub struct App {
     footer: Footer,
     theme: AppTheme,
     database: Database,
-    all_time_data: AllTimeDataDB,
+    all_time_data: AllTimeData,
     tick_count: u64,
     show_close_dialog: bool,
+    database_migration_pending: bool,
 }
 
 impl App {
     /// Initializes the app, opens the database, and loads settings.
     pub fn new() -> (Self, Task<Message>) {
+        let database = Database::open_without_migrations().expect("Failed to open database");
+        if database.is_schema_current().unwrap_or(false) {
+            Self::ready(database)
+        } else {
+            Self::waiting_for_migration(database)
+        }
+    }
+
+    fn ready(mut database: Database) -> (Self, Task<Message>) {
         let current_page = Page::Dashboard;
-        let mut database = Database::new().expect("Failed to create database");
 
         let (language, carbon_intensity, theme, electricity_cost, show_setup) = match database.load_ui_settings() {
             Ok(Some(s)) => {
@@ -137,8 +147,43 @@ impl App {
                 all_time_data,
                 tick_count: 0,
                 show_close_dialog: false,
+                database_migration_pending: false,
             },
             task,
+        )
+    }
+
+    fn waiting_for_migration(database: Database) -> (Self, Task<Message>) {
+        let current_page = Page::Dashboard;
+        let language = AppLanguage::default();
+        let theme = AppTheme::default();
+
+        (
+            Self {
+                current_page,
+                sensors: HashMap::new(),
+                dashboard_page: DashboardPage,
+                header: Header::new(Page::all(), current_page),
+                footer: Footer,
+                info_page: InfoPage::new(),
+                settings_page: SettingsPage::new(),
+                settings_open: false,
+                info_modal_open: None,
+                language,
+                carbon_intensity: CarbonIntensity::PRESETS[8],
+                custom_carbon_input: String::new(),
+                electricity_cost: ElectricityCost::PRESETS[8],
+                custom_kwh_cost_input: String::new(),
+                show_setup: false,
+                theme,
+                database,
+                hardware_info: HardwareInfo::default(),
+                all_time_data: AllTimeData::default(),
+                tick_count: 0,
+                show_close_dialog: false,
+                database_migration_pending: true,
+            },
+            Task::none(),
         )
     }
 
@@ -146,6 +191,10 @@ impl App {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => {
+                if self.database_migration_pending {
+                    return self.retry_database_migration();
+                }
+
                 let data = self.load_latest_data(1);
                 for (timestamp, sensor_data) in data.iter() {
                     if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
@@ -155,7 +204,7 @@ impl App {
                 self.refresh_all_time_data();
                 self.tick_count += 1;
                 if self.tick_count % 10 == 0 {
-                    let table_name = ProcessDataDB::table_name_static();
+                    let table_name = ProcessData::table_name_static();
                     let time_range = self
                         .sensors
                         .get(table_name)
@@ -279,9 +328,9 @@ impl App {
                 }
                 Task::none()
             }
-            Message::ChangeChartMetricType(table_name, metric_kind) => {
+            Message::ChangeChartMetricType(table_name, metric_type) => {
                 if let Some(sensor) = self.sensors.get_mut(&table_name) {
-                    sensor.set_metric_kind(metric_kind);
+                    sensor.set_metric_type(metric_type);
                 }
                 Task::none()
             }
@@ -345,12 +394,12 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, DataDB)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
         from_db(self.database.select_last_n_records(n))
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, DataDB)> {
-        if table_name == ProcessDataDB::table_name_static() {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+        if table_name == ProcessData::table_name_static() {
             return self.load_process_data(time_range);
         }
         let result = match time_range {
@@ -365,28 +414,19 @@ impl App {
                     .select_last_n_seconds_average(time_range.seconds(), table_name, window)
             }
         };
-        let mut data = from_db(result);
-
-        // In energy mode, convert average watts → Wh per window
-        if time_range.is_energy_mode() {
-            let factor = time_range.power_scale_factor();
-            for (_, sensor_data) in &mut data {
-                sensor_data.power_to_energy(factor);
-            }
-        }
-
-        data
+        from_db(result)
     }
 
-    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, DataDB)> {
-        from_db(
-            self.database
-                .select_top_processes_average(time_range.seconds(), 10, time_range.is_energy_mode()),
-        )
+    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+        from_db(self.database.select_top_processes_average(time_range.seconds(), 10))
     }
 
     /// Builds the root UI element tree.
     pub fn view(&self) -> Element<'_, Message, AppTheme> {
+        if self.database_migration_pending {
+            return self.migration_waiting_view();
+        }
+
         let page_content = match self.current_page {
             Page::Dashboard => self.dashboard_page.view(
                 &self.sensors,
@@ -428,6 +468,32 @@ impl App {
         }
     }
 
+    fn migration_waiting_view(&self) -> Element<'_, Message, AppTheme> {
+        let card = Column::new()
+            .spacing(SPACING_MEDIUM)
+            .align_x(Alignment::Center)
+            .push(
+                Text::new(database_migrating_title(self.language))
+                    .size(FONT_SIZE_HEADER)
+                    .font(FONT_BOLD)
+                    .class(TextStyle::Primary),
+            )
+            .push(
+                Text::new(database_migrating_description(self.language))
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted),
+            );
+
+        Container::new(card)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .align_x(Alignment::Center)
+            .align_y(Alignment::Center)
+            .padding(PADDING_XLARGE)
+            .class(ContainerStyle::Card)
+            .into()
+    }
+
     fn info_modal_view(&self, target: &str) -> Element<'_, Message, AppTheme> {
         let language = self.language;
 
@@ -455,7 +521,10 @@ impl App {
             .push(description);
 
         if let Some(sensor) = self.sensors.get(target) {
-            let power = sensor.get_latest_reading().and_then(|d| d.total_consumption());
+            let power = sensor
+                .get_latest_reading()
+                .and_then(|d| d.total_energy())
+                .map(|energy| energy.as_watts_for_seconds(1.0));
 
             let power_text = power
                 .map(|p| format!("{:.1} W", p))
@@ -476,13 +545,13 @@ impl App {
                         .class(TextStyle::Primary),
                 );
 
-            if target != ProcessDataDB::table_name_static() {
+            if target != ProcessData::table_name_static() {
                 content = content.push(power_row);
             }
         }
 
         if let Some(&energy) = self.all_time_data.components.get(target) {
-            let energy_text = format!("{:.1} Wh", energy.max(0.0));
+            let energy_text = format!("{:.1} Wh", energy.as_watt_hours().max(0.0));
             let all_time_row = Row::new()
                 .spacing(SPACING_MEDIUM)
                 .align_y(Alignment::Center)
@@ -500,7 +569,7 @@ impl App {
             content = content.push(all_time_row);
         }
 
-        if target == TotalDataDB::table_name_static() {
+        if target == TotalData::table_name_static() {
             if let Some((name, power)) = self.find_current_top_consumer() {
                 let consumer_row = Row::new()
                     .spacing(SPACING_MEDIUM)
@@ -538,8 +607,8 @@ impl App {
             }
         }
 
-        if target == ProcessDataDB::table_name_static() {
-            if let Some(proc_sensor) = self.sensors.get(ProcessDataDB::table_name_static()) {
+        if target == ProcessData::table_name_static() {
+            if let Some(proc_sensor) = self.sensors.get(ProcessData::table_name_static()) {
                 if let Some(top_proc) = proc_sensor.get_top_process() {
                     let mut proc_row = Row::new().spacing(SPACING_MEDIUM).align_y(Alignment::Center).push(
                         Text::new(info_modal_top_process(language))
@@ -555,16 +624,18 @@ impl App {
                         );
                     }
 
+                    let range = proc_sensor.current_time_range();
+                    let value = if range.is_energy_mode() {
+                        top_proc.process_energy.as_watt_hours()
+                    } else {
+                        top_proc.process_energy.as_watts_for_seconds(range.seconds() as f64)
+                    };
+
                     proc_row = proc_row.push(
-                        Text::new(format!(
-                            "{} ({:.1} {})",
-                            top_proc.app_name,
-                            top_proc.process_consumption,
-                            proc_sensor.current_time_range().power_unit()
-                        ))
-                        .size(FONT_SIZE_SUBTITLE)
-                        .font(FONT_BOLD)
-                        .class(TextStyle::Primary),
+                        Text::new(format!("{} ({:.1} {})", top_proc.app_name, value, range.power_unit()))
+                            .size(FONT_SIZE_SUBTITLE)
+                            .font(FONT_BOLD)
+                            .class(TextStyle::Primary),
                     );
 
                     content = content.push(proc_row);
@@ -573,13 +644,14 @@ impl App {
         }
 
         if target == "carbon_emissions" {
-            let total_consumption = self
+            let total_energy_wh = self
                 .all_time_data
                 .components
-                .get(TotalDataDB::table_name_static())
+                .get(TotalData::table_name_static())
                 .copied()
+                .map(|energy| energy.as_watt_hours())
                 .unwrap_or(0.0);
-            let measured_g = (total_consumption / 1000.0) * self.carbon_intensity.g_per_kwh;
+            let measured_g = (total_energy_wh / 1000.0) * self.carbon_intensity.g_per_kwh;
 
             let make_co2_row = |label: &'static str, value: String, style: TextStyle| {
                 Row::new()
@@ -609,11 +681,12 @@ impl App {
     fn find_current_top_consumer(&self) -> Option<(String, f64)> {
         self.sensors
             .iter()
-            .filter(|(name, _)| {
-                *name != TotalDataDB::table_name_static() && *name != ProcessDataDB::table_name_static()
-            })
+            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
             .filter_map(|(_, sensor)| {
-                let power = sensor.get_latest_reading().and_then(|d| d.total_consumption())?;
+                let power = sensor
+                    .get_latest_reading()
+                    .and_then(|d| d.total_energy())?
+                    .as_watts_for_seconds(1.0);
                 Some((sensor.name().to_string(), power))
             })
             .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
@@ -623,11 +696,9 @@ impl App {
         self.all_time_data
             .components
             .iter()
-            .filter(|(name, _)| {
-                *name != TotalDataDB::table_name_static() && *name != ProcessDataDB::table_name_static()
-            })
-            .max_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-            .map(|(name, energy)| (info_modal_title(self.language, name), *energy))
+            .filter(|(name, _)| *name != TotalData::table_name_static() && *name != ProcessData::table_name_static())
+            .max_by(|a, b| a.1.partial_cmp(b.1).unwrap_or(std::cmp::Ordering::Equal))
+            .map(|(name, energy)| (info_modal_title(self.language, name), energy.as_watt_hours()))
     }
 
     /// Produces a 1 Hz tick and listens for window-close requests.
@@ -657,6 +728,20 @@ impl App {
     fn refresh_all_time_data(&mut self) {
         if let Ok(all_time_data) = self.database.get_all_time_data() {
             self.all_time_data = all_time_data;
+        }
+    }
+
+    fn retry_database_migration(&mut self) -> Task<Message> {
+        if !self.database.is_schema_current().unwrap_or(false) {
+            return Task::none();
+        }
+
+        if let Ok(database) = Database::open_without_migrations() {
+            let (ready, task) = Self::ready(database);
+            *self = ready;
+            task
+        } else {
+            Task::none()
         }
     }
 
@@ -828,7 +913,7 @@ impl App {
     }
 }
 
-fn from_db(data: Result<Vec<(SystemTime, DataDB)>, DatabaseError>) -> Vec<(DateTime<Local>, DataDB)> {
+fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorData)> {
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))

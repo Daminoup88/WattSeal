@@ -1,9 +1,10 @@
-use std::{cell::RefCell, time::Instant};
+use std::cell::RefCell;
 
-use common::{CPUData, EnergyUJ, SensorData};
+use common::types::EnergyUj;
 use driver::ScaphandreMsrReader;
 
 use super::{CPUVendor, Sensor, SensorError};
+use crate::database::{CPUData, SensorData};
 
 mod driver;
 
@@ -41,23 +42,31 @@ pub fn setup() {
             false
         }
     };
-    if !installed {
+
+    if installed && ScaphandreMsrReader::new().is_ok() {
+        return;
+    }
+
+    if installed {
+        crate::clog!("\u{26a0} CPU MSR driver is installed but not running. Admin approval is required to start it.");
+    } else {
         crate::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.");
-        if let Ok(exe) = std::env::current_exe() {
-            match runas::Command::new(&exe).arg("--install-cpu-driver").gui(true).status() {
-                Ok(status) if status.success() => {
-                    crate::clog!("✓ CPU MSR driver installation completed");
-                }
-                Ok(_) => {
-                    crate::clog!("\u{26a0} CPU MSR driver installation canceled or failed; using estimation");
-                }
-                Err(e) => {
-                    crate::clog!("\u{26a0} Failed to launch driver installer: {e}");
-                }
+    }
+
+    if let Ok(exe) = std::env::current_exe() {
+        match runas::Command::new(&exe).arg("--install-cpu-driver").gui(true).status() {
+            Ok(status) if status.success() => {
+                crate::clog!("✓ CPU MSR driver installation/start completed");
             }
-        } else {
-            crate::clog!("\u{26a0} Unable to locate executable to install the CPU driver");
+            Ok(_) => {
+                crate::clog!("\u{26a0} CPU MSR driver installation/start canceled or failed; using estimation");
+            }
+            Err(e) => {
+                crate::clog!("\u{26a0} Failed to launch driver installer: {e}");
+            }
         }
+    } else {
+        crate::clog!("\u{26a0} Unable to locate executable to install/start the CPU driver");
     }
 }
 
@@ -72,38 +81,18 @@ struct CPUValues {
 impl Default for CPUValues {
     fn default() -> Self {
         CPUValues {
-            pkg: None,
-            pp0: None,
-            pp1: None,
-            dram: None,
+            pkg: Some(0),
+            pp0: Some(0),
+            pp1: Some(0),
+            dram: Some(0),
         }
     }
 }
 
-#[derive(Clone)]
-struct EnergyMeasurement {
-    cpu_energy_values: CPUValues,
-    instant: Instant,
-}
-
-impl Default for EnergyMeasurement {
-    fn default() -> Self {
-        EnergyMeasurement {
-            cpu_energy_values: CPUValues {
-                pkg: Some(0),
-                pp0: Some(0),
-                pp1: Some(0),
-                dram: Some(0),
-            },
-            instant: Instant::now(),
-        }
-    }
-}
-
-/// Windows CPU power sensor using MSR (Model-Specific Registers) via Scaphandre.
+/// Windows CPU energy sensor using MSR (Model-Specific Registers) via Scaphandre.
 pub struct WindowsCPUSensor {
     msr_reader: MSRReader,
-    last_energy_measurement: RefCell<EnergyMeasurement>,
+    last_energy_measurement: RefCell<CPUValues>,
 }
 
 impl WindowsCPUSensor {
@@ -116,12 +105,12 @@ impl WindowsCPUSensor {
 
         Ok(WindowsCPUSensor {
             msr_reader,
-            last_energy_measurement: RefCell::new(EnergyMeasurement::default()),
+            last_energy_measurement: RefCell::new(CPUValues::default()),
         })
     }
 
-    /// Reads raw energy counters and compute delta since last call.
-    fn read_raw_energy(&self) -> Result<CPUValues, SensorError> {
+    /// Reads raw energy counters and computes delta since last call.
+    fn read_raw_energy_delta(&self) -> Result<CPUData, SensorError> {
         let current_energy = self.msr_reader.read_energy()?;
         let energy_values = {
             let last_energy = self
@@ -137,25 +126,17 @@ impl WindowsCPUSensor {
             .map_err(|e| SensorError::ReadError(format!("Failed to update last energy measurement: {}", e)))?;
         *last_energy_mut = current_energy;
 
-        if energy_values.pkg.is_none() {
-            return Err(SensorError::ReadError("Failed to calculate power".to_string()));
+        if energy_values.total_energy.is_none() {
+            return Err(SensorError::ReadError("Failed to calculate energy".to_string()));
         }
         Ok(energy_values)
     }
 }
 
 impl Sensor for WindowsCPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
-        let cpu_energy_values = self.read_raw_energy()?;
-
-        let data = CPUData {
-            total_consumption: cpu_energy_values.pkg,
-            pp0_consumption: cpu_energy_values.pp0,
-            pp1_consumption: cpu_energy_values.pp1,
-            dram_consumption: cpu_energy_values.dram,
-            usage_percent: None,
-        };
-        Ok(data.into())
+    fn read_full_data(&self) -> Result<SensorData, SensorError> {
+        let cpu_energy_values = self.read_raw_energy_delta()?;
+        Ok(cpu_energy_values.into())
     }
 }
 
@@ -184,37 +165,23 @@ impl MSRReader {
         read_fn(msr_reader).map_err(SensorError::ReadError)
     }
 
-    fn read_energy(&self) -> Result<EnergyMeasurement, SensorError> {
+    fn read_energy(&self) -> Result<CPUValues, SensorError> {
         let read_fn = match self.vendor {
             CPUVendor::Intel => IntelMSR::read_energy_value,
             CPUVendor::Amd => AMDMSR::read_energy_value,
             CPUVendor::Other => return Err(SensorError::NotSupported),
         };
         let cpu_energy_values = read_fn(&self.msr_reader).map_err(SensorError::ReadError)?;
-        Ok(EnergyMeasurement {
-            cpu_energy_values,
-            instant: Instant::now(),
-        })
+        Ok(cpu_energy_values)
     }
 
-    fn compute_delta_energy(&self, current_energy: &EnergyMeasurement, last_energy: &EnergyMeasurement) -> CPUValues {
-        let pp1_value = self
-            .compute_component_delta_energy(current_energy.cpu_energy_values.pp1, last_energy.cpu_energy_values.pp1);
-
-        let pkg_value = self
-            .compute_component_delta_energy(current_energy.cpu_energy_values.pkg, last_energy.cpu_energy_values.pkg);
-
-        CPUValues {
-            pkg: pkg_value,
-            pp0: self.compute_component_delta_energy(
-                current_energy.cpu_energy_values.pp0,
-                last_energy.cpu_energy_values.pp0,
-            ),
-            pp1: pp1_value,
-            dram: self.compute_component_delta_energy(
-                current_energy.cpu_energy_values.dram,
-                last_energy.cpu_energy_values.dram,
-            ),
+    fn compute_delta_energy(&self, current_energy: &CPUValues, last_energy: &CPUValues) -> CPUData {
+        CPUData {
+            total_energy: self.compute_component_delta_energy(current_energy.pkg, last_energy.pkg),
+            pp0_energy: self.compute_component_delta_energy(current_energy.pp0, last_energy.pp0),
+            pp1_energy: self.compute_component_delta_energy(current_energy.pp1, last_energy.pp1),
+            dram_energy: self.compute_component_delta_energy(current_energy.dram, last_energy.dram),
+            usage_percent: None,
         }
     }
 
@@ -222,14 +189,16 @@ impl MSRReader {
         &self,
         current_energy_value: Option<u64>,
         last_energy_value: Option<u64>,
-    ) -> Option<u64> {
+    ) -> Option<EnergyUj> {
         match (current_energy_value, last_energy_value) {
             (Some(current), Some(last)) => {
-                let energy_diff = (current as u64).saturating_sub(last as u64);
+                // Handle wrap-around of the energy counter and cast to u32 for 32-bit counters (still works for 64-bit counters with real-world deltas)
+                let energy_diff = (current.wrapping_sub(last)) as u32;
                 if current == 0 || last == 0 || energy_diff == 0 {
                     return None;
                 }
-                Some(((energy_diff as f64) * self.energy_unit * 1_000_000.0) as u64) // To uj
+                let energy_joules = energy_diff as f64 * self.energy_unit;
+                Some(EnergyUj::from_joules(energy_joules))
             }
             _ => None,
         }
@@ -286,10 +255,10 @@ impl MSR for IntelMSR {
         let dram_energy = Self::read_msr(msr_reader, Self::MSR_DRAM_ENERGY_STATUS as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
-            pkg: Some(pkg_energy as u64),
-            pp0: Some(pp0_energy as u64),
-            pp1: Some(pp1_energy as u64),
-            dram: Some(dram_energy as u64),
+            pkg: Some(pkg_energy),
+            pp0: Some(pp0_energy),
+            pp1: Some(pp1_energy),
+            dram: Some(dram_energy),
         })
     }
 }
@@ -316,12 +285,12 @@ impl MSR for AMDMSR {
     }
 
     fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
-        let pkg_energy: u64 = Self::read_msr(msr_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
+        let pkg_energy = Self::read_msr(msr_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
         let pp0_energy = Self::read_msr(msr_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
 
         Ok(CPUValues {
-            pkg: Some(pkg_energy as u64),
-            pp0: Some(pp0_energy as u64),
+            pkg: Some(pkg_energy),
+            pp0: Some(pp0_energy),
             pp1: None,
             dram: None,
         })

@@ -1,17 +1,14 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
-use common::{
-    CPUData, EnergyUJ, SensorData,
-    types::{CpuInfo, InitialInfo},
-};
+use common::types::{CpuInfo, InitialInfo};
 use sysinfo::System;
 
 use super::{Sensor, SensorError, SensorType};
+use crate::database::{CPUData, SensorData};
 
 mod estimation;
 #[cfg(target_os = "linux")]
 mod linux_cpu;
-
 #[cfg(target_os = "windows")]
 pub mod windows_cpu;
 
@@ -50,7 +47,7 @@ impl CPUSensor {
 }
 
 impl Sensor for CPUSensor {
-    fn read_full_data(&self) -> Result<SensorData<EnergyUJ>, SensorError> {
+    fn read_full_data(&self) -> Result<SensorData, SensorError> {
         // Get CPU usage first (needed for estimation, always populated)
         let usage_percent = {
             let mut sys = self
@@ -67,10 +64,10 @@ impl Sensor for CPUSensor {
             #[cfg(target_os = "linux")]
             CPUOS::LinuxRAPL(sensor) => sensor.read_full_data()?,
             CPUOS::Estimation(sensor) => SensorData::CPU(CPUData {
-                total_consumption: Some(sensor.estimate(usage_percent)),
-                pp0_consumption: None,
-                pp1_consumption: None,
-                dram_consumption: None,
+                total_energy: Some(sensor.estimate(usage_percent)),
+                pp0_energy: None,
+                pp1_energy: None,
+                dram_energy: None,
                 usage_percent: None,
             }),
         };
@@ -170,7 +167,10 @@ pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result
     let cpu = s.cpus().get(index).ok_or(SensorError::NotSupported)?;
     let cpu_name = cpu.brand().to_string();
     #[cfg(target_os = "windows")]
-    let vendor_id = cpu.vendor_id().to_string();
+    let vendor_id = {
+        windows_cpu::setup();
+        cpu.vendor_id().to_string()
+    };
     drop(s);
 
     // Try platform-specific sensor first, fall back to TDP estimation
