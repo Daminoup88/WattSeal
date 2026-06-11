@@ -13,7 +13,7 @@ mod linux_cpu;
 pub mod windows_cpu;
 
 use estimation::EstimationCPUSensor;
-pub use estimation::estimate_igpu_power;
+pub use estimation::estimate_igpu_energy;
 #[cfg(target_os = "linux")]
 use linux_cpu::LinuxCPUSensor;
 #[cfg(target_os = "windows")]
@@ -64,10 +64,10 @@ impl Sensor for CPUSensor {
             #[cfg(target_os = "linux")]
             CPUOS::LinuxRAPL(sensor) => sensor.read_full_data()?,
             CPUOS::Estimation(sensor) => SensorData::CPU(CPUData {
-                total_power_watts: Some(sensor.estimate(usage_percent)),
-                pp0_power_watts: None,
-                pp1_power_watts: None,
-                dram_power_watts: None,
+                total_energy: Some(sensor.estimate(usage_percent)),
+                pp0_energy: None,
+                pp1_energy: None,
+                dram_energy: None,
                 usage_percent: None,
             }),
         };
@@ -167,7 +167,10 @@ pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result
     let cpu = s.cpus().get(index).ok_or(SensorError::NotSupported)?;
     let cpu_name = cpu.brand().to_string();
     #[cfg(target_os = "windows")]
-    let vendor_id = cpu.vendor_id().to_string();
+    let vendor_id = {
+        windows_cpu::setup();
+        cpu.vendor_id().to_string()
+    };
     drop(s);
 
     // Try platform-specific sensor first, fall back to TDP estimation

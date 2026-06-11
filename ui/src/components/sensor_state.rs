@@ -7,9 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DatabaseEntry, DiskData, IconData, MetricType, NetworkData, ProcessData, RamData, SecondaryValues, SensorData,
-    TotalData,
-    utils::{bytes_to_mb, load_icon_and_name},
+    DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData, SecondaryValues,
+    SensorData, TotalData, database::LIVE_SAMPLING_PERIOD_SECONDS, utils::load_icon_and_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
@@ -74,7 +73,7 @@ impl PowerChartState {
     }
 
     fn init_power_series(&mut self, display_name: &str, language: AppLanguage) {
-        let metric_type = MetricType::default();
+        let metric_type = MetricKind::default();
         self.chart.set_y_axis_unit(metric_type.unit());
         let key = metric_type.legend(display_name);
         let display = metric_type_name(language, metric_type);
@@ -118,8 +117,8 @@ struct ComponentState {
     power_graph: PowerChartState,
     secondary_histories: Vec<HistoryRef>,
     _show_in_total: bool,
-    metric_type: MetricType,
-    pending_initial_metric: Option<MetricType>,
+    metric_type: MetricKind,
+    pending_initial_metric: Option<MetricKind>,
 }
 
 impl ComponentState {
@@ -131,7 +130,7 @@ impl ComponentState {
             power_graph,
             secondary_histories: Vec::new(),
             _show_in_total: true,
-            metric_type: MetricType::default(),
+            metric_type: MetricKind::default(),
             pending_initial_metric: initial_metric_for_table(table_name),
         }
     }
@@ -142,9 +141,10 @@ impl ComponentState {
         }
     }
 
-    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
-        if let Some(power) = data.total_power_watts() {
-            self.power_graph.append_power(timestamp, power as f32);
+    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+        if let Some(energy) = data.total_energy() {
+            self.power_graph
+                .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
         }
         if let Some(secondary_values) = data.secondary_values() {
             self.extend_secondary_histories(secondary_values.values.len());
@@ -182,7 +182,7 @@ impl ComponentState {
 
     fn update_metric_type(
         &mut self,
-        metric_type: MetricType,
+        metric_type: MetricKind,
         display_name: &str,
         language: AppLanguage,
         secondary_values: Option<SecondaryValues>,
@@ -194,7 +194,7 @@ impl ComponentState {
             .chart
             .set_y_axis_unit(metric_type.effective_unit(energy_mode));
         match metric_type {
-            MetricType::Power => {
+            MetricKind::Power => {
                 let key = metric_type.legend(display_name);
                 let display = metric_type_name(language, metric_type);
                 self.power_graph.chart.add_series(
@@ -228,8 +228,8 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&SensorData>) -> Vec<MetricType> {
-        let mut metrics = vec![MetricType::default()];
+    fn available_metrics(&self, latest: Option<&SensorData>) -> Vec<MetricKind> {
+        let mut metrics = vec![MetricKind::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
             metrics.push(secondary_values.metric_type);
         }
@@ -288,9 +288,10 @@ impl TotalState {
         }
     }
 
-    fn append(&self, timestamp: DateTime<Local>, data: &SensorData) {
-        if let Some(power) = data.total_power_watts() {
-            self.power_graph.append_power(timestamp, power as f32);
+    fn append(&self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+        if let Some(energy) = data.total_energy() {
+            self.power_graph
+                .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
         }
     }
 
@@ -460,10 +461,10 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
-                if s.metric_type == MetricType::Power {
+                if s.metric_type == MetricKind::Power {
                     s.power_graph
                         .chart
-                        .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                        .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
                     s.power_graph
                         .chart
                         .set_all_display_labels(power_or_energy(self.language, energy_mode));
@@ -473,7 +474,7 @@ impl SensorState {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
                 s.power_graph
                     .chart
-                    .set_y_axis_unit(MetricType::Power.effective_unit(energy_mode));
+                    .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
                 s.power_graph.chart.set_all_line_types(line_type);
                 s.power_graph
                     .chart
@@ -497,7 +498,7 @@ impl SensorState {
     }
 
     /// Switches the displayed metric (power, usage, or speed).
-    pub fn set_metric_type(&mut self, metric_type: MetricType) {
+    pub fn set_metric_type(&mut self, metric_type: MetricKind) {
         if let SensorCategory::Component(state) = &mut self.sensor_category {
             let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
             state.update_metric_type(
@@ -523,14 +524,14 @@ impl SensorState {
             match &mut self.sensor_category {
                 SensorCategory::Component(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data);
+                        state.append(timestamp, data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
                 }
                 SensorCategory::Total(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data);
+                        state.append(timestamp, data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
@@ -544,8 +545,8 @@ impl SensorState {
     pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         match &mut self.sensor_category {
-            SensorCategory::Component(state) => state.append(timestamp, data),
-            SensorCategory::Total(state) => state.append(timestamp, data),
+            SensorCategory::Component(state) => state.append(timestamp, data, &self.time_range),
+            SensorCategory::Total(state) => state.append(timestamp, data, &self.time_range),
             SensorCategory::Processes(_) => {}
         }
     }
@@ -837,7 +838,11 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!("{:.1}{}", p.process_power_watts, unit_str),
+                        format!(
+                            "{:.1}{}",
+                            process_power_or_energy(p.process_energy, &self.time_range),
+                            unit_str
+                        ),
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_POWER_WIDTH),
@@ -865,14 +870,14 @@ impl SensorState {
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", bytes_to_mb(p.read_bytes_per_sec)),
+                        format!("{:.1}MB/s", p.read_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_DISK_READ_WIDTH),
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", bytes_to_mb(p.written_bytes_per_sec)),
+                        format!("{:.1}MB/s", p.written_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Tertiary,
                         Length::Fixed(PROCESS_DISK_WRITE_WIDTH),
@@ -905,7 +910,11 @@ impl SensorState {
         height: f32,
         show_secondary: bool,
     ) -> Element<'b, Message, AppTheme> {
-        let power = self.latest_reading.as_ref().and_then(|d| d.total_power_watts());
+        let power = self
+            .latest_reading
+            .as_ref()
+            .and_then(|d| d.total_energy())
+            .map(|energy| energy.as_watts_for_seconds(LIVE_SAMPLING_PERIOD_SECONDS as f64));
 
         match &self.sensor_category {
             SensorCategory::Component(state) => {
@@ -960,6 +969,22 @@ fn process_icon_cell(cached_handle: Option<image::Handle>) -> Element<'static, M
         .into()
 }
 
+fn chart_power_or_energy(energy: EnergyUj, time_range: &TimeRange) -> f64 {
+    if time_range.is_energy_mode() {
+        energy.as_watts_for_seconds(1.0) * time_range.power_scale_factor()
+    } else {
+        energy.as_watts_for_seconds(1.0)
+    }
+}
+
+fn process_power_or_energy(energy: EnergyUj, time_range: &TimeRange) -> f64 {
+    if time_range.is_energy_mode() {
+        energy.as_watt_hours()
+    } else {
+        energy.as_watts_for_seconds(time_range.seconds() as f64)
+    }
+}
+
 fn process_identity(process: &ProcessData) -> String {
     process
         .process_exe_path
@@ -976,11 +1001,11 @@ fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
     }
 }
 
-fn initial_metric_for_table(table_name: &str) -> Option<MetricType> {
+fn initial_metric_for_table(table_name: &str) -> Option<MetricKind> {
     if table_name == RamData::table_name_static() {
-        Some(MetricType::Usage)
+        Some(MetricKind::Usage)
     } else if table_name == DiskData::table_name_static() || table_name == NetworkData::table_name_static() {
-        Some(MetricType::Speed)
+        Some(MetricKind::Speed)
     } else {
         None
     }

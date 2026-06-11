@@ -33,9 +33,13 @@ impl GPUVendor {
 /// Returns the list of GPU adapter names detected on this system.
 #[cfg(target_os = "windows")]
 pub fn get_gpu_list() -> Vec<String> {
+    use std::collections::HashSet;
+
     use windows::Win32::Graphics::Dxgi::*;
 
     let mut list = Vec::new();
+    // Use a HashSet to track the unique identifiers of the GPUs we've seen
+    let mut seen_luids: HashSet<u64> = HashSet::new();
 
     unsafe {
         let factory: IDXGIFactory1 = match CreateDXGIFactory1() {
@@ -51,6 +55,13 @@ pub fn get_gpu_list() -> Vec<String> {
             };
 
             if let Ok(desc) = adapter.GetDesc1() {
+                let luid_u64 = ((desc.AdapterLuid.HighPart as u64) << 32) | (desc.AdapterLuid.LowPart as u64);
+
+                if !seen_luids.insert(luid_u64) {
+                    i += 1;
+                    continue;
+                }
+
                 let name = String::from_utf16_lossy(
                     &desc
                         .Description
@@ -94,7 +105,7 @@ pub fn get_gpu_list() -> Vec<String> {
     Vec::new()
 }
 
-/// Platform-specific GPU power sensor.
+/// Platform-specific GPU energy sensor.
 pub enum GPUSensor {
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     Nvidia(nvidia_gpu::NvidiaGPUSensor),
@@ -127,8 +138,8 @@ impl Sensor for GPUSensor {
     }
 }
 
-/// Creates a GPU power sensor appropriate for the given vendor.
-pub fn get_gpu_power_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
+/// Creates a GPU energy sensor appropriate for the given vendor.
+pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
 
     #[cfg(target_os = "windows")]
@@ -184,14 +195,19 @@ impl GPUSensor {
 
 #[cfg(target_os = "windows")]
 mod amd_gpu {
-    use adlx::{gpu_metrics::GpuMetrics, helper::AdlxHelper};
+    use std::{cell::RefCell, time::Instant};
+
+    use adlx::{Gpu, helper::AdlxHelper, performance_monitoring_services::PerformanceMonitoringServices};
+    use common::types::EnergyUj;
 
     use super::{Sensor, SensorError};
     use crate::database::{GPUData, SensorData};
 
     pub struct AmdGPUSensor {
         _helper: AdlxHelper,
-        gpu_metrics: GpuMetrics,
+        perfo: PerformanceMonitoringServices,
+        gpu: Gpu,
+        last_reading: RefCell<Instant>,
     }
 
     impl AmdGPUSensor {
@@ -202,40 +218,43 @@ mod amd_gpu {
                 .performance_monitoring_services()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
             let gpu_list = system.gpus().map_err(|e| SensorError::ReadError(e.to_string()))?;
-
             let gpu = gpu_list.at(index).map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let gpu_metrics = perfo
-                .current_gpu_metrics(&gpu)
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             Ok(AmdGPUSensor {
                 _helper: helper,
-                gpu_metrics,
+                perfo,
+                gpu,
+                last_reading: RefCell::new(Instant::now()),
             })
         }
     }
 
     impl Sensor for AmdGPUSensor {
         fn read_full_data(&self) -> Result<SensorData, SensorError> {
-            // Read AMD GPU data here
-            let power_mw = self
-                .gpu_metrics
-                .power()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let usage = self
-                .gpu_metrics
-                .usage()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let memory = self
-                .gpu_metrics
-                .vram()
+            let now = Instant::now();
+            let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+            let gpu_metrics = self
+                .perfo
+                .current_gpu_metrics(&self.gpu)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
+            // Read AMD GPU data here
+            let power_w = gpu_metrics
+                .total_board_power()
+                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+
+            let energy_j = power_w * duration;
+
+            let usage = gpu_metrics.usage().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let memory = gpu_metrics.vram().map_err(|e| SensorError::ReadError(e.to_string()))?;
+
             let data = GPUData {
-                total_power_watts: Some(power_mw as f64 / 1000.0),
+                total_energy: Some(EnergyUj::from_joules(energy_j)),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: Some(memory as f64),
             };
+
+            *self.last_reading.borrow_mut() = now;
 
             Ok(data.into())
         }
@@ -246,6 +265,7 @@ mod amd_gpu {
 mod nvidia_gpu {
     use std::{cell::RefCell, collections::HashMap};
 
+    use common::types::EnergyUj;
     use nvml_wrapper::Nvml;
 
     use super::{Sensor, SensorError};
@@ -255,6 +275,7 @@ mod nvidia_gpu {
         nvml: Nvml,
         device_index: u32,
         last_timestamp: RefCell<u64>,
+        last_energy_mj: RefCell<u64>,
     }
 
     impl NvidiaGPUSensor {
@@ -292,6 +313,7 @@ mod nvidia_gpu {
                 nvml,
                 device_index: index,
                 last_timestamp: RefCell::new(0),
+                last_energy_mj: RefCell::new(0),
             })
         }
 
@@ -333,15 +355,28 @@ mod nvidia_gpu {
                 .nvml
                 .device_by_index(self.device_index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let power_usage_mw = device
-                .power_usage()
+            let current_energy_mj = device
+                .total_energy_consumption()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let mut last_energy_mj = self
+                .last_energy_mj
+                .try_borrow_mut()
+                .map_err(|_| SensorError::ReadError("Failed to borrow last_energy".to_string()))?;
+
+            let energy_mj = if *last_energy_mj == 0 {
+                0
+            } else {
+                current_energy_mj.saturating_sub(*last_energy_mj)
+            };
+
+            *last_energy_mj = current_energy_mj;
+
             let utilization = device
                 .utilization_rates()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             let data = GPUData {
-                total_power_watts: Some(power_usage_mw as f64 / 1000.0),
+                total_energy: Some(EnergyUj::from_millijoules(energy_mj)),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
             };
@@ -421,7 +456,7 @@ mod intel_gpu {
                     != PDH_MORE_DATA
                 {
                     return Ok(GPUData {
-                        total_power_watts: None,
+                        total_energy: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                     }
@@ -431,7 +466,7 @@ mod intel_gpu {
                 let items = buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
                 if PdhGetFormattedCounterArrayW(self.counter, PDH_FMT_DOUBLE, &mut size, &mut count, Some(items)) != 0 {
                     return Ok(GPUData {
-                        total_power_watts: None,
+                        total_energy: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                     }
@@ -446,7 +481,7 @@ mod intel_gpu {
                     })
                     .fold(0.0f64, f64::max);
                 Ok(GPUData {
-                    total_power_watts: None,
+                    total_energy: None,
                     usage_percent: Some(max.clamp(0.0, 100.0)),
                     vram_usage_percent: None,
                 }

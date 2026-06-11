@@ -1,4 +1,4 @@
-use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricType, NetworkData, ProcessData, RamData, TotalData};
+use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData, ProcessData, RamData, TotalData};
 
 use crate::types::{AppLanguage, TimeRange};
 
@@ -69,6 +69,24 @@ pub fn current_power_consumption(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Current power consumption",
         AppLanguage::French => "Consommation actuelle",
+    }
+}
+
+pub fn database_migrating_title(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Preparing database",
+        AppLanguage::French => "Préparation de la base de données",
+    }
+}
+
+pub fn database_migrating_description(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => {
+            "WattSeal is waiting for the collector to finish migrating the database. Retrying every second…"
+        }
+        AppLanguage::French => {
+            "WattSeal attend que le collecteur termine la migration de la base de données. Nouvel essai chaque seconde…"
+        }
     }
 }
 
@@ -532,11 +550,11 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn metric_type_name(language: AppLanguage, metric: MetricType) -> &'static str {
+pub fn metric_type_name(language: AppLanguage, metric: MetricKind) -> &'static str {
     match metric {
-        MetricType::Power => metric_power(language),
-        MetricType::Usage => metric_usage(language),
-        MetricType::Speed => metric_speed(language),
+        MetricKind::Power => metric_power(language),
+        MetricKind::Usage => metric_usage(language),
+        MetricKind::Speed => metric_speed(language),
     }
 }
 
@@ -1110,12 +1128,12 @@ impl std::fmt::Display for TranslatedTimeRange {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslatedMetricType {
-    pub metric: MetricType,
+    pub metric: MetricKind,
     language: AppLanguage,
 }
 
 impl TranslatedMetricType {
-    pub fn new(metric: MetricType, language: AppLanguage) -> Self {
+    pub fn new(metric: MetricKind, language: AppLanguage) -> Self {
         Self { metric, language }
     }
 }

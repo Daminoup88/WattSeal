@@ -18,8 +18,9 @@ macro_rules! clog {
 pub use database::{DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table};
 pub use singleton::SingletonGuard;
 pub use types::{
-    AllTimeData, CPUData, DiskData, Event, GPUData, GeneralData, HardwareInfo, IconData, LabeledValue, MetricType,
-    NetworkData, ProcessData, RamData, SecondaryValues, SensorData, TotalData,
+    AllTimeData, CPUData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, IconData, LabeledValue,
+    MICROJOULES_PER_JOULE, MetricKind, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR, SecondaryValues,
+    SensorData, TotalData,
 };
 pub use utils::set_current_dir_to_exe_dir;
 

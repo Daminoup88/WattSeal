@@ -9,7 +9,7 @@ use std::{
 };
 
 use bpaf::{OptionParser, Parser, construct, long, short};
-use collector::{CollectorApp, MQTTInfos};
+use collector::{CollectorApp, ConsumptionUnit, MQTTInfo};
 use common::WINDOW_ICON_BYTES;
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
@@ -31,6 +31,7 @@ struct Options {
     headless_mode: bool,
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
+    mqtt_unit: Option<ConsumptionUnit>,
     db_mode: bool,
     #[cfg(target_os = "windows")]
     install_cpu_driver: bool,
@@ -67,6 +68,20 @@ fn options() -> OptionParser<Options> {
         .argument::<SocketAddr>("ADDRESS")
         .optional();
 
+    let mqtt_unit = long("mqtt-unit")
+        .help(
+            "Unit for collector consumption values published via MQTT. \
+       One of: uj (microjoules), wh (watt-hours). \
+       If omitted, returns raw collector values with their original unit (uj).",
+        )
+        .argument::<String>("UNIT")
+        .parse(|s| match s.as_str() {
+            "uj" => Ok(ConsumptionUnit::UJoul),
+            "wh" => Ok(ConsumptionUnit::WattHour),
+            other => Err(format!("Unknown returns unit '{}' for MQTT: expected uj or wh.", other)),
+        })
+        .optional();
+
     let db_mode = long("no-db")
         .help("Do not save sensors metrics in local database.")
         .flag(false, true);
@@ -89,6 +104,7 @@ fn options() -> OptionParser<Options> {
             headless_mode,
             mqtt_id,
             mqtt_addr,
+            mqtt_unit,
             db_mode,
             install_cpu_driver,
             uninstall_cpu_driver,
@@ -105,6 +121,7 @@ fn options() -> OptionParser<Options> {
             headless_mode,
             mqtt_id,
             mqtt_addr,
+            mqtt_unit,
             db_mode,
         })
         .to_options()
@@ -237,7 +254,7 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfos>) -> Result<CollectorApp, String> {
+fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfo>) -> Result<CollectorApp, String> {
     let mut app =
         CollectorApp::new(enable_save_db, mqtt_infos).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
@@ -306,7 +323,8 @@ fn main() {
 
     let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
-        Some(MQTTInfos::new(&id, &mqtt_addr))
+        let unit = options.mqtt_unit;
+        Some(MQTTInfo::new(&id, &mqtt_addr, unit))
     } else {
         None
     };

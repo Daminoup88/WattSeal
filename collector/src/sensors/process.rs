@@ -1,17 +1,18 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
+use common::types::EnergyUj;
 use sysinfo::{Pid, Process, System};
 
 use crate::sensors::ProcessData;
 
-/// Collects the top-N processes ranked by estimated power consumption.
+/// Collects the top-N processes ranked by estimated energy consumption.
 pub fn get_processes(
     system: Rc<RefCell<System>>,
-    cpu_power: f64,
+    cpu_energy: EnergyUj,
     cpu_usage: f64,
-    gpu_power: f64,
+    gpu_energy: EnergyUj,
     gpu_usage: f64,
-    total_power: f64,
+    total_energy: EnergyUj,
     number_processes: usize,
     proc_gpu_usage: HashMap<u32, f64>,
 ) -> Vec<ProcessData> {
@@ -37,77 +38,81 @@ pub fn get_processes(
     let mut processes = extract_and_group_processes(
         sys.processes(),
         sys.total_memory(),
-        cpu_power,
+        cpu_energy,
         cpu_usage,
         nb_cores,
-        gpu_power,
+        gpu_energy,
         gpu_usage,
-        total_power,
+        total_energy,
         proc_gpu_usage,
     );
+
     processes.sort_by(|a, b| {
-        b.process_power_watts
-            .partial_cmp(&a.process_power_watts)
+        b.process_energy
+            .partial_cmp(&a.process_energy)
             .unwrap_or(std::cmp::Ordering::Equal)
     });
 
-    let top_apps = processes.into_iter().take(number_processes).collect();
-
-    return top_apps;
+    processes.into_iter().take(number_processes).collect()
 }
 
-/// Groups OS processes by app name and estimates per-app power.
+/// Groups OS processes by app name and estimates per-app energy.
 fn extract_and_group_processes(
     processes: &HashMap<Pid, Process>,
     total_memory: u64,
-    cpu_power: f64,
+    cpu_energy: EnergyUj,
     cpu_usage: f64,
     nb_cores: usize,
-    gpu_power: f64,
+    gpu_energy: EnergyUj,
     gpu_usage: f64,
-    total_power: f64,
+    total_energy: EnergyUj,
     proc_gpu_usage: HashMap<u32, f64>,
 ) -> Vec<ProcessData> {
     let mut grouped: HashMap<String, ProcessData> = HashMap::new();
 
+    let cpu_energy_f = cpu_energy.as_f64();
+    let gpu_energy_f = gpu_energy.as_f64();
+    let total_energy_f = total_energy.as_f64();
+    let total_compute_energy_f = cpu_energy_f + gpu_energy_f;
+
     for (pid, proc_) in processes {
         let name = proc_.name().to_str().unwrap_or("Other").to_string().to_lowercase();
-        let exe = proc_
-            .exe()
-            .and_then(|path| path.to_str().and_then(|str| Some(str.to_string())));
+        let exe = proc_.exe().and_then(|path| path.to_str().map(|s| s.to_string()));
         // CPU usage percentage for this process as it would appear in a task manager (normalized by number of cores)
         let process_cpu_usage = proc_.cpu_usage() as f64 / nb_cores as f64;
         let process_gpu_usage = proc_gpu_usage.get(&pid.as_u32());
         let mem = proc_.memory() as f64 / total_memory as f64 * 100.0;
         let disk = proc_.disk_usage();
 
-        let process_cpu_power = if cpu_usage > 0.0 {
-            process_cpu_usage / cpu_usage * cpu_power
+        let process_cpu_energy = if cpu_usage > 0.0 {
+            (process_cpu_usage / cpu_usage) * cpu_energy_f
         } else {
             0.0
         }
-        .min(cpu_power);
-        let process_gpu_power = match process_gpu_usage {
-            Some(process_gpu_usage) if gpu_usage > 0.0 => process_gpu_usage / gpu_usage * gpu_power,
+        .min(cpu_energy_f);
+
+        let process_gpu_energy = match process_gpu_usage {
+            Some(gpu_usage_pct) if gpu_usage > 0.0 => (gpu_usage_pct / gpu_usage) * gpu_energy_f,
             _ => 0.0,
         }
-        .min(gpu_power);
+        .min(gpu_energy_f);
 
-        // Estimate process power based on the ponderation of CPU and GPU usage compared to the TOTAL
-        let total_compute_power = cpu_power + gpu_power;
-        let process_power = if total_compute_power > 0.0 {
-            (process_cpu_power + process_gpu_power) / total_compute_power * total_power
+        // Estimate process energy based on the ponderation of CPU and GPU usage compared to the TOTAL
+        let process_energy_f = if total_compute_energy_f > 0.0 {
+            ((process_cpu_energy + process_gpu_energy) / total_compute_energy_f) * total_energy_f
         } else {
             0.0
         }
-        .min(total_power);
+        .min(total_energy_f);
+
+        let process_energy = EnergyUj::from_f64(process_energy_f);
 
         // Group by application name
-        let entry = grouped.entry(name.clone()).or_insert(ProcessData::default());
+        let entry = grouped.entry(name.clone()).or_insert_with(ProcessData::default);
         if entry.app_name.is_empty() {
             entry.app_name = name;
         }
-        entry.process_power_watts += process_power;
+        entry.process_energy += process_energy;
         entry.process_cpu_usage += process_cpu_usage;
         if let Some(gpu_usage) = process_gpu_usage {
             match entry.process_gpu_usage {
@@ -116,13 +121,13 @@ fn extract_and_group_processes(
             }
         }
         entry.process_mem_usage += mem;
-        entry.read_bytes_per_sec += disk.read_bytes as f64;
-        entry.written_bytes_per_sec += disk.written_bytes as f64;
+        entry.read_bytes += disk.read_bytes;
+        entry.written_bytes += disk.written_bytes;
         entry.subprocess_count += 1;
         if entry.process_exe_path.is_none() && exe.is_some() {
             entry.process_exe_path = exe;
         }
     }
 
-    return grouped.into_iter().map(|(_, data)| data).collect();
+    grouped.into_iter().map(|(_, data)| data).collect()
 }

@@ -1,6 +1,9 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, time::Instant};
 
-use common::types::{DiskInfo, InitialInfo};
+use common::{
+    EnergyUj,
+    types::{Byte, DiskInfo, InitialInfo},
+};
 use sysinfo::Disks;
 
 use crate::{
@@ -12,13 +15,14 @@ const SSD_IDLE_W: f64 = 0.05;
 const HDD_IDLE_W: f64 = 3.0;
 const UNKNOWN_IDLE_W: f64 = 0.3;
 
-const SSD_W_PER_MB_S: f64 = 0.015;
-const HDD_W_PER_MB_S: f64 = 0.035;
-const UNKNOWN_W_PER_MB_S: f64 = 0.02;
+const SSD_W_PER_MB: f64 = 0.015;
+const HDD_W_PER_MB: f64 = 0.035;
+const UNKNOWN_W_PER_MB: f64 = 0.02;
 
 /// Disk I/O sensor that estimates power from throughput.
 pub struct DiskSensor {
     disks: RefCell<Disks>,
+    last_reading: RefCell<Instant>,
 }
 
 impl DiskSensor {
@@ -26,15 +30,19 @@ impl DiskSensor {
     pub fn new() -> Self {
         Self {
             disks: RefCell::new(Disks::new_with_refreshed_list()),
+            last_reading: RefCell::new(Instant::now()),
         }
     }
 }
 
 impl Sensor for DiskSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
-        let mut read_speed = 0.0;
-        let mut write_speed = 0.0;
-        let mut total_power = 0.0;
+        let now = Instant::now();
+        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+
+        let mut read_bytes = 0;
+        let mut written_bytes = 0;
+        let mut total_energy_j = 0.0;
 
         let mut disks = self
             .disks
@@ -44,24 +52,29 @@ impl Sensor for DiskSensor {
 
         for disk in disks.iter() {
             let usage = disk.usage();
-            let rd_mb = usage.read_bytes as f64 / 1_048_576.0;
-            let wr_mb = usage.written_bytes as f64 / 1_048_576.0;
-            read_speed += rd_mb;
-            write_speed += wr_mb;
+            let rd_b = usage.read_bytes;
+            let wr_b = usage.written_bytes;
+            read_bytes += rd_b;
+            written_bytes += wr_b;
+            let rd_mb = rd_b as f64 / 1_048_576.0;
+            let wr_mb = wr_b as f64 / 1_048_576.0;
 
             let throughput = rd_mb + wr_mb;
             let (idle, per_mb) = match disk.kind() {
-                sysinfo::DiskKind::SSD => (SSD_IDLE_W, SSD_W_PER_MB_S),
-                sysinfo::DiskKind::HDD => (HDD_IDLE_W, HDD_W_PER_MB_S),
-                _ => (UNKNOWN_IDLE_W, UNKNOWN_W_PER_MB_S),
+                sysinfo::DiskKind::SSD => (SSD_IDLE_W, SSD_W_PER_MB),
+                sysinfo::DiskKind::HDD => (HDD_IDLE_W, HDD_W_PER_MB),
+                _ => (UNKNOWN_IDLE_W, UNKNOWN_W_PER_MB),
             };
-            total_power += idle + throughput * per_mb;
+            let power = idle + throughput * per_mb;
+            total_energy_j += power * duration;
         }
 
+        *self.last_reading.borrow_mut() = now;
+
         Ok(SensorData::Disk(DiskData {
-            total_power_watts: Some(total_power),
-            read_usage_mb_s: read_speed,
-            write_usage_mb_s: write_speed,
+            total_energy: Some(EnergyUj::from_joules(total_energy_j)),
+            read_bytes: Byte::from(read_bytes),
+            written_bytes: Byte::from(written_bytes),
         }))
     }
 

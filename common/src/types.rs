@@ -1,8 +1,15 @@
 use std::{collections::HashMap, fmt::Display, time::SystemTime};
 
+use rusqlite::{
+    ToSql,
+    types::{FromSql, FromSqlError, FromSqlResult, ToSqlOutput, ValueRef},
+};
 use serde::{Deserialize, Serialize};
 
 use crate::DatabaseEntry;
+
+pub const MICROJOULES_PER_JOULE: f64 = 1_000_000.0;
+pub const SECONDS_PER_HOUR: f64 = 3600.0;
 
 /// Timestamped collection of sensor readings.
 #[derive(Debug, Clone)]
@@ -33,51 +40,226 @@ impl Event {
     }
 }
 
-/// Cumulative per-component energy totals.
-#[derive(Debug, Clone, Default)]
-pub struct AllTimeData {
-    pub components: HashMap<String, f64>,
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+pub struct EnergyUj(u64);
+
+impl std::fmt::Display for EnergyUj {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} µJ", self.0)
+    }
 }
 
-/// CPU power and usage readings.
+impl EnergyUj {
+    pub fn from_joules(joules: f64) -> Self {
+        EnergyUj((joules * MICROJOULES_PER_JOULE) as u64)
+    }
+
+    pub fn from_millijoules(mj: u64) -> Self {
+        EnergyUj(mj * 1_000)
+    }
+
+    pub fn as_f64(&self) -> f64 {
+        self.0 as f64
+    }
+
+    pub fn as_joules(&self) -> f64 {
+        self.as_f64() / MICROJOULES_PER_JOULE
+    }
+
+    pub fn as_watts_for_seconds(&self, seconds: f64) -> f64 {
+        if seconds <= 0.0 {
+            0.0
+        } else {
+            self.as_joules() / seconds
+        }
+    }
+
+    pub fn as_watt_hours(&self) -> f64 {
+        self.as_joules() / SECONDS_PER_HOUR
+    }
+
+    pub fn scale_by(self, factor: f64) -> Self {
+        if !factor.is_finite() || factor <= 0.0 {
+            EnergyUj(0)
+        } else {
+            EnergyUj::from_f64(self.as_f64() * factor)
+        }
+    }
+
+    pub fn from_f64(value: f64) -> Self {
+        EnergyUj(value.max(0.0) as u64)
+    }
+
+    pub fn from_u64(value: u64) -> Self {
+        EnergyUj(value)
+    }
+
+    pub fn to_wh(self) -> EnergyWh {
+        EnergyWh(self.as_watt_hours())
+    }
+}
+
+impl ToSql for EnergyUj {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0 as i64))
+    }
+}
+
+impl FromSql for EnergyUj {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value
+            .as_i64()
+            .map(|v| EnergyUj(v as u64))
+            .map_err(|e| FromSqlError::Other(Box::new(e)))
+    }
+}
+
+impl std::ops::AddAssign for EnergyUj {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 = self.0.saturating_add(rhs.0);
+    }
+}
+
+impl std::ops::SubAssign for EnergyUj {
+    fn sub_assign(&mut self, rhs: Self) {
+        self.0 = self.0.saturating_sub(rhs.0);
+    }
+}
+
+impl PartialEq<f64> for EnergyUj {
+    fn eq(&self, other: &f64) -> bool {
+        self.as_f64() == *other
+    }
+}
+
+impl PartialOrd<f64> for EnergyUj {
+    fn partial_cmp(&self, other: &f64) -> Option<std::cmp::Ordering> {
+        self.as_f64().partial_cmp(other)
+    }
+}
+
+impl std::ops::Mul<f64> for EnergyUj {
+    type Output = Self;
+
+    fn mul(self, rhs: f64) -> Self::Output {
+        self.scale_by(rhs)
+    }
+}
+
+impl std::ops::MulAssign<f64> for EnergyUj {
+    fn mul_assign(&mut self, rhs: f64) {
+        *self = self.scale_by(rhs);
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+pub struct EnergyWh(f64);
+
+impl std::fmt::Display for EnergyWh {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:.3} Wh", self.0)
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq)]
+pub struct PowerW(f64);
+
+//byte unit
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+pub struct Byte(u64);
+
+impl Byte {
+    pub fn as_f64(&self) -> f64 {
+        self.0 as f64
+    }
+
+    pub fn as_mb(&self) -> f64 {
+        self.as_f64() / 1_000_000.0
+    }
+
+    pub fn from(value: u64) -> Self {
+        Byte(value)
+    }
+}
+
+impl std::fmt::Display for Byte {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} B", self.0)
+    }
+}
+
+impl std::ops::AddAssign for Byte {
+    fn add_assign(&mut self, rhs: Self) {
+        self.0 = self.0.saturating_add(rhs.0);
+    }
+}
+
+impl std::ops::AddAssign<u64> for Byte {
+    fn add_assign(&mut self, rhs: u64) {
+        self.0 = self.0.saturating_add(rhs);
+    }
+}
+
+impl ToSql for Byte {
+    fn to_sql(&self) -> rusqlite::Result<ToSqlOutput<'_>> {
+        Ok(ToSqlOutput::from(self.0 as i64))
+    }
+}
+
+impl FromSql for Byte {
+    fn column_result(value: ValueRef<'_>) -> FromSqlResult<Self> {
+        value
+            .as_i64()
+            .map(|v| Byte(v as u64))
+            .map_err(|e| FromSqlError::Other(Box::new(e)))
+    }
+}
+
+/// Cumulative per-component energy totals.
+#[derive(Debug, Clone, Default)]
+pub struct AllTimeData<E = EnergyUj> {
+    pub components: HashMap<String, E>,
+}
+
+/// CPU energy and usage readings.
 #[derive(Debug, Clone, Serialize)]
-pub struct CPUData {
-    pub total_power_watts: Option<f64>,
-    pub pp0_power_watts: Option<f64>,
-    pub pp1_power_watts: Option<f64>,
-    pub dram_power_watts: Option<f64>,
+pub struct CPUData<E = EnergyUj> {
+    pub total_energy: Option<E>,
+    pub pp0_energy: Option<E>,
+    pub pp1_energy: Option<E>,
+    pub dram_energy: Option<E>,
     pub usage_percent: Option<f64>,
 }
 
-/// GPU power and usage readings.
+/// GPU energy and usage readings.
 #[derive(Debug, Clone, Serialize)]
-pub struct GPUData {
-    pub total_power_watts: Option<f64>,
+pub struct GPUData<E = EnergyUj> {
+    pub total_energy: Option<E>,
     pub usage_percent: Option<f64>,
     pub vram_usage_percent: Option<f64>,
 }
 
-/// RAM power and usage readings.
+/// RAM energy and usage readings.
 #[derive(Debug, Clone, Serialize)]
-pub struct RamData {
-    pub total_power_watts: Option<f64>,
+pub struct RamData<E = EnergyUj> {
+    pub total_energy: Option<E>,
     pub usage_percent: Option<f64>,
 }
 
-/// Disk power and I/O throughput readings.
+/// Disk energy and I/O throughput readings.
 #[derive(Debug, Clone, Serialize)]
-pub struct DiskData {
-    pub total_power_watts: Option<f64>,
-    pub read_usage_mb_s: f64,
-    pub write_usage_mb_s: f64,
+pub struct DiskData<E = EnergyUj> {
+    pub total_energy: Option<E>,
+    pub read_bytes: Byte,
+    pub written_bytes: Byte,
 }
 
-/// Network power and throughput readings.
+/// Network energy and throughput readings.
 #[derive(Debug, Clone, Serialize)]
-pub struct NetworkData {
-    pub total_power_watts: Option<f64>,
-    pub download_speed_mb_s: f64,
-    pub upload_speed_mb_s: f64,
+pub struct NetworkData<E = EnergyUj> {
+    pub total_energy: Option<E>,
+    pub downloaded_bytes: Byte,
+    pub uploaded_bytes: Byte,
 }
 
 /// Raw RGBA icon pixel data.
@@ -90,36 +272,35 @@ pub struct IconData {
 
 /// Per-application resource usage snapshot.
 #[derive(Debug, Clone, Serialize)]
-pub struct ProcessData {
+pub struct ProcessData<E = EnergyUj> {
     pub app_name: String,
     pub process_exe_path: Option<String>,
-    pub process_power_watts: f64,
+    pub process_energy: E,
     pub process_cpu_usage: f64,
     pub process_gpu_usage: Option<f64>,
     pub process_mem_usage: f64,
-    pub read_bytes_per_sec: f64,
-    pub written_bytes_per_sec: f64,
+    pub read_bytes: Byte,
+    pub written_bytes: Byte,
     pub subprocess_count: u32,
     pub icon: Option<IconData>,
 }
 
 /// Tagged union of all sensor reading types.
 #[derive(Debug, Clone, Serialize)]
-pub enum SensorData {
-    CPU(CPUData),
-    GPU(GPUData),
-    Ram(RamData),
-    Disk(DiskData),
-    Network(NetworkData),
-    Total(TotalData),
-    Process(Vec<ProcessData>),
+pub enum SensorData<E = EnergyUj> {
+    CPU(CPUData<E>),
+    GPU(GPUData<E>),
+    Ram(RamData<E>),
+    Disk(DiskData<E>),
+    Network(NetworkData<E>),
+    Total(TotalData<E>),
+    Process(Vec<ProcessData<E>>),
 }
 
-/// Aggregated total power across all components.
+/// Aggregated total energy across all components.
 #[derive(Debug, Clone, Serialize)]
-pub struct TotalData {
-    pub total_power_watts: f64,
-    pub period_type: String,
+pub struct TotalData<E = EnergyUj> {
+    pub total_energy: E,
 }
 
 /// Hardware information variant collected at startup.
@@ -257,39 +438,39 @@ pub struct BatteryInfo {
 
 /// Category of a sensor value (power, usage, or speed).
 #[derive(Default, PartialEq, Clone, Copy, Debug)]
-pub enum MetricType {
+pub enum MetricKind {
     #[default]
     Power,
     Usage,
     Speed,
 }
 
-impl Display for MetricType {
+impl Display for MetricKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            MetricType::Power => write!(f, "Power"),
-            MetricType::Usage => write!(f, "Usage"),
-            MetricType::Speed => write!(f, "Speed"),
+            MetricKind::Power => write!(f, "Power"),
+            MetricKind::Usage => write!(f, "Usage"),
+            MetricKind::Speed => write!(f, "Speed"),
         }
     }
 }
 
-impl MetricType {
+impl MetricKind {
     /// Returns the human-readable label.
     pub fn label(&self) -> &'static str {
         match self {
-            MetricType::Power => "Power",
-            MetricType::Usage => "Usage",
-            MetricType::Speed => "Speed",
+            MetricKind::Power => "Power",
+            MetricKind::Usage => "Usage",
+            MetricKind::Speed => "Speed",
         }
     }
 
     /// Returns the measurement unit string.
     pub fn unit(&self) -> &'static str {
         match self {
-            MetricType::Power => "W",
-            MetricType::Usage => "%",
-            MetricType::Speed => "MB/s",
+            MetricKind::Power => "W",
+            MetricKind::Usage => "%",
+            MetricKind::Speed => "MB/s",
         }
     }
 
@@ -300,7 +481,7 @@ impl MetricType {
 
     /// Returns the display unit, swapping W for Wh in energy mode.
     pub fn effective_unit(&self, energy_mode: bool) -> &'static str {
-        if *self == MetricType::Power && energy_mode {
+        if *self == MetricKind::Power && energy_mode {
             "Wh"
         } else {
             self.unit()
@@ -318,12 +499,12 @@ pub struct LabeledValue {
 /// Collection of secondary metric values with their type.
 #[derive(Debug, Clone)]
 pub struct SecondaryValues {
-    pub metric_type: MetricType,
+    pub metric_type: MetricKind,
     pub values: Vec<LabeledValue>,
 }
 
 impl SecondaryValues {
-    fn from_labeled_values(metric_type: MetricType, values: Vec<LabeledValue>) -> Self {
+    fn from_labeled_values(metric_type: MetricKind, values: Vec<LabeledValue>) -> Self {
         Self { metric_type, values }
     }
 
@@ -333,7 +514,7 @@ impl SecondaryValues {
     }
 
     /// Returns the metric type of these secondary values.
-    pub fn metric_type(&self) -> MetricType {
+    pub fn metric_type(&self) -> MetricKind {
         self.metric_type
     }
 }
@@ -382,32 +563,83 @@ impl SensorData {
         }
     }
 
-    /// Returns the total power in watts, if available.
-    pub fn total_power_watts(&self) -> Option<f64> {
+    /// Returns the total energy in µJ, if available.
+    pub fn total_energy(&self) -> Option<EnergyUj> {
         match self {
-            SensorData::CPU(data) => data.total_power_watts,
-            SensorData::GPU(data) => data.total_power_watts,
-            SensorData::Ram(data) => data.total_power_watts,
-            SensorData::Disk(data) => data.total_power_watts,
-            SensorData::Network(data) => data.total_power_watts,
-            SensorData::Total(power) => Some(power.total_power_watts),
+            SensorData::CPU(data) => data.total_energy,
+            SensorData::GPU(data) => data.total_energy,
+            SensorData::Ram(data) => data.total_energy,
+            SensorData::Disk(data) => data.total_energy,
+            SensorData::Network(data) => data.total_energy,
+            SensorData::Total(power) => Some(power.total_energy),
             SensorData::Process(_) => None,
         }
     }
 
-    /// Multiply all power fields by `factor`.
-    /// Used to convert average watts → Wh when switching to energy mode.
-    pub fn scale_power(&mut self, factor: f64) {
+    /// Converts the sensor to SensorData<EnergyWh> by converting energy values to watt-hours.
+    pub fn to_wh(&self) -> SensorData<EnergyWh> {
         match self {
-            SensorData::CPU(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
-            SensorData::GPU(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
-            SensorData::Ram(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
-            SensorData::Disk(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
-            SensorData::Network(d) => d.total_power_watts = d.total_power_watts.map(|w| w * factor),
-            SensorData::Total(d) => d.total_power_watts *= factor,
+            SensorData::CPU(data) => SensorData::CPU(CPUData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                pp0_energy: data.pp0_energy.map(|e| e.to_wh()),
+                pp1_energy: data.pp1_energy.map(|e| e.to_wh()),
+                dram_energy: data.dram_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+            }),
+            SensorData::GPU(data) => SensorData::GPU(GPUData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+                vram_usage_percent: data.vram_usage_percent,
+            }),
+            SensorData::Ram(data) => SensorData::Ram(RamData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+            }),
+            SensorData::Disk(data) => SensorData::Disk(DiskData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                read_bytes: data.read_bytes,
+                written_bytes: data.written_bytes,
+            }),
+            SensorData::Network(data) => SensorData::Network(NetworkData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                downloaded_bytes: data.downloaded_bytes,
+                uploaded_bytes: data.uploaded_bytes,
+            }),
+            SensorData::Total(total) => SensorData::Total(TotalData {
+                total_energy: total.total_energy.to_wh(),
+            }),
+            SensorData::Process(processes) => SensorData::Process(
+                processes
+                    .iter()
+                    .map(|p| ProcessData {
+                        app_name: p.app_name.clone(),
+                        process_exe_path: p.process_exe_path.clone(),
+                        process_energy: p.process_energy.to_wh(),
+                        process_cpu_usage: p.process_cpu_usage,
+                        process_gpu_usage: p.process_gpu_usage,
+                        process_mem_usage: p.process_mem_usage,
+                        read_bytes: p.read_bytes,
+                        written_bytes: p.written_bytes,
+                        subprocess_count: p.subprocess_count,
+                        icon: p.icon.clone(),
+                    })
+                    .collect(),
+            ),
+        }
+    }
+
+    /// Scales all energy fields by `factor`.
+    pub fn scale_energy(&mut self, factor: f64) {
+        match self {
+            SensorData::CPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            SensorData::GPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            SensorData::Ram(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            SensorData::Disk(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            SensorData::Network(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            SensorData::Total(d) => d.total_energy *= factor,
             SensorData::Process(procs) => {
                 for p in procs {
-                    p.process_power_watts *= factor;
+                    p.process_energy *= factor;
                 }
             }
         }
@@ -432,15 +664,15 @@ impl SensorData {
             SensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![
-                    LabeledValue::from_mb_s(Some(data.read_usage_mb_s), "Read"),
-                    LabeledValue::from_mb_s(Some(data.write_usage_mb_s), "Write"),
+                    LabeledValue::from_mb_s(Some(data.read_bytes.as_mb()), "Read"),
+                    LabeledValue::from_mb_s(Some(data.written_bytes.as_mb()), "Write"),
                 ],
             )),
             SensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![
-                    LabeledValue::from_mb_s(Some(data.download_speed_mb_s), "Download"),
-                    LabeledValue::from_mb_s(Some(data.upload_speed_mb_s), "Upload"),
+                    LabeledValue::from_mb_s(Some(data.downloaded_bytes.as_mb()), "Download"),
+                    LabeledValue::from_mb_s(Some(data.uploaded_bytes.as_mb()), "Upload"),
                 ],
             )),
             _ => None,
@@ -448,10 +680,10 @@ impl SensorData {
     }
 
     /// Returns the secondary metric type for this sensor variant.
-    pub fn secondary_metric(&self) -> Option<MetricType> {
+    pub fn secondary_metric(&self) -> Option<MetricKind> {
         match self {
-            SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricType::Usage),
-            SensorData::Disk(_) | SensorData::Network(_) => Some(MetricType::Speed),
+            SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricKind::Usage),
+            SensorData::Disk(_) | SensorData::Network(_) => Some(MetricKind::Speed),
             _ => None,
         }
     }
@@ -462,51 +694,47 @@ impl Display for SensorData {
         match self {
             SensorData::CPU(data) => {
                 writeln!(f, "CPU Data:")?;
-                writeln!(f, "  Power PKG:  {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Power PP0:  {:.3} W", data.pp0_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Power PP1:  {:.3} W", data.pp1_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Power DRAM: {:.3} W", data.dram_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Usage:      {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
+                writeln!(f, "  Energy PKG:  {}", data.total_energy.unwrap_or_default())?;
+                writeln!(f, "  Energy PP0:  {}", data.pp0_energy.unwrap_or_default())?;
+                writeln!(f, "  Energy PP1:  {}", data.pp1_energy.unwrap_or_default())?;
+                writeln!(f, "  Energy DRAM: {}", data.dram_energy.unwrap_or_default())?;
+                writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
             SensorData::GPU(data) => {
                 writeln!(f, "GPU Data:")?;
-                writeln!(f, "  Power:       {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
+                writeln!(f, "  Energy:      {}", data.total_energy.unwrap_or_default())?;
                 writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 writeln!(f, "  VRAM Usage:  {:.2} %", data.vram_usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
             SensorData::Ram(data) => {
                 writeln!(f, "RAM Data:")?;
-                writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, " Usage: {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
+                writeln!(f, "  Energy: {}", data.total_energy.unwrap_or_default())?;
+                writeln!(f, "  Usage:  {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
                 Ok(())
             }
             SensorData::Disk(data) => {
                 writeln!(f, "Disk Data:")?;
-                writeln!(f, "  Power: {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Read Speed:  {:.2} MB/s", data.read_usage_mb_s)?;
-                writeln!(f, "  Write Speed: {:.2} MB/s", data.write_usage_mb_s)?;
+                writeln!(f, "  Energy: {}", data.total_energy.unwrap_or_default())?;
+                writeln!(f, "  Read:   {:.2} MB", data.read_bytes.as_mb())?;
+                writeln!(f, "  Write:  {:.2} MB", data.written_bytes.as_mb())?;
                 Ok(())
             }
             SensorData::Network(data) => {
                 writeln!(f, "Network Data:")?;
-                writeln!(f, "  Power:        {:.3} W", data.total_power_watts.unwrap_or(-1.0))?;
-                writeln!(f, "  Download Speed: {:.2} MB/s", data.download_speed_mb_s)?;
-                writeln!(f, "  Upload Speed:   {:.2} MB/s", data.upload_speed_mb_s)?;
+                writeln!(f, "  Energy:   {}", data.total_energy.unwrap_or_default())?;
+                writeln!(f, "  Download: {:.2} MB", data.downloaded_bytes.as_mb())?;
+                writeln!(f, "  Upload:   {:.2} MB", data.uploaded_bytes.as_mb())?;
                 Ok(())
             }
-            SensorData::Total(total) => writeln!(
-                f,
-                "Total Power during 1 {}: {:.3} W",
-                total.period_type, total.total_power_watts
-            ),
+            SensorData::Total(total) => writeln!(f, "Total Energy: {}", total.total_energy),
             SensorData::Process(processes) => {
                 writeln!(f, "Top Processes by CPU Usage:")?;
                 writeln!(
                     f,
-                    "{:<30} {:>10} {:>10} {:>10} {:>10} {:>15} {:>15} {:>20}",
-                    "App Name", "CPU %", "GPU %", "Mem %", "Power W", "Read MB/s", "Write MB/s", "Subprocesses"
+                    "{:<30.30} {:>10} {:>10} {:>10} {:>16} {:>15} {:>15} {:>20}",
+                    "App Name", "CPU %", "GPU %", "Mem %", "Energy", "Read MB", "Write MB", "Subprocesses"
                 )?;
                 for process in processes {
                     write!(f, "{}", process)?;
@@ -519,16 +747,18 @@ impl Display for SensorData {
 
 impl Display for ProcessData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Force conversion for alignment
+        let energy_str = self.process_energy.to_string();
         writeln!(
             f,
-            "{:<30} {:>10.2} {:>10.2} {:>10.2} {:>10.3} {:>15.2} {:>15.2} {:>20}",
+            "{:<30.30} {:>10.2} {:>10.2} {:>10.2} {:>16} {:>15.2} {:>15.2} {:>20}",
             self.app_name,
             self.process_cpu_usage,
             self.process_gpu_usage.unwrap_or(0.0),
             self.process_mem_usage,
-            self.process_power_watts,
-            self.read_bytes_per_sec / 1_000_000.0,    // Convert to MB/s
-            self.written_bytes_per_sec / 1_000_000.0, // Convert to MB/s
+            energy_str,
+            self.read_bytes.as_mb(),
+            self.written_bytes.as_mb(),
             self.subprocess_count
         )?;
         Ok(())
@@ -571,17 +801,21 @@ impl From<NetworkData> for SensorData {
 
 impl From<ProcessData> for SensorData {
     fn from(data: ProcessData) -> Self {
-        SensorData::Process(vec![data])
+        if data.app_name.is_empty() {
+            SensorData::Process(Vec::new())
+        } else {
+            SensorData::Process(vec![data])
+        }
     }
 }
 
 impl Default for CPUData {
     fn default() -> Self {
         CPUData {
-            total_power_watts: Some(0.0),
-            pp0_power_watts: Some(0.0),
-            pp1_power_watts: Some(0.0),
-            dram_power_watts: Some(0.0),
+            total_energy: Some(EnergyUj(0)),
+            pp0_energy: Some(EnergyUj(0)),
+            pp1_energy: Some(EnergyUj(0)),
+            dram_energy: Some(EnergyUj(0)),
             usage_percent: Some(0.0),
         }
     }
@@ -590,7 +824,7 @@ impl Default for CPUData {
 impl Default for GPUData {
     fn default() -> Self {
         GPUData {
-            total_power_watts: Some(0.0),
+            total_energy: Some(EnergyUj(0)),
             usage_percent: Some(0.0),
             vram_usage_percent: Some(0.0),
         }
@@ -600,7 +834,7 @@ impl Default for GPUData {
 impl Default for RamData {
     fn default() -> Self {
         RamData {
-            total_power_watts: Some(0.0),
+            total_energy: Some(EnergyUj(0)),
             usage_percent: Some(0.0),
         }
     }
@@ -609,9 +843,9 @@ impl Default for RamData {
 impl Default for DiskData {
     fn default() -> Self {
         DiskData {
-            total_power_watts: Some(0.0),
-            read_usage_mb_s: 0.0,
-            write_usage_mb_s: 0.0,
+            total_energy: Some(EnergyUj(0)),
+            read_bytes: Byte(0),
+            written_bytes: Byte(0),
         }
     }
 }
@@ -619,9 +853,9 @@ impl Default for DiskData {
 impl Default for NetworkData {
     fn default() -> Self {
         NetworkData {
-            total_power_watts: Some(0.0),
-            download_speed_mb_s: 0.0,
-            upload_speed_mb_s: 0.0,
+            total_energy: Some(EnergyUj(0)),
+            downloaded_bytes: Byte(0),
+            uploaded_bytes: Byte(0),
         }
     }
 }
@@ -631,12 +865,12 @@ impl Default for ProcessData {
         ProcessData {
             app_name: String::new(),
             process_exe_path: None,
-            process_power_watts: 0.0,
+            process_energy: EnergyUj(0),
             process_cpu_usage: 0.0,
             process_gpu_usage: None,
             process_mem_usage: 0.0,
-            read_bytes_per_sec: 0.0,
-            written_bytes_per_sec: 0.0,
+            read_bytes: Byte(0),
+            written_bytes: Byte(0),
             subprocess_count: 0,
             icon: None,
         }
@@ -646,8 +880,7 @@ impl Default for ProcessData {
 impl Default for TotalData {
     fn default() -> Self {
         TotalData {
-            total_power_watts: 0.0,
-            period_type: "second".to_string(),
+            total_energy: EnergyUj(0),
         }
     }
 }

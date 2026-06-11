@@ -76,7 +76,8 @@ impl DashboardPage {
             sensors
                 .get(TotalData::table_name_static())
                 .and_then(|c| c.get_latest_reading())
-                .and_then(|data| data.total_power_watts())
+                .and_then(|data| data.total_energy())
+                .map(|energy| energy.as_watts_for_seconds(1.0))
                 .unwrap_or(0.0)
         );
 
@@ -107,6 +108,7 @@ impl DashboardPage {
             .components
             .get(TotalData::table_name_static())
             .copied()
+            .map(|energy| energy.as_watt_hours())
             .unwrap_or(0.0);
 
         let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
