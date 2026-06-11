@@ -127,9 +127,51 @@ impl Database {
     /// Opens the database, applies collector-owned migrations, and reads metadata.
     pub fn new() -> Result<Self, DatabaseError> {
         let mut conn = Self::open_connection()?;
-        Self::ensure_ui_settings_table(&conn)?;
-        migration::run_migrations(&mut conn)?;
+        let current_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
+
+        if current_version == 0 {
+            // Differentiate between a fresh DB and a version 0 DB
+            let timestamp_table_exists: bool = conn.query_row(
+                "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='timestamp')",
+                [],
+                |row| row.get(0),
+            )?;
+
+            if timestamp_table_exists {
+                // Legacy Version 0
+                migration::run_migrations(&mut conn)?;
+            } else {
+                // Fresh database
+                Self::create_base_tables(&conn)?;
+                conn.pragma_update(None, "user_version", DATABASE_TARGET_VERSION)?;
+            }
+        } else if current_version < DATABASE_TARGET_VERSION {
+            // Legacy versioned database
+            migration::run_migrations(&mut conn)?;
+        }
+
         Self::from_connection(conn)
+    }
+
+    fn create_base_tables(conn: &Connection) -> Result<(), DatabaseError> {
+        conn.execute_batch(
+            "CREATE TABLE IF NOT EXISTS timestamp (
+            id              INTEGER PRIMARY KEY,
+            timestamp       INTEGER NOT NULL,
+            sampling_period INTEGER NOT NULL
+         );
+         CREATE TABLE IF NOT EXISTS hardware_info (
+            id                 INTEGER PRIMARY KEY,
+            tables             TEXT,
+            hardware_data      TEXT
+         );
+         CREATE TABLE IF NOT EXISTS component_all_time_data (
+            id              INTEGER PRIMARY KEY,
+            component_name  TEXT UNIQUE NOT NULL,
+            total_energy_uj INTEGER NOT NULL DEFAULT 0
+         );",
+        )?;
+        Ok(())
     }
 
     /// Opens the database for the UI without running migrations.
@@ -143,10 +185,11 @@ impl Database {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        Self::create_settings_table_if_not_exists(&conn)?;
         Ok(conn)
     }
 
-    fn ensure_ui_settings_table(conn: &Connection) -> Result<(), DatabaseError> {
+    fn create_settings_table_if_not_exists(conn: &Connection) -> Result<(), DatabaseError> {
         conn.execute_batch(
             "CREATE TABLE IF NOT EXISTS ui_settings (
                 id               INTEGER PRIMARY KEY CHECK (id = 1),
@@ -187,32 +230,6 @@ impl Database {
     /// Creates sensor tables that don't already exist.
     pub fn create_tables_if_not_exists(&mut self, table_names: &[&str]) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS timestamp (
-                  id              INTEGER PRIMARY KEY,
-                  timestamp       INTEGER NOT NULL,
-                  sampling_period INTEGER NOT NULL
-                  )",
-            [],
-        )?;
-
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS hardware_info (
-                    id                 INTEGER PRIMARY KEY,
-                    tables             TEXT,
-                    hardware_data      TEXT
-            )",
-            [],
-        )?;
-
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS component_all_time_data (
-                    id              INTEGER PRIMARY KEY,
-                    component_name  TEXT UNIQUE NOT NULL,
-                    total_energy_uj INTEGER NOT NULL DEFAULT 0
-            )",
-            [],
-        )?;
 
         let mut current_tables = self.tables.clone().unwrap_or_default();
         let mut has_changed = false;
@@ -287,15 +304,6 @@ impl Database {
     /// Insert hardware info if line with id=1 doesn't exist, otherwise update it
     pub fn insert_hardware_info(&mut self, data: &GeneralData) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
-
-        tx.execute(
-            "CREATE TABLE IF NOT EXISTS hardware_info (
-                    id                 INTEGER PRIMARY KEY,
-                    tables             TEXT,
-                    hardware_data      TEXT
-            )",
-            [],
-        )?;
 
         let existing: Option<i64> = tx
             .query_row("SELECT id FROM hardware_info WHERE id = 1", [], |row| row.get(0))
