@@ -1,6 +1,6 @@
-use common::{DatabaseEntry, ProcessData};
+use common::DatabaseEntry;
 
-use super::{CPUData, DiskData, GPUData, NetworkData, RamData, TotalData};
+use super::{CPUData, DiskData, GPUData, NetworkData, RamData};
 use crate::sensors::SensorType;
 
 impl SensorType {
@@ -12,8 +12,6 @@ impl SensorType {
             SensorType::RAM(_) => RamData::table_name_static(),
             SensorType::Disk(_) => DiskData::table_name_static(),
             SensorType::Network(_) => NetworkData::table_name_static(),
-            SensorType::Total => TotalData::table_name_static(),
-            SensorType::Process => ProcessData::table_name_static(),
         }
     }
 }

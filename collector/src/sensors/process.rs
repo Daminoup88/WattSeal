@@ -109,23 +109,23 @@ fn extract_and_group_processes(
 
         // Group by application name
         let entry = grouped.entry(name.clone()).or_insert_with(ProcessData::default);
-        if entry.app_name.is_empty() {
-            entry.app_name = name;
+        if entry.measured.app_name.is_empty() {
+            entry.measured.app_name = name;
         }
         entry.process_energy += process_energy;
-        entry.process_cpu_usage += process_cpu_usage;
+        entry.measured.process_cpu_usage += process_cpu_usage;
         if let Some(gpu_usage) = process_gpu_usage {
-            match entry.process_gpu_usage {
-                Some(current_gpu_usage) => entry.process_gpu_usage = Some(current_gpu_usage + gpu_usage),
-                None => entry.process_gpu_usage = Some(*gpu_usage),
+            match entry.measured.process_gpu_usage {
+                Some(current_gpu_usage) => entry.measured.process_gpu_usage = Some(current_gpu_usage + gpu_usage),
+                None => entry.measured.process_gpu_usage = Some(*gpu_usage),
             }
         }
-        entry.process_mem_usage += mem;
-        entry.read_bytes += disk.read_bytes;
-        entry.written_bytes += disk.written_bytes;
+        entry.measured.process_mem_usage += mem;
+        entry.measured.read_bytes += disk.read_bytes;
+        entry.measured.written_bytes += disk.written_bytes;
         entry.subprocess_count += 1;
-        if entry.process_exe_path.is_none() && exe.is_some() {
-            entry.process_exe_path = exe;
+        if entry.measured.process_exe_path.is_none() && exe.is_some() {
+            entry.measured.process_exe_path = exe;
         }
     }
 

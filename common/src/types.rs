@@ -13,14 +13,14 @@ pub const SECONDS_PER_HOUR: f64 = 3600.0;
 
 /// Timestamped collection of sensor readings.
 #[derive(Debug, Clone)]
-pub struct Event {
+pub struct Event<T = SensorData> {
     time: SystemTime,
-    data: Vec<SensorData>,
+    data: Vec<T>,
 }
 
-impl Event {
+impl<T> Event<T> {
     /// Creates an event with the given timestamp and sensor data.
-    pub fn new(time: SystemTime, data: Vec<SensorData>) -> Self {
+    pub fn new(time: SystemTime, data: Vec<T>) -> Self {
         Event { time, data }
     }
 
@@ -30,17 +30,17 @@ impl Event {
     }
 
     /// Returns the list of sensor readings.
-    pub fn data(&self) -> &Vec<SensorData> {
+    pub fn data(&self) -> &Vec<T> {
         &self.data
     }
 
     /// Appends a sensor reading to this event.
-    pub fn push_data(&mut self, data: SensorData) {
+    pub fn push_data(&mut self, data: T) {
         self.data.push(data);
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct EnergyUj(u64);
 
 impl std::fmt::Display for EnergyUj {
@@ -152,7 +152,7 @@ impl std::ops::MulAssign<f64> for EnergyUj {
     }
 }
 
-#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
 pub struct EnergyWh(f64);
 
 impl std::fmt::Display for EnergyWh {
@@ -165,7 +165,7 @@ impl std::fmt::Display for EnergyWh {
 pub struct PowerW(f64);
 
 //byte unit
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Byte(u64);
 
 impl Byte {
@@ -222,7 +222,7 @@ pub struct AllTimeData<E = EnergyUj> {
 }
 
 /// CPU energy and usage readings.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CPUData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub pp0_energy: Option<E>,
@@ -232,7 +232,7 @@ pub struct CPUData<E = EnergyUj> {
 }
 
 /// GPU energy and usage readings.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GPUData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub usage_percent: Option<f64>,
@@ -240,14 +240,14 @@ pub struct GPUData<E = EnergyUj> {
 }
 
 /// RAM energy and usage readings.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RamData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub usage_percent: Option<f64>,
 }
 
 /// Disk energy and I/O throughput readings.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DiskData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub read_bytes: Byte,
@@ -255,7 +255,7 @@ pub struct DiskData<E = EnergyUj> {
 }
 
 /// Network energy and throughput readings.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct NetworkData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub downloaded_bytes: Byte,
@@ -263,31 +263,49 @@ pub struct NetworkData<E = EnergyUj> {
 }
 
 /// Raw RGBA icon pixel data.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IconData {
     pub width: u32,
     pub height: u32,
     pub pixels: Vec<u8>,
 }
 
-/// Per-application resource usage snapshot.
-#[derive(Debug, Clone, Serialize)]
-pub struct ProcessData<E = EnergyUj> {
+/// Measured process details (raw resource metrics).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MeasuredProcessData {
+    pub pid: Option<u32>,
     pub app_name: String,
     pub process_exe_path: Option<String>,
-    pub process_energy: E,
     pub process_cpu_usage: f64,
     pub process_gpu_usage: Option<f64>,
     pub process_mem_usage: f64,
     pub read_bytes: Byte,
     pub written_bytes: Byte,
+}
+
+/// Per-application resource usage snapshot.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProcessData<E = EnergyUj> {
+    pub measured: MeasuredProcessData,
+    pub process_energy: E,
     pub subprocess_count: u32,
     pub icon: Option<IconData>,
 }
 
-/// Tagged union of all sensor reading types.
-#[derive(Debug, Clone, Serialize)]
+/// Tagged union of all raw measured sensor reading types.
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SensorData<E = EnergyUj> {
+    CPU(CPUData<E>),
+    GPU(GPUData<E>),
+    Ram(RamData<E>),
+    Disk(DiskData<E>),
+    Network(NetworkData<E>),
+    Process(Vec<MeasuredProcessData>),
+}
+
+/// Tagged union of all sensor reading types.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ComputedSensorData<E = EnergyUj> {
     CPU(CPUData<E>),
     GPU(GPUData<E>),
     Ram(RamData<E>),
@@ -298,7 +316,7 @@ pub enum SensorData<E = EnergyUj> {
 }
 
 /// Aggregated total energy across all components.
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TotalData<E = EnergyUj> {
     pub total_energy: E,
 }
@@ -545,21 +563,7 @@ impl SensorData {
             SensorData::Ram(_) => "RAM",
             SensorData::Disk(_) => "Disk",
             SensorData::Network(_) => "Network",
-            SensorData::Total(_) => "Total",
             SensorData::Process(_) => "Processes",
-        }
-    }
-
-    /// Returns the database table name for this variant.
-    pub fn table_name(&self) -> &'static str {
-        match self {
-            SensorData::CPU(_) => CPUData::table_name_static(),
-            SensorData::GPU(_) => GPUData::table_name_static(),
-            SensorData::Total(_) => TotalData::table_name_static(),
-            SensorData::Ram(_) => RamData::table_name_static(),
-            SensorData::Disk(_) => DiskData::table_name_static(),
-            SensorData::Network(_) => NetworkData::table_name_static(),
-            SensorData::Process(_) => ProcessData::table_name_static(),
         }
     }
 
@@ -571,7 +575,6 @@ impl SensorData {
             SensorData::Ram(data) => data.total_energy,
             SensorData::Disk(data) => data.total_energy,
             SensorData::Network(data) => data.total_energy,
-            SensorData::Total(power) => Some(power.total_energy),
             SensorData::Process(_) => None,
         }
     }
@@ -605,39 +608,77 @@ impl SensorData {
                 downloaded_bytes: data.downloaded_bytes,
                 uploaded_bytes: data.uploaded_bytes,
             }),
-            SensorData::Total(total) => SensorData::Total(TotalData {
-                total_energy: total.total_energy.to_wh(),
-            }),
-            SensorData::Process(processes) => SensorData::Process(
-                processes
-                    .iter()
-                    .map(|p| ProcessData {
-                        app_name: p.app_name.clone(),
-                        process_exe_path: p.process_exe_path.clone(),
-                        process_energy: p.process_energy.to_wh(),
-                        process_cpu_usage: p.process_cpu_usage,
-                        process_gpu_usage: p.process_gpu_usage,
-                        process_mem_usage: p.process_mem_usage,
-                        read_bytes: p.read_bytes,
-                        written_bytes: p.written_bytes,
-                        subprocess_count: p.subprocess_count,
-                        icon: p.icon.clone(),
-                    })
-                    .collect(),
-            ),
+            SensorData::Process(processes) => SensorData::Process(processes.to_vec()),
+        }
+    }
+}
+
+impl Display for SensorData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SensorData::CPU(data) => write!(f, "{}", data),
+            SensorData::GPU(data) => write!(f, "{}", data),
+            SensorData::Ram(data) => write!(f, "{}", data),
+            SensorData::Disk(data) => write!(f, "{}", data),
+            SensorData::Network(data) => write!(f, "{}", data),
+            SensorData::Process(processes) => {
+                writeln!(f, "Processes:")?;
+                for p in processes {
+                    writeln!(
+                        f,
+                        "- {} (PID: {:?}): CPU {}%, GPU {}%, Mem {}%, Read {}, Write {}",
+                        p.app_name,
+                        p.pid,
+                        p.process_cpu_usage,
+                        p.process_gpu_usage.map_or(0.0, |gpu| gpu),
+                        p.process_mem_usage,
+                        p.read_bytes,
+                        p.written_bytes
+                    )?;
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
+impl ComputedSensorData {
+    /// Returns the database table name for this variant.
+    pub fn table_name(&self) -> &'static str {
+        match self {
+            ComputedSensorData::CPU(_) => CPUData::table_name_static(),
+            ComputedSensorData::GPU(_) => GPUData::table_name_static(),
+            ComputedSensorData::Total(_) => TotalData::table_name_static(),
+            ComputedSensorData::Ram(_) => RamData::table_name_static(),
+            ComputedSensorData::Disk(_) => DiskData::table_name_static(),
+            ComputedSensorData::Network(_) => NetworkData::table_name_static(),
+            ComputedSensorData::Process(_) => ProcessData::table_name_static(),
+        }
+    }
+
+    /// Returns the total energy in µJ, if available.
+    pub fn total_energy(&self) -> Option<EnergyUj> {
+        match self {
+            ComputedSensorData::CPU(data) => data.total_energy,
+            ComputedSensorData::GPU(data) => data.total_energy,
+            ComputedSensorData::Ram(data) => data.total_energy,
+            ComputedSensorData::Disk(data) => data.total_energy,
+            ComputedSensorData::Network(data) => data.total_energy,
+            ComputedSensorData::Total(power) => Some(power.total_energy),
+            ComputedSensorData::Process(_) => None,
         }
     }
 
     /// Scales all energy fields by `factor`.
     pub fn scale_energy(&mut self, factor: f64) {
         match self {
-            SensorData::CPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
-            SensorData::GPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
-            SensorData::Ram(d) => d.total_energy = d.total_energy.map(|w| w * factor),
-            SensorData::Disk(d) => d.total_energy = d.total_energy.map(|w| w * factor),
-            SensorData::Network(d) => d.total_energy = d.total_energy.map(|w| w * factor),
-            SensorData::Total(d) => d.total_energy *= factor,
-            SensorData::Process(procs) => {
+            ComputedSensorData::CPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            ComputedSensorData::GPU(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            ComputedSensorData::Ram(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            ComputedSensorData::Disk(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            ComputedSensorData::Network(d) => d.total_energy = d.total_energy.map(|w| w * factor),
+            ComputedSensorData::Total(d) => d.total_energy *= factor,
+            ComputedSensorData::Process(procs) => {
                 for p in procs {
                     p.process_energy *= factor;
                 }
@@ -649,26 +690,26 @@ impl SensorData {
     pub fn secondary_values(&self) -> Option<SecondaryValues> {
         let metric_type = self.secondary_metric()?;
         match self {
-            SensorData::CPU(data) => Some(SecondaryValues::from_labeled_values(
+            ComputedSensorData::CPU(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![LabeledValue::from_usage_percent(data.usage_percent)],
             )),
-            SensorData::GPU(data) => Some(SecondaryValues::from_labeled_values(
+            ComputedSensorData::GPU(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![LabeledValue::from_usage_percent(data.usage_percent)],
             )),
-            SensorData::Ram(data) => Some(SecondaryValues::from_labeled_values(
+            ComputedSensorData::Ram(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![LabeledValue::from_usage_percent(data.usage_percent)],
             )),
-            SensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
+            ComputedSensorData::Disk(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![
                     LabeledValue::from_mb_s(Some(data.read_bytes.as_mb()), "Read"),
                     LabeledValue::from_mb_s(Some(data.written_bytes.as_mb()), "Write"),
                 ],
             )),
-            SensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
+            ComputedSensorData::Network(data) => Some(SecondaryValues::from_labeled_values(
                 metric_type,
                 vec![
                     LabeledValue::from_mb_s(Some(data.downloaded_bytes.as_mb()), "Download"),
@@ -682,54 +723,25 @@ impl SensorData {
     /// Returns the secondary metric type for this sensor variant.
     pub fn secondary_metric(&self) -> Option<MetricKind> {
         match self {
-            SensorData::CPU(_) | SensorData::GPU(_) | SensorData::Ram(_) => Some(MetricKind::Usage),
-            SensorData::Disk(_) | SensorData::Network(_) => Some(MetricKind::Speed),
+            ComputedSensorData::CPU(_) | ComputedSensorData::GPU(_) | ComputedSensorData::Ram(_) => {
+                Some(MetricKind::Usage)
+            }
+            ComputedSensorData::Disk(_) | ComputedSensorData::Network(_) => Some(MetricKind::Speed),
             _ => None,
         }
     }
 }
 
-impl Display for SensorData {
+impl Display for ComputedSensorData {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SensorData::CPU(data) => {
-                writeln!(f, "CPU Data:")?;
-                writeln!(f, "  Energy PKG:  {}", data.total_energy.unwrap_or_default())?;
-                writeln!(f, "  Energy PP0:  {}", data.pp0_energy.unwrap_or_default())?;
-                writeln!(f, "  Energy PP1:  {}", data.pp1_energy.unwrap_or_default())?;
-                writeln!(f, "  Energy DRAM: {}", data.dram_energy.unwrap_or_default())?;
-                writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
-                Ok(())
-            }
-            SensorData::GPU(data) => {
-                writeln!(f, "GPU Data:")?;
-                writeln!(f, "  Energy:      {}", data.total_energy.unwrap_or_default())?;
-                writeln!(f, "  Usage:       {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
-                writeln!(f, "  VRAM Usage:  {:.2} %", data.vram_usage_percent.unwrap_or(-1.0))?;
-                Ok(())
-            }
-            SensorData::Ram(data) => {
-                writeln!(f, "RAM Data:")?;
-                writeln!(f, "  Energy: {}", data.total_energy.unwrap_or_default())?;
-                writeln!(f, "  Usage:  {:.2} %", data.usage_percent.unwrap_or(-1.0))?;
-                Ok(())
-            }
-            SensorData::Disk(data) => {
-                writeln!(f, "Disk Data:")?;
-                writeln!(f, "  Energy: {}", data.total_energy.unwrap_or_default())?;
-                writeln!(f, "  Read:   {:.2} MB", data.read_bytes.as_mb())?;
-                writeln!(f, "  Write:  {:.2} MB", data.written_bytes.as_mb())?;
-                Ok(())
-            }
-            SensorData::Network(data) => {
-                writeln!(f, "Network Data:")?;
-                writeln!(f, "  Energy:   {}", data.total_energy.unwrap_or_default())?;
-                writeln!(f, "  Download: {:.2} MB", data.downloaded_bytes.as_mb())?;
-                writeln!(f, "  Upload:   {:.2} MB", data.uploaded_bytes.as_mb())?;
-                Ok(())
-            }
-            SensorData::Total(total) => writeln!(f, "Total Energy: {}", total.total_energy),
-            SensorData::Process(processes) => {
+            ComputedSensorData::CPU(data) => write!(f, "{}", data),
+            ComputedSensorData::GPU(data) => write!(f, "{}", data),
+            ComputedSensorData::Ram(data) => write!(f, "{}", data),
+            ComputedSensorData::Disk(data) => write!(f, "{}", data),
+            ComputedSensorData::Network(data) => write!(f, "{}", data),
+            ComputedSensorData::Total(total) => writeln!(f, "Total Energy: {}", total.total_energy),
+            ComputedSensorData::Process(processes) => {
                 writeln!(f, "Top Processes by CPU Usage:")?;
                 writeln!(
                     f,
@@ -752,16 +764,89 @@ impl Display for ProcessData {
         writeln!(
             f,
             "{:<30.30} {:>10.2} {:>10.2} {:>10.2} {:>16} {:>15.2} {:>15.2} {:>20}",
-            self.app_name,
-            self.process_cpu_usage,
-            self.process_gpu_usage.unwrap_or(0.0),
-            self.process_mem_usage,
+            self.measured.app_name,
+            self.measured.process_cpu_usage,
+            self.measured.process_gpu_usage.unwrap_or(0.0),
+            self.measured.process_mem_usage,
             energy_str,
-            self.read_bytes.as_mb(),
-            self.written_bytes.as_mb(),
+            self.measured.read_bytes.as_mb(),
+            self.measured.written_bytes.as_mb(),
             self.subprocess_count
         )?;
         Ok(())
+    }
+}
+
+impl Display for CPUData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "CPU Data:")?;
+        writeln!(f, "  Energy PKG:  {}", self.total_energy.unwrap_or_default())?;
+        writeln!(f, "  Energy PP0:  {}", self.pp0_energy.unwrap_or_default())?;
+        writeln!(f, "  Energy PP1:  {}", self.pp1_energy.unwrap_or_default())?;
+        writeln!(f, "  Energy DRAM: {}", self.dram_energy.unwrap_or_default())?;
+        writeln!(f, "  Usage:       {:.2} %", self.usage_percent.unwrap_or(-1.0))?;
+        Ok(())
+    }
+}
+
+impl Display for GPUData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "GPU Data:")?;
+        writeln!(f, "  Energy:      {}", self.total_energy.unwrap_or_default())?;
+        writeln!(f, "  Usage:       {:.2} %", self.usage_percent.unwrap_or(-1.0))?;
+        writeln!(f, "  VRAM Usage:  {:.2} %", self.vram_usage_percent.unwrap_or(-1.0))?;
+        Ok(())
+    }
+}
+
+impl Display for RamData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "RAM Data:")?;
+        writeln!(f, "  Energy: {}", self.total_energy.unwrap_or_default())?;
+        writeln!(f, "  Usage:  {:.2} %", self.usage_percent.unwrap_or(-1.0))?;
+        Ok(())
+    }
+}
+
+impl Display for DiskData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Disk Data:")?;
+        writeln!(f, "  Energy: {}", self.total_energy.unwrap_or_default())?;
+        writeln!(f, "  Read:   {:.2} MB", self.read_bytes.as_mb())?;
+        writeln!(f, "  Write:  {:.2} MB", self.written_bytes.as_mb())?;
+        Ok(())
+    }
+}
+
+impl Display for NetworkData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "Network Data:")?;
+        writeln!(f, "  Energy:   {}", self.total_energy.unwrap_or_default())?;
+        writeln!(f, "  Download: {:.2} MB", self.downloaded_bytes.as_mb())?;
+        writeln!(f, "  Upload:   {:.2} MB", self.uploaded_bytes.as_mb())?;
+        Ok(())
+    }
+}
+
+impl From<SensorData> for ComputedSensorData {
+    fn from(data: SensorData) -> Self {
+        match data {
+            SensorData::CPU(cpu) => ComputedSensorData::CPU(cpu),
+            SensorData::GPU(gpu) => ComputedSensorData::GPU(gpu),
+            SensorData::Ram(ram) => ComputedSensorData::Ram(ram),
+            SensorData::Disk(disk) => ComputedSensorData::Disk(disk),
+            SensorData::Network(network) => ComputedSensorData::Network(network),
+            SensorData::Process(processes) => {
+                let computed_processes = processes
+                    .into_iter()
+                    .map(|p| ProcessData {
+                        measured: p,
+                        ..Default::default()
+                    })
+                    .collect();
+                ComputedSensorData::Process(computed_processes)
+            }
+        }
     }
 }
 
@@ -771,15 +856,27 @@ impl From<CPUData> for SensorData {
     }
 }
 
+impl From<CPUData> for ComputedSensorData {
+    fn from(data: CPUData) -> Self {
+        ComputedSensorData::CPU(data)
+    }
+}
+
 impl From<GPUData> for SensorData {
     fn from(data: GPUData) -> Self {
         SensorData::GPU(data)
     }
 }
 
-impl From<TotalData> for SensorData {
+impl From<GPUData> for ComputedSensorData {
+    fn from(data: GPUData) -> Self {
+        ComputedSensorData::GPU(data)
+    }
+}
+
+impl From<TotalData> for ComputedSensorData {
     fn from(data: TotalData) -> Self {
-        SensorData::Total(data)
+        ComputedSensorData::Total(data)
     }
 }
 
@@ -788,24 +885,50 @@ impl From<RamData> for SensorData {
         SensorData::Ram(data)
     }
 }
+
+impl From<RamData> for ComputedSensorData {
+    fn from(data: RamData) -> Self {
+        ComputedSensorData::Ram(data)
+    }
+}
+
 impl From<DiskData> for SensorData {
     fn from(data: DiskData) -> Self {
         SensorData::Disk(data)
     }
 }
+
+impl From<DiskData> for ComputedSensorData {
+    fn from(data: DiskData) -> Self {
+        ComputedSensorData::Disk(data)
+    }
+}
+
 impl From<NetworkData> for SensorData {
     fn from(data: NetworkData) -> Self {
         SensorData::Network(data)
     }
 }
 
-impl From<ProcessData> for SensorData {
-    fn from(data: ProcessData) -> Self {
+impl From<NetworkData> for ComputedSensorData {
+    fn from(data: NetworkData) -> Self {
+        ComputedSensorData::Network(data)
+    }
+}
+
+impl From<MeasuredProcessData> for SensorData {
+    fn from(data: MeasuredProcessData) -> Self {
         if data.app_name.is_empty() {
             SensorData::Process(Vec::new())
         } else {
             SensorData::Process(vec![data])
         }
+    }
+}
+
+impl From<ProcessData> for ComputedSensorData {
+    fn from(data: ProcessData) -> Self {
+        ComputedSensorData::Process(vec![data])
     }
 }
 
@@ -860,17 +983,26 @@ impl Default for NetworkData {
     }
 }
 
-impl Default for ProcessData {
+impl Default for MeasuredProcessData {
     fn default() -> Self {
-        ProcessData {
+        MeasuredProcessData {
+            pid: None,
             app_name: String::new(),
             process_exe_path: None,
-            process_energy: EnergyUj(0),
             process_cpu_usage: 0.0,
             process_gpu_usage: None,
             process_mem_usage: 0.0,
             read_bytes: Byte(0),
             written_bytes: Byte(0),
+        }
+    }
+}
+
+impl Default for ProcessData {
+    fn default() -> Self {
+        ProcessData {
+            measured: MeasuredProcessData::default(),
+            process_energy: EnergyUj(0),
             subprocess_count: 0,
             icon: None,
         }

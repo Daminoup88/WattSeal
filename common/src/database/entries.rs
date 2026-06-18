@@ -2,7 +2,9 @@ use std::collections::HashMap;
 
 use rusqlite::{Row, ToSql};
 
-use crate::types::{AllTimeData, CPUData, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+use crate::types::{
+    AllTimeData, CPUData, ComputedSensorData, DiskData, GPUData, NetworkData, ProcessData, RamData, TotalData,
+};
 
 /// Maps a data type to its SQLite table schema and row conversion.
 pub trait DatabaseEntry {
@@ -14,9 +16,9 @@ pub trait DatabaseEntry {
     where
         Self: Sized;
 
-    fn zero() -> SensorData
+    fn zero() -> ComputedSensorData
     where
-        Self: Default + Into<SensorData>,
+        Self: Default + Into<ComputedSensorData>,
     {
         Self::default().into()
     }
@@ -173,24 +175,61 @@ impl_database_entry! {
     }
 }
 
-impl_database_entry! {
-    struct ProcessData {
-        generic_name: "Processes",
-        table_name: "process_data",
-        mappings: {
-            app_name: "app_name" => "TEXT NOT NULL",
-            process_exe_path: "process_exe_path" => "TEXT",
-            process_energy: "process_energy_uj" => "INTEGER",
-            process_cpu_usage: "process_cpu_usage" => "REAL",
-            process_gpu_usage: "process_gpu_usage" => "REAL",
-            process_mem_usage: "process_mem_usage" => "REAL",
-            read_bytes: "read_bytes" => "INTEGER",
-            written_bytes: "written_bytes" => "INTEGER",
-            subprocess_count: "subprocess_count" => "INTEGER",
-        },
-        extra_fields: {
+impl DatabaseEntry for ProcessData {
+    fn generic_name() -> &'static str {
+        "Processes"
+    }
+
+    fn table_name_static() -> &'static str {
+        "process_data"
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("app_name", "TEXT NOT NULL"),
+            ("process_exe_path", "TEXT"),
+            ("process_energy_uj", "INTEGER"),
+            ("process_cpu_usage", "REAL"),
+            ("process_gpu_usage", "REAL"),
+            ("process_mem_usage", "REAL"),
+            ("read_bytes", "INTEGER"),
+            ("written_bytes", "INTEGER"),
+            ("subprocess_count", "INTEGER"),
+        ]
+    }
+
+    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            timestamp_id,
+            &self.measured.app_name,
+            &self.measured.process_exe_path,
+            &self.process_energy,
+            &self.measured.process_cpu_usage,
+            &self.measured.process_gpu_usage,
+            &self.measured.process_mem_usage,
+            &self.measured.read_bytes,
+            &self.measured.written_bytes,
+            &self.subprocess_count,
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        use crate::types::MeasuredProcessData;
+        Ok(Self {
+            measured: MeasuredProcessData {
+                pid: None,
+                app_name: row.get("app_name")?,
+                process_exe_path: row.get("process_exe_path")?,
+                process_cpu_usage: row.get("process_cpu_usage")?,
+                process_gpu_usage: row.get("process_gpu_usage")?,
+                process_mem_usage: row.get("process_mem_usage")?,
+                read_bytes: row.get("read_bytes")?,
+                written_bytes: row.get("written_bytes")?,
+            },
+            process_energy: row.get("process_energy_uj")?,
+            subprocess_count: row.get("subprocess_count")?,
             icon: None,
-        }
+        })
     }
 }
 
@@ -217,14 +256,16 @@ impl DatabaseEntry for AllTimeData {
 
 #[cfg(test)]
 mod tests {
-    use super::{CPUData, DatabaseEntry, DiskData, GPUData, NetworkData, ProcessData, RamData, SensorData, TotalData};
+    use super::{
+        CPUData, ComputedSensorData, DatabaseEntry, DiskData, GPUData, NetworkData, ProcessData, RamData, TotalData,
+    };
     use crate::types::{Byte, EnergyUj};
 
     #[test]
     fn zero_defaults_are_zero_filled() {
         // CPU
         match CPUData::zero() {
-            SensorData::CPU(cpu) => {
+            ComputedSensorData::CPU(cpu) => {
                 assert_eq!(cpu.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.pp0_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.pp1_energy, Some(EnergyUj::from_u64(0)));
@@ -236,7 +277,7 @@ mod tests {
 
         // GPU
         match GPUData::zero() {
-            SensorData::GPU(gpu) => {
+            ComputedSensorData::GPU(gpu) => {
                 assert_eq!(gpu.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(gpu.usage_percent, Some(0.0));
                 assert_eq!(gpu.vram_usage_percent, Some(0.0));
@@ -246,7 +287,7 @@ mod tests {
 
         // RAM
         match RamData::zero() {
-            SensorData::Ram(ram) => {
+            ComputedSensorData::Ram(ram) => {
                 assert_eq!(ram.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(ram.usage_percent, Some(0.0));
             }
@@ -255,7 +296,7 @@ mod tests {
 
         // Disk
         match DiskData::zero() {
-            SensorData::Disk(disk) => {
+            ComputedSensorData::Disk(disk) => {
                 assert_eq!(disk.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(disk.read_bytes, Byte::from(0));
                 assert_eq!(disk.written_bytes, Byte::from(0));
@@ -265,7 +306,7 @@ mod tests {
 
         // Network
         match NetworkData::zero() {
-            SensorData::Network(net) => {
+            ComputedSensorData::Network(net) => {
                 assert_eq!(net.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(net.downloaded_bytes, Byte::from(0));
                 assert_eq!(net.uploaded_bytes, Byte::from(0));
@@ -275,7 +316,7 @@ mod tests {
 
         // Total
         match TotalData::zero() {
-            SensorData::Total(total) => {
+            ComputedSensorData::Total(total) => {
                 assert_eq!(total.total_energy, EnergyUj::from_u64(0));
             }
             _ => panic!("TotalData::zero() returned wrong SensorData variant"),
@@ -283,7 +324,7 @@ mod tests {
 
         // Process
         match ProcessData::zero() {
-            SensorData::Process(vec) => {
+            ComputedSensorData::Process(vec) => {
                 assert!(vec.is_empty());
             }
             _ => panic!("ProcessData::zero() returned wrong SensorData variant"),

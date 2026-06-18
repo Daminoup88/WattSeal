@@ -2,8 +2,8 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, SensorData, TotalData, UiSettings,
-    generic_name_for_table,
+    AllTimeData, ComputedSensorData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, TotalData,
+    UiSettings, generic_name_for_table,
 };
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
@@ -394,11 +394,11 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, SensorData)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, ComputedSensorData)> {
         from_db(self.database.select_last_n_records(n))
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, ComputedSensorData)> {
         if table_name == ProcessData::table_name_static() {
             return self.load_process_data(time_range);
         }
@@ -417,7 +417,7 @@ impl App {
         from_db(result)
     }
 
-    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, SensorData)> {
+    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, ComputedSensorData)> {
         from_db(self.database.select_top_processes_average(time_range.seconds(), 10))
     }
 
@@ -632,10 +632,15 @@ impl App {
                     };
 
                     proc_row = proc_row.push(
-                        Text::new(format!("{} ({:.1} {})", top_proc.app_name, value, range.power_unit()))
-                            .size(FONT_SIZE_SUBTITLE)
-                            .font(FONT_BOLD)
-                            .class(TextStyle::Primary),
+                        Text::new(format!(
+                            "{} ({:.1} {})",
+                            top_proc.measured.app_name,
+                            value,
+                            range.power_unit()
+                        ))
+                        .size(FONT_SIZE_SUBTITLE)
+                        .font(FONT_BOLD)
+                        .class(TextStyle::Primary),
                     );
 
                     content = content.push(proc_row);
@@ -913,7 +918,9 @@ impl App {
     }
 }
 
-fn from_db(data: Result<Vec<(SystemTime, SensorData)>, DatabaseError>) -> Vec<(DateTime<Local>, SensorData)> {
+fn from_db(
+    data: Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError>,
+) -> Vec<(DateTime<Local>, ComputedSensorData)> {
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))
