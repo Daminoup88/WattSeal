@@ -242,14 +242,11 @@ pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
 }
 
 /// Collects hardware info (names + initial specs) from all sensors.
-pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
-    let mut tables: Vec<String> = Vec::new();
+pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -> GeneralData {
     let mut detected_materials: Vec<String> = Vec::new();
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
     for sensor in sensors {
-        tables.push(sensor.table_name().to_string());
-
         match sensor.read_name() {
             Ok(name) => detected_materials.push(name),
             Err(SensorError::NotSupported) => {}
@@ -339,8 +336,8 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>) -> GeneralData {
     let hardware_info: HardwareInfo = sensors_info.into();
 
     let data = GeneralData {
-        tables: tables.join(","),
-        hardware_info_serialized: hardware_info.serialized(),
+        tables: table_names.join(","),
+        hardware_info: hardware_info,
     };
 
     return data;

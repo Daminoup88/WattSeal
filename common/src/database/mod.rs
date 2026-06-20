@@ -231,12 +231,12 @@ impl Database {
     }
 
     /// Creates sensor tables that don't already exist.
-    pub fn create_tables_if_not_exists(&mut self, table_names: &[&str]) -> Result<(), DatabaseError> {
+    pub fn create_tables_if_not_exists(&mut self, table_names: &Vec<String>) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
 
         let mut current_tables = self.tables.clone().unwrap_or_default();
         let mut has_changed = false;
-        for &name in table_names {
+        for name in table_names {
             if !current_tables.contains(&name.to_string()) {
                 if let Some(create_sql) = dispatch_entry!(name, create_table_sql()) {
                     tx.execute_batch(&create_sql)?;
@@ -319,12 +319,12 @@ impl Database {
         if existing.is_some() {
             tx.execute(
                 "UPDATE hardware_info SET tables = ?1, hardware_data = ?2 WHERE id = 1",
-                params![data.tables, data.hardware_info_serialized],
+                params![data.tables, data.hardware_info.serialized()],
             )?;
         } else {
             tx.execute(
                 "INSERT INTO hardware_info (id, tables, hardware_data) VALUES (1, ?1, ?2)",
-                params![data.tables, data.hardware_info_serialized],
+                params![data.tables, data.hardware_info.serialized()],
             )?;
         }
 

@@ -333,10 +333,10 @@ pub enum InitialInfo {
 }
 
 /// Database metadata pairing table list with serialized hardware info.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct GeneralData {
     pub tables: String,
-    pub hardware_info_serialized: String,
+    pub hardware_info: HardwareInfo,
 }
 
 /// Complete hardware inventory of the system.
@@ -656,6 +656,64 @@ impl ComputedSensorData {
         }
     }
 
+    pub fn sensor_type(&self) -> &'static str {
+        match self {
+            ComputedSensorData::CPU(_) => "CPU",
+            ComputedSensorData::GPU(_) => "GPU",
+            ComputedSensorData::Ram(_) => "RAM",
+            ComputedSensorData::Disk(_) => "Disk",
+            ComputedSensorData::Network(_) => "Network",
+            ComputedSensorData::Total(_) => "Total",
+            ComputedSensorData::Process(_) => "Processes",
+        }
+    }
+
+    pub fn to_wh(&self) -> ComputedSensorData<EnergyWh> {
+        match self {
+            ComputedSensorData::CPU(data) => ComputedSensorData::CPU(CPUData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                pp0_energy: data.pp0_energy.map(|e| e.to_wh()),
+                pp1_energy: data.pp1_energy.map(|e| e.to_wh()),
+                dram_energy: data.dram_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+            }),
+            ComputedSensorData::GPU(data) => ComputedSensorData::GPU(GPUData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+                vram_usage_percent: data.vram_usage_percent,
+            }),
+            ComputedSensorData::Ram(data) => ComputedSensorData::Ram(RamData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                usage_percent: data.usage_percent,
+            }),
+            ComputedSensorData::Disk(data) => ComputedSensorData::Disk(DiskData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                read_bytes: data.read_bytes,
+                written_bytes: data.written_bytes,
+            }),
+            ComputedSensorData::Network(data) => ComputedSensorData::Network(NetworkData {
+                total_energy: data.total_energy.map(|e| e.to_wh()),
+                downloaded_bytes: data.downloaded_bytes,
+                uploaded_bytes: data.uploaded_bytes,
+            }),
+            ComputedSensorData::Total(total) => ComputedSensorData::Total(TotalData {
+                total_energy: total.total_energy.to_wh(),
+            }),
+            ComputedSensorData::Process(processes) => {
+                let converted_processes = processes
+                    .iter()
+                    .map(|p| ProcessData {
+                        measured: p.measured.clone(),
+                        process_energy: p.process_energy.to_wh(),
+                        subprocess_count: p.subprocess_count,
+                        icon: p.icon.clone(),
+                    })
+                    .collect();
+                ComputedSensorData::Process(converted_processes)
+            }
+        }
+    }
+
     /// Returns the total energy in µJ, if available.
     pub fn total_energy(&self) -> Option<EnergyUj> {
         match self {
@@ -754,6 +812,32 @@ impl Display for ComputedSensorData {
                 Ok(())
             }
         }
+    }
+}
+
+pub trait PublishableSensor: Serialize {
+    type Wh: Serialize;
+    fn sensor_type(&self) -> &'static str;
+    fn to_wh(&self) -> Self::Wh;
+}
+
+impl PublishableSensor for SensorData {
+    type Wh = SensorData<EnergyWh>;
+    fn sensor_type(&self) -> &'static str {
+        SensorData::sensor_type(self)
+    }
+    fn to_wh(&self) -> Self::Wh {
+        SensorData::to_wh(self)
+    }
+}
+
+impl PublishableSensor for ComputedSensorData {
+    type Wh = ComputedSensorData<EnergyWh>;
+    fn sensor_type(&self) -> &'static str {
+        ComputedSensorData::sensor_type(self)
+    }
+    fn to_wh(&self) -> Self::Wh {
+        ComputedSensorData::to_wh(self)
     }
 }
 

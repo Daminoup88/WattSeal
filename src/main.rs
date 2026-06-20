@@ -32,6 +32,7 @@ struct Options {
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
     mqtt_unit: Option<ConsumptionUnit>,
+    mqtt_raw: bool,
     db_mode: bool,
     #[cfg(target_os = "windows")]
     install_cpu_driver: bool,
@@ -82,6 +83,10 @@ fn options() -> OptionParser<Options> {
         })
         .optional();
 
+    let mqtt_raw = long("mqtt-raw")
+        .help("Publish directly raw (non-computed) sensor data.")
+        .switch();
+
     let db_mode = long("no-db")
         .help("Do not save sensors metrics in local database.")
         .flag(false, true);
@@ -105,6 +110,7 @@ fn options() -> OptionParser<Options> {
             mqtt_id,
             mqtt_addr,
             mqtt_unit,
+            mqtt_raw,
             db_mode,
             install_cpu_driver,
             uninstall_cpu_driver,
@@ -122,6 +128,7 @@ fn options() -> OptionParser<Options> {
             mqtt_id,
             mqtt_addr,
             mqtt_unit,
+            mqtt_raw,
             db_mode,
         })
         .to_options()
@@ -324,7 +331,7 @@ fn main() {
     let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
         let unit = options.mqtt_unit;
-        Some(MQTTInfo::new(&id, &mqtt_addr, unit))
+        Some(MQTTInfo::new(&id, &mqtt_addr, unit, options.mqtt_raw))
     } else {
         None
     };
