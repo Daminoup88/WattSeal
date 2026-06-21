@@ -510,7 +510,8 @@ pub fn tooltip_time(language: AppLanguage, time_text: &str) -> String {
 
 pub fn application(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French | AppLanguage::Chinese => "Application",
+        AppLanguage::English | AppLanguage::French => "Application",
+        AppLanguage::Chinese => "应用",
         AppLanguage::Romanian => "Aplicație",
     }
 }
