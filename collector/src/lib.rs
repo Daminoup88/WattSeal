@@ -238,7 +238,7 @@ impl CollectorApp {
             #[cfg(debug_assertions)]
             println!("\n--- Iteration {} ---", self.iteration);
 
-            let event = create_event_from_sensors(&self.sensors, since_last_update);
+            let event = create_event_from_sensors(&self.sensors, self.system.clone(), since_last_update);
 
             let needs_computed = self.database.is_some()
                 || self
@@ -246,10 +246,7 @@ impl CollectorApp {
                     .as_ref()
                     .is_some_and(|m| m.data_mode == MqttDataMode::Computed);
 
-            let computed_event = needs_computed.then(|| {
-                let process_gpu_usage = sensors::get_process_gpu_usage(&self.sensors);
-                to_computed_event(&event, self.system.clone(), process_gpu_usage)
-            });
+            let computed_event = needs_computed.then(|| to_computed_event(&event));
 
             if let Some(database) = &mut self.database {
                 if let Some(computed_event) = &computed_event {
@@ -292,8 +289,16 @@ impl CollectorApp {
             }
 
             #[cfg(debug_assertions)]
-            for sensor_data in event.data() {
-                println!("{sensor_data}");
+            {
+                if let Some(computed) = &computed_event {
+                    for sensor_data in computed.data() {
+                        println!("{sensor_data}");
+                    }
+                } else {
+                    for sensor_data in event.data() {
+                        println!("{sensor_data}");
+                    }
+                }
             }
 
             #[cfg(debug_assertions)]

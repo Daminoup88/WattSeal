@@ -23,9 +23,10 @@ pub use disk::DiskSensor;
 use display_info::DisplayInfo;
 pub use gpu::{GPUSensor, get_gpu_list};
 pub use network::NetworkSensor;
-pub use process::get_processes;
 pub use ram::RamSensor;
 use sysinfo::System;
+
+use crate::sensors::process::{compute_processes_energy, get_measured_processes, sort_processes_by_energy};
 
 /// Variant wrapper for all supported sensor types.
 pub enum SensorType {
@@ -88,7 +89,11 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(sensors: &Vec<SensorType>, since_last_update: Duration) -> Event {
+pub fn create_event_from_sensors(
+    sensors: &Vec<SensorType>,
+    system: Rc<RefCell<System>>,
+    since_last_update: Duration,
+) -> Event {
     let time = SystemTime::now();
     let mut data: Vec<SensorData> = Vec::new();
 
@@ -165,16 +170,14 @@ pub fn create_event_from_sensors(sensors: &Vec<SensorType>, since_last_update: D
         }
     }
 
-    // TODO: Measure processes + process gpu usage
+    let proc_gpu_usage = get_process_gpu_usage(sensors);
+    let measured_processes = get_measured_processes(system, proc_gpu_usage);
+    data.push(SensorData::Process(measured_processes));
 
     return Event::new(time, data);
 }
 
-pub fn to_computed_event(
-    sensors_event: &Event,
-    system: Rc<RefCell<System>>,
-    process_gpu_usage: HashMap<u32, f64>,
-) -> Event<ComputedSensorData> {
+pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
     let mut data: Vec<ComputedSensorData> = Vec::new();
     let (mut cpu_energy, mut cpu_usage, mut nb_cpus) = (EnergyUj::from_u64(0), 0.0, 0);
     let (mut gpu_energy, mut gpu_usage, mut nb_gpus) = (EnergyUj::from_u64(0), 0.0, 0);
@@ -204,17 +207,30 @@ pub fn to_computed_event(
 
     cpu_usage /= nb_cpus.max(1) as f64;
     gpu_usage /= nb_gpus.max(1) as f64;
-    let top10_process_data: Vec<ProcessData> = get_processes(
-        system.clone(),
+    let computed_process_data = compute_processes_energy(
+        sensors_event
+            .data()
+            .iter()
+            .filter_map(|d| {
+                if let SensorData::Process(measured_processes) = d {
+                    Some(measured_processes.to_vec())
+                } else {
+                    None
+                }
+            })
+            .flatten()
+            .collect(),
         cpu_energy,
         cpu_usage,
         gpu_energy,
         gpu_usage,
         total_energy,
-        10,
-        process_gpu_usage,
     );
-    data.push(ComputedSensorData::Process(top10_process_data));
+    let top10_processes: Vec<ProcessData> = sort_processes_by_energy(computed_process_data)
+        .into_iter()
+        .take(10)
+        .collect();
+    data.push(ComputedSensorData::Process(top10_processes));
 
     Event::new(sensors_event.time(), data)
 }
