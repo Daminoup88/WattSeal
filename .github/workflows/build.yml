@@ -50,7 +50,7 @@ jobs:
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           ref: ${{ inputs.ref }}
           fetch-tags: false
