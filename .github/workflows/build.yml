@@ -25,19 +25,19 @@ env:
 
 jobs:
   build:
-    name: ${{ inputs.check-only && 'Check' || 'Build' }} (${{ matrix.os-name }})
+    name: ${{ matrix.os-name }}
     strategy:
       fail-fast: false
       matrix:
         include:
           - os: windows-latest
-            os-name: Windows x86
+            os-name: Windows x64
             binary-src: target/release/WattSeal.exe
             binary-dst-base: WattSeal-windows
             ext: .exe
 
           - os: ubuntu-latest
-            os-name: Linux x86
+            os-name: Linux x64
             zigbuild-target: x86_64-unknown-linux-gnu.2.17
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
             binary-dst-base: WattSeal-linux
