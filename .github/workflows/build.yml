@@ -31,20 +31,21 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            os-name: Windows
+            os-name: Windows x86
             binary-src: target/release/WattSeal.exe
-            binary-dst: WattSeal-windows.exe
+            binary-dst-base: WattSeal-windows
+            ext: .exe
 
           - os: ubuntu-latest
-            os-name: Linux
+            os-name: Linux x86
             zigbuild-target: x86_64-unknown-linux-gnu.2.17
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
-            binary-dst: WattSeal-linux
+            binary-dst-base: WattSeal-linux
 
           - os: macos-latest
-            os-name: macOS
+            os-name: macOS arm64
             binary-src: target/release/WattSeal
-            binary-dst: WattSeal-macos
+            binary-dst-base: WattSeal-macos
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
@@ -103,12 +104,13 @@ jobs:
         if: ${{ !inputs.check-only }}
         shell: bash
         run: |
-          cp "${{ matrix.binary-src }}" "${{ matrix.binary-dst }}"
-          chmod +x "${{ matrix.binary-dst }}" 2>/dev/null || true
+          FINAL_DST="${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          cp "${{ matrix.binary-src }}" "$FINAL_DST"
+          chmod +x "$FINAL_DST" 2>/dev/null || true
 
       - name: Upload artifact
         if: ${{ !inputs.check-only && inputs.upload-artifacts }}
         uses: actions/upload-artifact@v7
         with:
-          name: ${{ matrix.binary-dst }}
-          path: ${{ matrix.binary-dst }}
+          name: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}
+          path: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
