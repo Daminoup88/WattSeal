@@ -12,8 +12,8 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use crate::{
     AllTimeData,
     types::{
-        CPUData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData, RamData,
-        SensorData, TotalData,
+        CPUData, ComputedSensorData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, NetworkData,
+        ProcessData, RamData, TotalData,
     },
 };
 
@@ -53,13 +53,13 @@ macro_rules! dispatch_entry {
 macro_rules! match_sensor_variant {
     ($val:expr, $inner:ident => $body:expr) => {
         match $val {
-            SensorData::CPU($inner) => $body,
-            SensorData::GPU($inner) => $body,
-            SensorData::Ram($inner) => $body,
-            SensorData::Disk($inner) => $body,
-            SensorData::Network($inner) => $body,
-            SensorData::Total($inner) => $body,
-            SensorData::Process(processes) => {
+            ComputedSensorData::CPU($inner) => $body,
+            ComputedSensorData::GPU($inner) => $body,
+            ComputedSensorData::Ram($inner) => $body,
+            ComputedSensorData::Disk($inner) => $body,
+            ComputedSensorData::Network($inner) => $body,
+            ComputedSensorData::Total($inner) => $body,
+            ComputedSensorData::Process(processes) => {
                 for $inner in processes {
                     $body?;
                 }
@@ -231,12 +231,12 @@ impl Database {
     }
 
     /// Creates sensor tables that don't already exist.
-    pub fn create_tables_if_not_exists(&mut self, table_names: &[&str]) -> Result<(), DatabaseError> {
+    pub fn create_tables_if_not_exists(&mut self, table_names: &Vec<String>) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
 
         let mut current_tables = self.tables.clone().unwrap_or_default();
         let mut has_changed = false;
-        for &name in table_names {
+        for name in table_names {
             if !current_tables.contains(&name.to_string()) {
                 if let Some(create_sql) = dispatch_entry!(name, create_table_sql()) {
                     tx.execute_batch(&create_sql)?;
@@ -258,7 +258,11 @@ impl Database {
     }
 
     /// Insert an event and update component energy totals in a single transaction.
-    pub fn insert_event_and_update_energy(&mut self, event: &Event, sampling_period: u32) -> Result<(), DatabaseError> {
+    pub fn insert_event_and_update_energy(
+        &mut self,
+        event: &Event<ComputedSensorData>,
+        sampling_period: u32,
+    ) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)",
@@ -287,7 +291,7 @@ impl Database {
     }
 
     /// Inserts a sensor event with all its readings.
-    pub fn insert_event(&mut self, event: &Event) -> Result<(), DatabaseError> {
+    pub fn insert_event(&mut self, event: &Event<ComputedSensorData>) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
         tx.execute(
             "INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)",
@@ -315,12 +319,12 @@ impl Database {
         if existing.is_some() {
             tx.execute(
                 "UPDATE hardware_info SET tables = ?1, hardware_data = ?2 WHERE id = 1",
-                params![data.tables, data.hardware_info_serialized],
+                params![data.tables, data.hardware_info.serialized()],
             )?;
         } else {
             tx.execute(
                 "INSERT INTO hardware_info (id, tables, hardware_data) VALUES (1, ?1, ?2)",
-                params![data.tables, data.hardware_info_serialized],
+                params![data.tables, data.hardware_info.serialized()],
             )?;
         }
 
@@ -394,7 +398,11 @@ impl Database {
         Ok(())
     }
 
-    fn insert_sensor_data(tx: &Transaction, timestamp_id: &i64, sensor_data: &SensorData) -> Result<(), DatabaseError> {
+    fn insert_sensor_data(
+        tx: &Transaction,
+        timestamp_id: &i64,
+        sensor_data: &ComputedSensorData,
+    ) -> Result<(), DatabaseError> {
         match_sensor_variant!(sensor_data, data => Self::insert_entry(tx, timestamp_id, data))
     }
 
@@ -411,7 +419,7 @@ impl Database {
         table_name: &str,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
@@ -424,11 +432,11 @@ impl Database {
         &mut self,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
-        let mut records = Vec::<(i64, SensorData)>::new();
+        let mut records = Vec::<(i64, ComputedSensorData)>::new();
         if let Some(tables) = &self.tables {
             for table_name in tables {
                 let mut table_records =
@@ -445,7 +453,7 @@ impl Database {
         n: i64,
         table_name: &str,
         window_seconds: i64,
-    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
         if n <= 0 || window_seconds <= 0 {
             return Ok(Vec::new());
         }
@@ -472,8 +480,8 @@ impl Database {
     }
 
     /// Returns the most recent N timestamped records.
-    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
-        let mut records = Vec::<(SystemTime, SensorData)>::new();
+    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
+        let mut records = Vec::<(SystemTime, ComputedSensorData)>::new();
         let mut stmt = self
             .conn
             .prepare("SELECT id, timestamp FROM timestamp ORDER BY id DESC LIMIT ?1")?;
@@ -544,16 +552,16 @@ impl Database {
         table_name: &str,
         query: &str,
         params: P,
-    ) -> rusqlite::Result<Vec<(i64, SensorData)>>
+    ) -> rusqlite::Result<Vec<(i64, ComputedSensorData)>>
     where
         P: rusqlite::Params,
     {
         dispatch_entry!(table_name, self, query_sensor_table, P, (query, params)).unwrap_or_else(|| Ok(Vec::new()))
     }
 
-    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, SensorData)>>
+    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, ComputedSensorData)>>
     where
-        T: DatabaseEntry + Into<SensorData>,
+        T: DatabaseEntry + Into<ComputedSensorData>,
         P: rusqlite::Params,
     {
         let mut stmt = self.conn.prepare(query)?;
@@ -571,7 +579,7 @@ impl Database {
         table_name: &str,
         start_time_millis: i64,
         end_time_millis: i64,
-    ) -> Result<Vec<(i64, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -593,7 +601,7 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -670,7 +678,7 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
         let second_query = "SELECT \
                 (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
                 CAST(SUM(COALESCE(d.total_energy_uj, 0)) / ?2 AS INTEGER) AS total_energy_uj \
@@ -733,7 +741,7 @@ impl Database {
             } else if let Some(hour_data) = hour_by_window.remove(&current) {
                 hour_data
             } else {
-                SensorData::Total(TotalData {
+                ComputedSensorData::Total(TotalData {
                     total_energy: EnergyUj::from_u64(0),
                 })
             };
@@ -750,76 +758,49 @@ impl Database {
         &self,
         n_seconds: i64,
         top_n: usize,
-    ) -> Result<Vec<(SystemTime, SensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
         if n_seconds == 0 {
-            return Ok(vec![(SystemTime::now(), SensorData::Process(Vec::new()))]);
+            return Ok(vec![(SystemTime::now(), ComputedSensorData::Process(Vec::new()))]);
         }
 
         let now_ms = to_epoch_millis(SystemTime::now())?;
         let start = now_ms - n_seconds * 1000;
 
-        let query = "SELECT \
-                ?2 AS timestamp, \
-                combined.app_name AS app_name, \
-                MAX(combined.process_exe_path) AS process_exe_path, \
-                CAST(SUM(combined.energy_uj) AS INTEGER) AS process_energy_uj, \
-                SUM(combined.cpu_contrib)  / ?4 AS process_cpu_usage, \
-                SUM(combined.gpu_contrib)  / ?4 AS process_gpu_usage, \
-                SUM(combined.mem_contrib)  / ?4 AS process_mem_usage, \
-                CAST(SUM(combined.read_contrib)  / ?4 AS INTEGER) AS read_bytes, \
-                CAST(SUM(combined.write_contrib) / ?4 AS INTEGER) AS written_bytes, \
-                CAST(MAX(combined.subprocess_count) AS INTEGER) AS subprocess_count \
-             FROM ( \
-                 SELECT \
-                     p.app_name, p.process_exe_path, \
-                     COALESCE(p.process_energy_uj, 0) AS energy_uj, \
-                     COALESCE(p.process_cpu_usage, 0.0) AS cpu_contrib, \
-                     COALESCE(p.process_gpu_usage, 0.0) AS gpu_contrib, \
-                     COALESCE(p.process_mem_usage, 0.0) AS mem_contrib, \
-                     COALESCE(p.read_bytes,    0) AS read_contrib, \
-                     COALESCE(p.written_bytes, 0) AS write_contrib, \
-                     p.subprocess_count \
-                 FROM timestamp t JOIN process_data p ON t.id = p.timestamp_id \
-                 WHERE t.sampling_period = ?5 \
-                   AND t.timestamp >= ?1 AND t.timestamp < ?2 \
-                 UNION ALL \
-                 SELECT \
-                     p.app_name, p.process_exe_path, \
-                     COALESCE(p.process_energy_uj, 0) AS energy_uj, \
-                     COALESCE(p.process_cpu_usage, 0.0) * ?6 AS cpu_contrib, \
-                     COALESCE(p.process_gpu_usage, 0.0) * ?6 AS gpu_contrib, \
-                     COALESCE(p.process_mem_usage, 0.0) * ?6 AS mem_contrib, \
-                     COALESCE(p.read_bytes, 0) AS read_contrib, \
-                     COALESCE(p.written_bytes, 0) AS write_contrib, \
-                     p.subprocess_count \
-                 FROM timestamp t JOIN process_data p ON t.id = p.timestamp_id \
-                 WHERE t.sampling_period = ?6 \
-                   AND t.timestamp >= ?1 AND t.timestamp < ?2 \
-             ) combined \
-             GROUP BY combined.app_name \
-             ORDER BY process_energy_uj DESC \
-             LIMIT ?3";
+        let query = "\
+                SELECT \
+                    ?2 AS timestamp, \
+                    p.app_name AS app_name, \
+                    MAX(p.process_exe_path) AS process_exe_path, \
+                    CAST(SUM(COALESCE(p.process_energy_uj, 0)) AS INTEGER) AS process_energy_uj, \
+                    MIN(SUM(COALESCE(p.process_cpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_cpu_usage, \
+                    MIN(SUM(COALESCE(p.process_gpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_gpu_usage, \
+                    MIN(SUM(COALESCE(p.process_mem_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_mem_usage, \
+                    CAST(SUM(COALESCE(p.read_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS read_bytes, \
+                    CAST(SUM(COALESCE(p.written_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS written_bytes, \
+                    CAST(MAX(p.subprocess_count) AS INTEGER) AS subprocess_count \
+                FROM timestamp t \
+                JOIN process_data p ON t.id = p.timestamp_id \
+                WHERE t.timestamp >= ?1 AND t.timestamp < ?2 \
+                GROUP BY p.app_name \
+                ORDER BY process_energy_uj DESC \
+                LIMIT ?3";
 
         let rows = self.execute_sensor_query(
             ProcessData::table_name_static(),
             query,
-            rusqlite::params![
-                start,
-                now_ms,
-                top_n as i64,
-                n_seconds as f64,
-                LIVE_SAMPLING_PERIOD_SECONDS,
-                HOURLY_SAMPLING_PERIOD_SECONDS
-            ],
+            rusqlite::params![start, now_ms, top_n as i64],
         )?;
 
         let mut processes = Vec::new();
         for (_, data) in rows {
-            if let SensorData::Process(mut proc_data) = data {
+            if let ComputedSensorData::Process(mut proc_data) = data {
                 processes.append(&mut proc_data);
             }
         }
-        Ok(vec![(from_epoch_millis(now_ms as i64), SensorData::Process(processes))])
+        Ok(vec![(
+            from_epoch_millis(now_ms as i64),
+            ComputedSensorData::Process(processes),
+        )])
     }
 }
 
@@ -880,7 +861,7 @@ fn windowed_column_expr(
     }
 }
 
-fn zero_sensor_data(table_name: &str) -> Option<SensorData> {
+fn zero_sensor_data(table_name: &str) -> Option<ComputedSensorData> {
     dispatch_entry!(table_name, zero())
 }
 
@@ -892,7 +873,7 @@ fn from_epoch_millis(ts_millis: i64) -> SystemTime {
     SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(ts_millis as u64)
 }
 
-fn to_system_time_records(records: Vec<(i64, SensorData)>) -> Vec<(SystemTime, SensorData)> {
+fn to_system_time_records(records: Vec<(i64, ComputedSensorData)>) -> Vec<(SystemTime, ComputedSensorData)> {
     records
         .into_iter()
         .map(|(ts_millis, data)| (from_epoch_millis(ts_millis), data))

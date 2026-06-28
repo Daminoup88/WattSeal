@@ -7,8 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData, SecondaryValues,
-    SensorData, TotalData, database::LIVE_SAMPLING_PERIOD_SECONDS, utils::load_icon_and_name,
+    ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData,
+    SecondaryValues, TotalData, database::LIVE_SAMPLING_PERIOD_SECONDS, utils::load_icon_and_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
@@ -141,7 +141,7 @@ impl ComponentState {
         }
     }
 
-    fn append(&mut self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+    fn append(&mut self, timestamp: DateTime<Local>, data: &ComputedSensorData, time_range: &TimeRange) {
         if let Some(energy) = data.total_energy() {
             self.power_graph
                 .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
@@ -228,7 +228,7 @@ impl ComponentState {
         }
     }
 
-    fn available_metrics(&self, latest: Option<&SensorData>) -> Vec<MetricKind> {
+    fn available_metrics(&self, latest: Option<&ComputedSensorData>) -> Vec<MetricKind> {
         let mut metrics = vec![MetricKind::default()];
         if let Some(secondary_values) = latest.and_then(|d| d.secondary_values()) {
             metrics.push(secondary_values.metric_type);
@@ -238,7 +238,7 @@ impl ComponentState {
 
     fn snapshot_row(
         &self,
-        latest: Option<&SensorData>,
+        latest: Option<&ComputedSensorData>,
         language: AppLanguage,
     ) -> Option<Row<'static, Message, AppTheme>> {
         let secondary_values = latest?.secondary_values()?;
@@ -288,7 +288,7 @@ impl TotalState {
         }
     }
 
-    fn append(&self, timestamp: DateTime<Local>, data: &SensorData, time_range: &TimeRange) {
+    fn append(&self, timestamp: DateTime<Local>, data: &ComputedSensorData, time_range: &TimeRange) {
         if let Some(energy) = data.total_energy() {
             self.power_graph
                 .append_power(timestamp, chart_power_or_energy(energy, time_range) as f32);
@@ -329,7 +329,7 @@ impl ProcessesState {
         let mut next_top = processes.to_vec();
 
         for process in &mut next_top {
-            if let Some(exe_path) = &process.process_exe_path {
+            if let Some(exe_path) = &process.measured.process_exe_path {
                 let path = Path::new(exe_path);
                 if !path.is_absolute() {
                     continue;
@@ -343,7 +343,7 @@ impl ProcessesState {
                 });
                 process.icon = entry.0.clone();
                 if let Some(ref friendly_name) = entry.1 {
-                    process.app_name = friendly_name.clone();
+                    process.measured.app_name = friendly_name.clone();
                 }
             }
         }
@@ -383,7 +383,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<SensorData>,
+    latest_reading: Option<ComputedSensorData>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -422,7 +422,7 @@ impl SensorState {
     }
 
     /// Returns the most recent sensor reading.
-    pub fn get_latest_reading(&self) -> Option<&SensorData> {
+    pub fn get_latest_reading(&self) -> Option<&ComputedSensorData> {
         self.latest_reading.as_ref()
     }
 
@@ -512,7 +512,7 @@ impl SensorState {
     }
 
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &ComputedSensorData) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
@@ -542,7 +542,7 @@ impl SensorState {
     }
 
     /// Adds a data point to history without updating the latest reading.
-    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &SensorData) {
+    pub fn push_to_history_only(&mut self, timestamp: DateTime<Local>, data: &ComputedSensorData) {
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
         match &mut self.sensor_category {
             SensorCategory::Component(state) => state.append(timestamp, data, &self.time_range),
@@ -552,9 +552,9 @@ impl SensorState {
     }
 
     /// Replaces chart data with a full history batch.
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, SensorData)]) {
+    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, ComputedSensorData)]) {
         if let SensorCategory::Processes(state) = &mut self.sensor_category {
-            if let Some((_, SensorData::Process(processes))) = data.last() {
+            if let Some((_, ComputedSensorData::Process(processes))) = data.last() {
                 state.update_from_snapshot(processes);
             }
             return;
@@ -823,6 +823,7 @@ impl SensorState {
         let table_font_size = FONT_SIZE_BODY;
         for p in &state.top_processes {
             let gpu = p
+                .measured
                 .process_gpu_usage
                 .map_or(na(self.language).to_string(), |v| format!("{:.1}%", v));
             table = table.push(
@@ -831,7 +832,7 @@ impl SensorState {
                     .align_y(Alignment::Center)
                     .push(process_icon_cell(state.icon_handle_for(p)))
                     .push(text_widget(
-                        format!("{} ({})", p.app_name, p.subprocess_count),
+                        format!("{} ({})", p.measured.app_name, p.subprocess_count),
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_APP_WIDTH),
@@ -849,7 +850,7 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!("{:.1}%", p.process_cpu_usage),
+                        format!("{:.1}%", p.measured.process_cpu_usage),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_CPU_WIDTH),
@@ -863,21 +864,21 @@ impl SensorState {
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}%", p.process_mem_usage),
+                        format!("{:.1}%", p.measured.process_mem_usage),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_RAM_WIDTH),
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", p.read_bytes.as_mb()),
+                        format!("{:.1}MB/s", p.measured.read_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_DISK_READ_WIDTH),
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", p.written_bytes.as_mb()),
+                        format!("{:.1}MB/s", p.measured.written_bytes.as_mb()),
                         table_font_size,
                         TextStyle::Tertiary,
                         Length::Fixed(PROCESS_DISK_WRITE_WIDTH),
@@ -987,10 +988,11 @@ fn process_power_or_energy(energy: EnergyUj, time_range: &TimeRange) -> f64 {
 
 fn process_identity(process: &ProcessData) -> String {
     process
+        .measured
         .process_exe_path
         .as_ref()
         .cloned()
-        .unwrap_or_else(|| process.app_name.clone())
+        .unwrap_or_else(|| process.measured.app_name.clone())
 }
 
 fn prune_history(history: &HistoryRef, cutoff: DateTime<Local>) {
