@@ -766,59 +766,29 @@ impl Database {
         let now_ms = to_epoch_millis(SystemTime::now())?;
         let start = now_ms - n_seconds * 1000;
 
-        let query = "SELECT \
-                ?2 AS timestamp, \
-                combined.app_name AS app_name, \
-                MAX(combined.process_exe_path) AS process_exe_path, \
-                CAST(SUM(combined.energy_uj) AS INTEGER) AS process_energy_uj, \
-                SUM(combined.cpu_contrib)  / ?4 AS process_cpu_usage, \
-                SUM(combined.gpu_contrib)  / ?4 AS process_gpu_usage, \
-                SUM(combined.mem_contrib)  / ?4 AS process_mem_usage, \
-                CAST(SUM(combined.read_contrib)  / ?4 AS INTEGER) AS read_bytes, \
-                CAST(SUM(combined.write_contrib) / ?4 AS INTEGER) AS written_bytes, \
-                CAST(MAX(combined.subprocess_count) AS INTEGER) AS subprocess_count \
-             FROM ( \
-                 SELECT \
-                     p.app_name, p.process_exe_path, \
-                     COALESCE(p.process_energy_uj, 0) AS energy_uj, \
-                     COALESCE(p.process_cpu_usage, 0.0) AS cpu_contrib, \
-                     COALESCE(p.process_gpu_usage, 0.0) AS gpu_contrib, \
-                     COALESCE(p.process_mem_usage, 0.0) AS mem_contrib, \
-                     COALESCE(p.read_bytes,    0) AS read_contrib, \
-                     COALESCE(p.written_bytes, 0) AS write_contrib, \
-                     p.subprocess_count \
-                 FROM timestamp t JOIN process_data p ON t.id = p.timestamp_id \
-                 WHERE t.sampling_period = ?5 \
-                   AND t.timestamp >= ?1 AND t.timestamp < ?2 \
-                 UNION ALL \
-                 SELECT \
-                     p.app_name, p.process_exe_path, \
-                     COALESCE(p.process_energy_uj, 0) AS energy_uj, \
-                     COALESCE(p.process_cpu_usage, 0.0) * ?6 AS cpu_contrib, \
-                     COALESCE(p.process_gpu_usage, 0.0) * ?6 AS gpu_contrib, \
-                     COALESCE(p.process_mem_usage, 0.0) * ?6 AS mem_contrib, \
-                     COALESCE(p.read_bytes, 0) AS read_contrib, \
-                     COALESCE(p.written_bytes, 0) AS write_contrib, \
-                     p.subprocess_count \
-                 FROM timestamp t JOIN process_data p ON t.id = p.timestamp_id \
-                 WHERE t.sampling_period = ?6 \
-                   AND t.timestamp >= ?1 AND t.timestamp < ?2 \
-             ) combined \
-             GROUP BY combined.app_name \
-             ORDER BY process_energy_uj DESC \
-             LIMIT ?3";
+        let query = "\
+                SELECT \
+                    ?2 AS timestamp, \
+                    p.app_name AS app_name, \
+                    MAX(p.process_exe_path) AS process_exe_path, \
+                    CAST(SUM(COALESCE(p.process_energy_uj, 0)) AS INTEGER) AS process_energy_uj, \
+                    MIN(SUM(COALESCE(p.process_cpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_cpu_usage, \
+                    MIN(SUM(COALESCE(p.process_gpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_gpu_usage, \
+                    MIN(SUM(COALESCE(p.process_mem_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_mem_usage, \
+                    CAST(SUM(COALESCE(p.read_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS read_bytes, \
+                    CAST(SUM(COALESCE(p.written_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS written_bytes, \
+                    CAST(MAX(p.subprocess_count) AS INTEGER) AS subprocess_count \
+                FROM timestamp t \
+                JOIN process_data p ON t.id = p.timestamp_id \
+                WHERE t.timestamp >= ?1 AND t.timestamp < ?2 \
+                GROUP BY p.app_name \
+                ORDER BY process_energy_uj DESC \
+                LIMIT ?3";
 
         let rows = self.execute_sensor_query(
             ProcessData::table_name_static(),
             query,
-            rusqlite::params![
-                start,
-                now_ms,
-                top_n as i64,
-                n_seconds as f64,
-                LIVE_SAMPLING_PERIOD_SECONDS,
-                HOURLY_SAMPLING_PERIOD_SECONDS
-            ],
+            rusqlite::params![start, now_ms, top_n as i64],
         )?;
 
         let mut processes = Vec::new();
