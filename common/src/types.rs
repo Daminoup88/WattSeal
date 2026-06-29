@@ -237,6 +237,7 @@ pub struct GPUData<E = EnergyUj> {
     pub total_energy: Option<E>,
     pub usage_percent: Option<f64>,
     pub vram_usage_percent: Option<f64>,
+    pub name: Option<String>,
 }
 
 /// RAM energy and usage readings.
@@ -593,6 +594,7 @@ impl SensorData {
                 total_energy: data.total_energy.map(|e| e.to_wh()),
                 usage_percent: data.usage_percent,
                 vram_usage_percent: data.vram_usage_percent,
+                name: data.name.clone(),
             }),
             SensorData::Ram(data) => SensorData::Ram(RamData {
                 total_energy: data.total_energy.map(|e| e.to_wh()),
@@ -678,6 +680,7 @@ impl ComputedSensorData {
                 usage_percent: data.usage_percent,
             }),
             ComputedSensorData::GPU(data) => ComputedSensorData::GPU(GPUData {
+                name: data.name.clone(),
                 total_energy: data.total_energy.map(|e| e.to_wh()),
                 usage_percent: data.usage_percent,
                 vram_usage_percent: data.vram_usage_percent,
@@ -1034,6 +1037,7 @@ impl Default for GPUData {
             total_energy: Some(EnergyUj(0)),
             usage_percent: Some(0.0),
             vram_usage_percent: Some(0.0),
+            name: None,
         }
     }
 }

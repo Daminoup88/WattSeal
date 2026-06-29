@@ -138,20 +138,43 @@ pub fn create_event_from_sensors(
     // --- Integrated-GPU energy resolution ---
     // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
     if let Some(igpu_energy) = integrated_gpu_energy {
-        let merged = data.iter_mut().any(|d| {
-            if let SensorData::GPU(gpu) = d {
+        let mut merged = false;
+        // Try to merge into a tracked integrated GPU first
+        for &idx in &integrated_gpu_indices {
+            if let Some(SensorData::GPU(gpu)) = data.get_mut(idx) {
                 if gpu.total_energy.is_none() {
                     gpu.total_energy = Some(igpu_energy);
-                    return true;
+                    merged = true;
+                    break;
                 }
             }
-            false
-        });
+        }
+        // Fallback to any GPU without energy reading
         if !merged {
+            merged = data.iter_mut().any(|d| {
+                if let SensorData::GPU(gpu) = d {
+                    if gpu.total_energy.is_none() {
+                        gpu.total_energy = Some(igpu_energy);
+                        return true;
+                    }
+                }
+                false
+            });
+        }
+        if !merged {
+            let igpu_name = sensors.iter().find_map(|s| {
+                if let SensorType::GPU(gpu_sensor) = s {
+                    if gpu_sensor.is_integrated() {
+                        return Some(gpu_sensor.name());
+                    }
+                }
+                None
+            });
             data.push(SensorData::GPU(GPUData {
                 total_energy: Some(igpu_energy),
                 usage_percent: None,
                 vram_usage_percent: None,
+                name: igpu_name,
             }));
         }
     }
@@ -259,12 +282,11 @@ pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
 
 /// Collects hardware info (names + initial specs) from all sensors.
 pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -> GeneralData {
-    let mut detected_materials: Vec<String> = Vec::new();
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
     for sensor in sensors {
         match sensor.read_name() {
-            Ok(name) => detected_materials.push(name),
+            Ok(name) => crate::clog!("✓ Added sensor {}: {}", sensor.table_name(), name),
             Err(SensorError::NotSupported) => {}
             Err(e) => crate::clog!("✗ Failed to read sensor name for {}: {:?}", sensor.table_name(), e),
         }
@@ -310,7 +332,11 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
             is_primary: display_info.is_primary,
         });
     }
-    detected_materials.push(format!("Display(s): [{}]", display_names.join(", ")));
+    crate::clog!(
+        "✓ Added {} display(s): [{}]",
+        screen_infos.len(),
+        display_names.join(", ")
+    );
     sensors_info.push(InitialInfo::Displays(screen_infos));
 
     // Battery info
@@ -347,7 +373,14 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
             battery_info
         }
     };
-    detected_materials.push(format!("Battery(s): [{}]", battery_names.join(", ")));
+    crate::clog!(
+        "✓ Added battery info: present={}, name(s)=[{}], design_capacity={:?}Wh, full_charge_capacity={:?}Wh, cycle_count={:?}",
+        battery_info.present,
+        battery_names.join(", "),
+        battery_info.design_capacity_wh,
+        battery_info.full_charge_capacity_wh,
+        battery_info.cycle_count
+    );
     sensors_info.push(InitialInfo::Battery(battery_info));
     let hardware_info: HardwareInfo = sensors_info.into();
 

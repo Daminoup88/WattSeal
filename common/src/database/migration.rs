@@ -73,13 +73,15 @@ fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
             timestamp_id       INTEGER NOT NULL REFERENCES timestamp(id) ON DELETE CASCADE,
             total_energy_uj    INTEGER,
             usage_percent      REAL,
-            vram_usage_percent REAL
+            vram_usage_percent REAL,
+            gpu_name           TEXT
         );
-        INSERT INTO gpu_data (id, timestamp_id, total_energy_uj, usage_percent, vram_usage_percent)
+        INSERT INTO gpu_data (id, timestamp_id, total_energy_uj, usage_percent, vram_usage_percent, gpu_name)
         SELECT g.id, g.timestamp_id, 
                CAST(g.total_power_watts * 1000000 * t.sampling_period AS INTEGER), 
                g.usage_percent, 
-               g.vram_usage_percent 
+               g.vram_usage_percent,
+               NULL
         FROM gpu_data_old g JOIN timestamp t ON g.timestamp_id = t.id;
         DROP TABLE gpu_data_old;
         CREATE INDEX idx_gpu_data_timestamp_id ON gpu_data(timestamp_id);

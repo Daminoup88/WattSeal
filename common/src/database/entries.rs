@@ -126,6 +126,7 @@ impl_database_entry! {
             total_energy: "total_energy_uj" => "INTEGER",
             usage_percent: "usage_percent" => "REAL",
             vram_usage_percent: "vram_usage_percent" => "REAL",
+            name: "gpu_name" => "TEXT",
         }
     }
 }
