@@ -99,7 +99,7 @@ pub fn create_event_from_sensors(
 
     let mut integrated_gpu_energy: Option<EnergyUj> = None;
     let mut has_pp1_source = false;
-    let mut integrated_gpu_indices: Vec<usize> = Vec::new();
+    let mut integrated_gpu_indice: Option<usize> = None;
     for sensor in sensors {
         let sensor_data = sensor.read_full_data();
         match sensor_data {
@@ -119,7 +119,7 @@ pub fn create_event_from_sensors(
                 // Track integrated Intel GPUs for estimation fallback.
                 if let SensorType::GPU(gpu_sensor) = sensor {
                     if gpu_sensor.is_integrated() {
-                        integrated_gpu_indices.push(data.len());
+                        integrated_gpu_indice = Some(data.len());
                     }
                 }
 
@@ -139,13 +139,12 @@ pub fn create_event_from_sensors(
     // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
     if let Some(igpu_energy) = integrated_gpu_energy {
         let mut merged = false;
-        // Try to merge into a tracked integrated GPU first
-        for &idx in &integrated_gpu_indices {
+        // Try to merge into the tracked integrated GPU first
+        if let Some(idx) = integrated_gpu_indice {
             if let Some(SensorData::GPU(gpu)) = data.get_mut(idx) {
                 if gpu.total_energy.is_none() {
                     gpu.total_energy = Some(igpu_energy);
                     merged = true;
-                    break;
                 }
             }
         }
@@ -181,7 +180,7 @@ pub fn create_event_from_sensors(
 
     // Priority 2: Estimate iGPU energy from usage when PP1 is unavailable.
     if !has_pp1_source {
-        for &idx in &integrated_gpu_indices {
+        if let Some(idx) = integrated_gpu_indice {
             if let SensorData::GPU(ref mut gpu) = data[idx] {
                 if gpu.total_energy.is_none() {
                     if let Some(usage) = gpu.usage_percent {
