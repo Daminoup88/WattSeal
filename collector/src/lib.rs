@@ -256,10 +256,6 @@ impl CollectorApp {
 
                         let result = database.insert_event_and_update_energy(&computed_event, 1);
                         let duration = start.elapsed();
-
-                        for sensor_data in computed_event.data() {
-                            println!("{sensor_data}");
-                        }
                         match result {
                             Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
                             Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),

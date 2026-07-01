@@ -586,11 +586,25 @@ impl Database {
                 table_name
             )));
         }
-        let query = format!(
-            "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
-             WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC",
-            table_name
-        );
+        let query = if table_name == "gpu_data" {
+            "SELECT t.timestamp, d.* FROM timestamp t JOIN ( \
+                 SELECT timestamp_id, \
+                        SUM(total_energy_uj) AS total_energy_uj, \
+                        SUM(usage_percent) AS usage_percent, \
+                        SUM(vram_usage_percent) AS vram_usage_percent, \
+                        NULL AS gpu_name \
+                 FROM gpu_data \
+                 GROUP BY timestamp_id \
+             ) d ON t.id = d.timestamp_id \
+             WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC"
+                .to_string()
+        } else {
+            format!(
+                "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
+                 WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC",
+                table_name
+            )
+        };
 
         Ok(self.execute_sensor_query(table_name, &query, params![start_time_millis, end_time_millis])?)
     }
@@ -611,18 +625,41 @@ impl Database {
         let live_cols = get_windowed_columns(table_name, "d.", window_seconds, WindowedSource::Live)?;
         let hourly_cols = get_windowed_columns(table_name, "d.", window_seconds, WindowedSource::Hourly)?;
         let query = |cols: &str| {
-            format!(
-                "SELECT \
-                    (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
-                    {} \
-                 FROM timestamp t \
-                 JOIN {} d ON t.id = d.timestamp_id \
-                 WHERE t.timestamp >= ?1 AND t.timestamp < ?3 \
-                   AND t.sampling_period = ?4 \
-                 GROUP BY window_start \
-                 ORDER BY window_start ASC",
-                cols, table_name
-            )
+            if table_name == "gpu_data" {
+                format!(
+                    "SELECT \
+                        (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        {} \
+                     FROM timestamp t \
+                     JOIN ( \
+                        SELECT timestamp_id, \
+                               SUM(total_energy_uj) AS total_energy_uj, \
+                               SUM(usage_percent) AS usage_percent, \
+                               SUM(vram_usage_percent) AS vram_usage_percent, \
+                               NULL AS gpu_name \
+                        FROM gpu_data \
+                        GROUP BY timestamp_id \
+                     ) d ON t.id = d.timestamp_id \
+                     WHERE t.timestamp >= ?1 AND t.timestamp < ?3 \
+                       AND t.sampling_period = ?4 \
+                     GROUP BY window_start \
+                     ORDER BY window_start ASC",
+                    cols
+                )
+            } else {
+                format!(
+                    "SELECT \
+                        (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        {} \
+                     FROM timestamp t \
+                     JOIN {} d ON t.id = d.timestamp_id \
+                     WHERE t.timestamp >= ?1 AND t.timestamp < ?3 \
+                       AND t.sampling_period = ?4 \
+                     GROUP BY window_start \
+                     ORDER BY window_start ASC",
+                    cols, table_name
+                )
+            }
         };
 
         let live_rows = self.execute_sensor_query(

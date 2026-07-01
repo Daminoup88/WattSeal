@@ -105,8 +105,8 @@ pub fn get_gpu_list() -> Vec<String> {
     Vec::new()
 }
 
-/// Platform-specific GPU energy sensor.
-pub enum GPUSensor {
+/// Platform-specific GPU energy sensor inner variant.
+pub enum GPUSensorInner {
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     Nvidia(nvidia_gpu::NvidiaGPUSensor),
     #[cfg(target_os = "windows")]
@@ -115,18 +115,28 @@ pub enum GPUSensor {
     Intel { sensor: intel_gpu::IntelGPUSensor },
 }
 
+/// Global GPU energy sensor wrapper.
+pub struct GPUSensor {
+    name: String,
+    inner: GPUSensorInner,
+}
+
 impl Sensor for GPUSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
-        match self {
+        let mut data = match &self.inner {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensor::Nvidia(sensor) => sensor.read_full_data(),
+            GPUSensorInner::Nvidia(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "windows")]
-            GPUSensor::Amd(sensor) => sensor.read_full_data(),
+            GPUSensorInner::Amd(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "windows")]
-            GPUSensor::Intel { sensor } => sensor.read_full_data(),
+            GPUSensorInner::Intel { sensor } => sensor.read_full_data()?,
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-            _ => Err(SensorError::NotSupported),
+            _ => return Err(SensorError::NotSupported),
+        };
+        if let SensorData::GPU(ref mut gpu) = data {
+            gpu.name = Some(self.name());
         }
+        Ok(data)
     }
 
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
@@ -134,33 +144,35 @@ impl Sensor for GPUSensor {
     }
 
     fn read_name(&self) -> Result<String, SensorError> {
-        Ok(format!("Gpu(s): [{}]", get_gpu_list().join(", ")))
+        Ok(self.name.clone())
     }
 }
 
 /// Creates a GPU energy sensor appropriate for the given vendor.
 pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
+    let name = format!("{} ({})", vendor_id, index);
 
     #[cfg(target_os = "windows")]
     {
-        let sensor = match vendor {
-            GPUVendor::Amd => Ok(GPUSensor::Amd(amd_gpu::AmdGPUSensor::new(index)?)),
-            GPUVendor::Nvidia => Ok(GPUSensor::Nvidia(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
-            GPUVendor::Intel => Ok(GPUSensor::Intel {
+        let inner = match vendor {
+            GPUVendor::Amd => Ok(GPUSensorInner::Amd(amd_gpu::AmdGPUSensor::new(index)?)),
+            GPUVendor::Nvidia => Ok(GPUSensorInner::Nvidia(nvidia_gpu::NvidiaGPUSensor::new(index)?)),
+            GPUVendor::Intel => Ok(GPUSensorInner::Intel {
                 sensor: intel_gpu::IntelGPUSensor::new(index)?,
             }),
             GPUVendor::Other => Err(SensorError::NotSupported),
-        };
-        return sensor.map(SensorType::GPU);
+        }?;
+        return Ok(SensorType::GPU(GPUSensor { name, inner }));
     }
 
     #[cfg(target_os = "linux")]
     {
-        return match vendor {
-            GPUVendor::Nvidia => nvidia_gpu::NvidiaGPUSensor::new(index).map(|s| SensorType::GPU(GPUSensor::Nvidia(s))),
+        let inner = match vendor {
+            GPUVendor::Nvidia => nvidia_gpu::NvidiaGPUSensor::new(index).map(GPUSensorInner::Nvidia),
             _ => Err(SensorError::NotSupported),
-        };
+        }?;
+        return Ok(SensorType::GPU(GPUSensor { name, inner }));
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
@@ -173,11 +185,11 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
 impl GPUSensor {
     /// Returns per-process GPU utilization percentages.
     pub fn get_process_gpu_usage(&self, current_timestamp: u64) -> Result<HashMap<u32, f64>, SensorError> {
-        match self {
+        match &self.inner {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensor::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
+            GPUSensorInner::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
             #[cfg(target_os = "windows")]
-            GPUSensor::Amd(_) | GPUSensor::Intel { .. } => Err(SensorError::NotSupported),
+            GPUSensorInner::Amd(_) | GPUSensorInner::Intel { .. } => Err(SensorError::NotSupported),
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
             _ => Err(SensorError::NotSupported),
         }
@@ -185,11 +197,15 @@ impl GPUSensor {
 
     /// Returns `true` when this GPU is a known integrated GPU model.
     pub fn is_integrated(&self) -> bool {
-        match self {
+        match &self.inner {
             #[cfg(target_os = "windows")]
-            GPUSensor::Intel { .. } => true,
+            GPUSensorInner::Intel { .. } => true,
             _ => false,
         }
+    }
+
+    pub fn name(&self) -> String {
+        self.name.to_string()
     }
 }
 
@@ -285,6 +301,7 @@ mod amd_gpu {
                 total_energy: Some(EnergyUj::from_joules(energy_j)),
                 usage_percent: Some(usage as f64),
                 vram_usage_percent: memory,
+                name: None,
             };
 
             *self.last_reading.borrow_mut() = now;
@@ -441,6 +458,7 @@ mod nvidia_gpu {
                 total_energy: Some(energy),
                 usage_percent: Some(utilization.gpu as f64),
                 vram_usage_percent: Some(utilization.memory as f64),
+                name: None,
             }
             .into())
         }
@@ -520,6 +538,7 @@ mod intel_gpu {
                         total_energy: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
+                        name: None,
                     }
                     .into());
                 }
@@ -530,6 +549,7 @@ mod intel_gpu {
                         total_energy: None,
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
+                        name: None,
                     }
                     .into());
                 }
@@ -545,6 +565,7 @@ mod intel_gpu {
                     total_energy: None,
                     usage_percent: Some(max.clamp(0.0, 100.0)),
                     vram_usage_percent: None,
+                    name: None,
                 }
                 .into())
             }
