@@ -167,10 +167,7 @@ pub fn get_cpu_power_sensor(system: Rc<RefCell<System>>, index: usize) -> Result
     let cpu = s.cpus().get(index).ok_or(SensorError::NotSupported)?;
     let cpu_name = cpu.brand().to_string();
     #[cfg(target_os = "windows")]
-    let vendor_id = {
-        windows_cpu::setup();
-        cpu.vendor_id().to_string()
-    };
+    let vendor_id = cpu.vendor_id().to_string();
     drop(s);
 
     // Try platform-specific sensor first, fall back to TDP estimation
