@@ -515,10 +515,21 @@ impl Database {
                 if !is_valid_table_name(table_name) {
                     continue;
                 }
-                let query = format!(
-                    "SELECT timestamp_id, * FROM {} WHERE timestamp_id IN ({})",
-                    table_name, id_list
-                );
+                // TODO: unify the query when the UI can handle several gpu values per timestamp
+                let query = if table_name == GPUData::table_name_static() {
+                    format!(
+                        "SELECT timestamp_id, SUM(total_energy_uj) AS total_energy_uj, \
+                         AVG(usage_percent) AS usage_percent, AVG(vram_usage_percent) AS vram_usage_percent, \
+                         NULL AS gpu_name \
+                         FROM {} WHERE timestamp_id IN ({}) GROUP BY timestamp_id",
+                        table_name, id_list
+                    )
+                } else {
+                    format!(
+                        "SELECT timestamp_id, * FROM {} WHERE timestamp_id IN ({})",
+                        table_name, id_list
+                    )
+                };
                 let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
                 for (ts_id, sensor_data) in sensor_data_list {
                     if let Some(ts) = timestamps_map.get(&ts_id) {
@@ -586,12 +597,13 @@ impl Database {
                 table_name
             )));
         }
-        let query = if table_name == "gpu_data" {
+        // TODO: unify the query when the UI can handle several gpu values per timestamp
+        let query = if table_name == GPUData::table_name_static() {
             "SELECT t.timestamp, d.* FROM timestamp t JOIN ( \
                  SELECT timestamp_id, \
                         SUM(total_energy_uj) AS total_energy_uj, \
-                        SUM(usage_percent) AS usage_percent, \
-                        SUM(vram_usage_percent) AS vram_usage_percent, \
+                        AVG(usage_percent) AS usage_percent, \
+                        AVG(vram_usage_percent) AS vram_usage_percent, \
                         NULL AS gpu_name \
                  FROM gpu_data \
                  GROUP BY timestamp_id \
