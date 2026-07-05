@@ -69,13 +69,17 @@ jobs:
           import re
           with open("Cargo.toml", "r", encoding="utf-8") as f:
               content = f.read()
+          match = re.search(r'^version = "(\d+)\.(\d+)\.(\d+)"', content, re.MULTILINE)
+          major, minor, patch = match.group(1), match.group(2), int(match.group(3)) + 1
+          new_version = f'{major}.{minor}.{patch}${{ inputs.version-suffix }}'
           new_content = re.sub(
-              r'^version = "([^"]+)"',
-              r'version = "\1${{ inputs.version-suffix }}"',
+              r'^version = "\d+\.\d+\.\d+"',
+              f'version = "{new_version}"',
               content, count=1, flags=re.MULTILINE
           )
           with open("Cargo.toml", "w", encoding="utf-8") as f:
               f.write(new_content)
+          print(f"Version set to {new_version}")
 
       - name: Install cargo-zigbuild
         if: ${{ !inputs.check-only && matrix.zigbuild-target != '' }}
