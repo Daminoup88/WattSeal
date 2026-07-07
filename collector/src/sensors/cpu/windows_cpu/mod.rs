@@ -227,6 +227,20 @@ trait MSR {
         let result = expression(edx, eax);
         Ok(result)
     }
+    fn read_optional_energy_domain(
+        msr_reader: &ScaphandreMsrReader,
+        msr_addr: u32,
+        domain_label: &'static str,
+    ) -> Option<u64> {
+        Self::read_msr(msr_reader, msr_addr, Self::energy_expression)
+            .inspect_err(|e| {
+                common::logging::log_component_error(
+                    domain_label,
+                    &format!("Failed to read {domain_label} energy: {e}"),
+                );
+            })
+            .ok()
+    }
     fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String>;
     fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String>;
 }
@@ -254,15 +268,15 @@ impl MSR for IntelMSR {
     }
     fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
         let pkg_energy = Self::read_msr(msr_reader, Self::MSR_PKG_ENERGY_STATUS as u32, Self::energy_expression)?;
-        let pp0_energy = Self::read_msr(msr_reader, Self::MSR_PP0_ENERGY_STATUS as u32, Self::energy_expression)?;
-        let pp1_energy = Self::read_msr(msr_reader, Self::MSR_PP1_ENERGY_STATUS as u32, Self::energy_expression)?;
-        let dram_energy = Self::read_msr(msr_reader, Self::MSR_DRAM_ENERGY_STATUS as u32, Self::energy_expression)?;
+        let pp0_energy = Self::read_optional_energy_domain(msr_reader, Self::MSR_PP0_ENERGY_STATUS as u32, "pp0");
+        let pp1_energy = Self::read_optional_energy_domain(msr_reader, Self::MSR_PP1_ENERGY_STATUS as u32, "pp1");
+        let dram_energy = Self::read_optional_energy_domain(msr_reader, Self::MSR_DRAM_ENERGY_STATUS as u32, "dram");
 
         Ok(CPUValues {
             pkg: Some(pkg_energy),
-            pp0: Some(pp0_energy),
-            pp1: Some(pp1_energy),
-            dram: Some(dram_energy),
+            pp0: pp0_energy,
+            pp1: pp1_energy,
+            dram: dram_energy,
         })
     }
 }

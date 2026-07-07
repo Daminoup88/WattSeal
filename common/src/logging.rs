@@ -53,22 +53,29 @@ static ERROR_COUNTS: Mutex<Option<HashMap<&'static str, u32>>> = Mutex::new(None
 #[cfg(not(debug_assertions))]
 static MAX_ERROR_LOGS: u32 = 3;
 
-#[cfg(not(debug_assertions))]
-/// Log a runtime error for the given component, but only for the first `MAX_ERROR_LOGS` occurrences.
+/// Log a runtime error for the given component, but only for the first `MAX_ERROR_LOGS` occurrences in release mode.
 pub fn log_component_error(component: &'static str, msg: &str) {
-    let mut guard = match ERROR_COUNTS.lock() {
-        Ok(g) => g,
-        Err(_) => return,
-    };
-    let map = guard.get_or_insert_with(HashMap::new);
-    let count = map.entry(component).or_insert(0);
-    if *count < MAX_ERROR_LOGS {
-        *count += 1;
-        let remaining = MAX_ERROR_LOGS - *count;
-        if remaining == 0 {
-            crate::clog!("✗ [{component}] {msg} (further errors suppressed)");
-        } else {
-            crate::clog!("✗ [{component}] {msg} ({remaining} log(s) remaining)");
+    #[cfg(debug_assertions)]
+    {
+        eprintln!("✗ [{component}] {msg}");
+    }
+
+    #[cfg(not(debug_assertions))]
+    {
+        let mut guard = match ERROR_COUNTS.lock() {
+            Ok(g) => g,
+            Err(_) => return,
+        };
+        let map = guard.get_or_insert_with(HashMap::new);
+        let count = map.entry(component).or_insert(0);
+        if *count < MAX_ERROR_LOGS {
+            *count += 1;
+            let remaining = MAX_ERROR_LOGS - *count;
+            if remaining == 0 {
+                crate::clog!("✗ [{component}] {msg} (further errors suppressed)");
+            } else {
+                crate::clog!("✗ [{component}] {msg} ({remaining} log(s) remaining)");
+            }
         }
     }
 }

@@ -125,9 +125,6 @@ pub fn create_event_from_sensors(
 
                 data.push(d);
             }
-            #[cfg(debug_assertions)]
-            Err(e) => eprintln!("✗ Error reading sensor data: {:?}", e),
-            #[cfg(not(debug_assertions))]
             Err(e) => common::logging::log_component_error(
                 sensor.table_name(),
                 &format!("Failed to read sensor data: {:?}", e),
