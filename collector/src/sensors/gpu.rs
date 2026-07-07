@@ -225,6 +225,8 @@ mod amd_gpu {
         gpu: Gpu,
         last_reading: RefCell<Instant>,
         vram_supported: bool,
+        power_supported: bool,
+        usage_supported: bool,
     }
 
     impl AmdGPUSensor {
@@ -251,17 +253,29 @@ mod amd_gpu {
                 .is_supported_gpu_vram()
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
-            if !power_supported {
+            if !power_supported && !usage_supported {
                 return Err(SensorError::ReadError(format!(
-                    "⚠ AMD GPU {} power telemetry unavailable at initialization",
+                    "⚠ AMD GPU {} power and usage telemetry unavailable at initialization",
                     index
                 )));
             }
-            if !usage_supported {
-                return Err(SensorError::ReadError(format!(
-                    "⚠ AMD GPU {} usage telemetry unavailable at initialization",
+            if !power_supported {
+                common::clog!(
+                    "⚠ AMD GPU {} power telemetry unavailable at initialization: energy will be estimated",
                     index
-                )));
+                );
+            }
+            if !usage_supported {
+                common::clog!(
+                    "⚠ AMD GPU {} usage telemetry unavailable at initialization: usage will be None",
+                    index
+                );
+            }
+            if !vram_supported {
+                common::clog!(
+                    "⚠ AMD GPU {} VRAM telemetry unavailable at initialization: VRAM usage will be None",
+                    index
+                );
             }
 
             Ok(AmdGPUSensor {
@@ -270,6 +284,8 @@ mod amd_gpu {
                 gpu,
                 last_reading: RefCell::new(Instant::now()),
                 vram_supported,
+                power_supported,
+                usage_supported,
             })
         }
     }
@@ -284,13 +300,21 @@ mod amd_gpu {
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
             // Read AMD GPU data here
-            let power_w = gpu_metrics
-                .total_board_power()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let total_energy = if self.power_supported {
+                let power_w = gpu_metrics
+                    .total_board_power()
+                    .ok()
+                    .or_else(|| gpu_metrics.power().ok());
+                power_w.map(|p| EnergyUj::from_joules(p * duration))
+            } else {
+                None
+            };
 
-            let energy_j = power_w * duration;
-
-            let usage = gpu_metrics.usage().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            let usage = if self.usage_supported {
+                gpu_metrics.usage().ok()
+            } else {
+                None
+            };
             let memory = if self.vram_supported {
                 Some(gpu_metrics.vram().map_err(|e| SensorError::ReadError(e.to_string()))? as f64)
             } else {
@@ -298,8 +322,8 @@ mod amd_gpu {
             };
 
             let data = GPUData {
-                total_energy: Some(EnergyUj::from_joules(energy_j)),
-                usage_percent: Some(usage as f64),
+                total_energy,
+                usage_percent: usage,
                 vram_usage_percent: memory,
                 name: None,
             };
