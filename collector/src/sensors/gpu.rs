@@ -316,7 +316,7 @@ mod nvidia_gpu {
     use std::{cell::RefCell, collections::HashMap, time::Instant};
 
     use common::types::EnergyUj;
-    use nvml_wrapper::Nvml;
+    use nvml_wrapper::{Nvml, enum_wrappers::device::Sampling, enums::device::SampleValue};
 
     use super::{Sensor, SensorError};
     use crate::database::{GPUData, SensorData};
@@ -324,6 +324,7 @@ mod nvidia_gpu {
     enum NvidiaReadMode {
         EnergyCounter,
         PowerInstant, // fallback when energy counter isn't available
+        PowerSamples, // fallback when neither counter nor instant reading is available
     }
 
     pub struct NvidiaGPUSensor {
@@ -333,12 +334,20 @@ mod nvidia_gpu {
         last_timestamp: RefCell<u64>,
         last_energy_mj: RefCell<u64>,
         last_power_instant: RefCell<Option<Instant>>,
+        last_sample_timestamp: RefCell<Option<u64>>,
     }
 
     impl NvidiaGPUSensor {
         pub fn new(index: u32) -> Result<Self, SensorError> {
             let nvml = Nvml::init().map_err(|e| SensorError::ReadError(e.to_string()))?;
-            // Validate that the device exists
+            let device_count = nvml.device_count().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            if index >= device_count {
+                return Err(SensorError::ReadError(format!(
+                    "NVIDIA GPU index {} out of range ({} device(s) reported by NVML)",
+                    index, device_count
+                )));
+            }
+
             let device = nvml
                 .device_by_index(index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
@@ -356,6 +365,12 @@ mod nvidia_gpu {
                     index
                 );
                 NvidiaReadMode::PowerInstant
+            } else if device.samples(Sampling::Power, None).is_ok() {
+                common::clog!(
+                    "NVIDIA GPU {}: instant power unavailable, falling back to sampled power (driver-side estimate)",
+                    index
+                );
+                NvidiaReadMode::PowerSamples
             } else {
                 return Err(SensorError::ReadError(format!(
                     "⚠ NVIDIA GPU {}: no power telemetry available",
@@ -370,6 +385,7 @@ mod nvidia_gpu {
                 last_timestamp: RefCell::new(0),
                 last_energy_mj: RefCell::new(0),
                 last_power_instant: RefCell::new(None),
+                last_sample_timestamp: RefCell::new(None),
             })
         }
 
@@ -447,6 +463,40 @@ mod nvidia_gpu {
                     };
                     *last_instant = Some(now);
                     energy
+                }
+                NvidiaReadMode::PowerSamples => {
+                    let mut last_ts = self
+                        .last_sample_timestamp
+                        .try_borrow_mut()
+                        .map_err(|_| SensorError::ReadError("Failed to borrow last sample timestamp".to_string()))?;
+
+                    let samples = device
+                        .samples(Sampling::Power, *last_ts)
+                        .map_err(|e| SensorError::ReadError(e.to_string()))?;
+
+                    if samples.is_empty() {
+                        EnergyUj::from_joules(0.0)
+                    } else {
+                        let avg_mw: f64 = samples
+                            .iter()
+                            .filter_map(|s| match s.value {
+                                SampleValue::F64(v) => Some(v),
+                                SampleValue::U32(v) => Some(v as f64),
+                                SampleValue::U64(v) => Some(v as f64),
+                                _ => None,
+                            })
+                            .sum::<f64>()
+                            / samples.len().max(1) as f64;
+
+                        *last_ts = samples.last().map(|s| s.timestamp).or(*last_ts);
+
+                        let dt = now
+                            .duration_since(self.last_power_instant.borrow().unwrap_or(now))
+                            .as_secs_f64();
+                        *self.last_power_instant.borrow_mut() = Some(now);
+
+                        EnergyUj::from_joules((avg_mw / 1000.0) * dt)
+                    }
                 }
             };
 
