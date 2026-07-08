@@ -100,6 +100,7 @@ pub fn create_event_from_sensors(
     let mut integrated_gpu_energy: Option<EnergyUj> = None;
     let mut has_pp1_source = false;
     let mut integrated_gpu_indice: Option<usize> = None;
+    let mut gpu_indices: Vec<(usize, String)> = Vec::new();
     for sensor in sensors {
         let sensor_data = sensor.read_full_data();
         match sensor_data {
@@ -121,6 +122,7 @@ pub fn create_event_from_sensors(
                     if gpu_sensor.is_integrated() {
                         integrated_gpu_indice = Some(data.len());
                     }
+                    gpu_indices.push((data.len(), gpu_sensor.name()));
                 }
 
                 data.push(d);
@@ -175,15 +177,18 @@ pub fn create_event_from_sensors(
         }
     }
 
-    // Priority 2: Estimate iGPU energy from usage when PP1 is unavailable.
-    if !has_pp1_source {
-        if let Some(idx) = integrated_gpu_indice {
-            if let SensorData::GPU(ref mut gpu) = data[idx] {
-                if gpu.total_energy.is_none() {
-                    if let Some(usage) = gpu.usage_percent {
-                        let estimated = cpu::estimate_igpu_energy(usage, since_last_update);
-                        gpu.total_energy = Some(estimated);
-                    }
+    // Priority 2: Estimate all GPU energy from usage when unavailable including integrated GPUs.
+    for (idx, name) in &gpu_indices {
+        // Skip the integrated GPU if it has a PP1 source (already accounted for).
+        if let Some(igpu_idx) = integrated_gpu_indice {
+            if *idx == igpu_idx && has_pp1_source {
+                continue;
+            }
+        }
+        if let Some(SensorData::GPU(gpu)) = data.get_mut(*idx) {
+            if gpu.total_energy.is_none() {
+                if let Some(usage) = gpu.usage_percent {
+                    gpu.total_energy = Some(gpu::estimation::estimate_energy(name, usage, since_last_update));
                 }
             }
         }

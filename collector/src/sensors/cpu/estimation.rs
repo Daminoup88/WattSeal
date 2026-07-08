@@ -68,11 +68,6 @@ static TDP_TABLE: &[(&str, f64)] = &[
 const DEFAULT_TDP: f64 = 65.0;
 const DEFAULT_BOOST_MULTIPLIER: f64 = 1.25;
 
-/// Typical max power budget for an Intel integrated GPU (watts).
-const IGPU_DEFAULT_TDP: f64 = 15.0;
-/// Idle power floor for an integrated GPU (watts).
-const IGPU_IDLE_POWER: f64 = 0.01;
-
 /// Looks up the TDP for a CPU model name, falling back to a default.
 pub fn lookup_tdp(cpu_name: &str) -> f64 {
     let name_lower = cpu_name.to_lowercase();
@@ -96,24 +91,9 @@ fn estimate_power(tdp: f64, usage_percent: f64) -> f64 {
     tdp_idle + (tdp_peak - tdp_idle) * usage_frac.powf(1.6)
 }
 
-/// Estimates integrated-GPU power from usage percentage.
-///
-/// Uses a non-linear curve similar to [`estimate_power`] with a fixed
-/// 15 W typical TDP and a 0.01 W idle floor.
-fn estimate_igpu_power(usage_percent: f64) -> f64 {
-    let frac = (usage_percent / 100.0).clamp(0.0, 1.0);
-    IGPU_IDLE_POWER + (IGPU_DEFAULT_TDP - IGPU_IDLE_POWER) * frac.powf(1.5)
-}
-
 /// Estimates energy in µJ directly from usage and elapsed duration.
 pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Duration) -> EnergyUj {
     let energy_joules = estimate_power(tdp, usage_percent) * duration.as_secs_f64();
-    EnergyUj::from_joules(energy_joules)
-}
-
-/// Estimates integrate-GPU energy in µJ directly from usage and elapsed duration.
-pub fn estimate_igpu_energy(usage_percent: f64, duration: std::time::Duration) -> EnergyUj {
-    let energy_joules = estimate_igpu_power(usage_percent) * duration.as_secs_f64();
     EnergyUj::from_joules(energy_joules)
 }
 

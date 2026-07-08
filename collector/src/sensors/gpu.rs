@@ -4,6 +4,7 @@ use common::types::InitialInfo;
 
 use super::{Sensor, SensorError, SensorType};
 use crate::database::SensorData;
+pub mod estimation;
 
 /// GPU hardware vendor identifier.
 #[derive(Copy, Clone, PartialEq, Debug)]
@@ -248,7 +249,7 @@ mod amd_gpu {
                 .is_supported_gpu_power()
                 .inspect_err(|e| {
                     common::clog!(
-                        "⚠ AMD GPU {} power telemetry unavailable at initialization ({})",
+                        "AMD GPU {} power telemetry unavailable at initialization ({})",
                         index,
                         e
                     );
@@ -258,7 +259,7 @@ mod amd_gpu {
                 .is_supported_gpu_usage()
                 .inspect_err(|e| {
                     common::clog!(
-                        "⚠ AMD GPU {} usage telemetry unavailable at initialization ({})",
+                        "AMD GPU {} usage telemetry unavailable at initialization ({})",
                         index,
                         e
                     );
@@ -267,11 +268,7 @@ mod amd_gpu {
             let vram_supported = supported_metrics
                 .is_supported_gpu_vram()
                 .inspect_err(|e| {
-                    common::clog!(
-                        "⚠ AMD GPU {} VRAM telemetry unavailable at initialization ({})",
-                        index,
-                        e
-                    );
+                    common::clog!("AMD GPU {} VRAM telemetry unavailable at initialization ({})", index, e);
                 })
                 .is_ok();
 
@@ -283,19 +280,19 @@ mod amd_gpu {
             }
             if !power_supported {
                 common::clog!(
-                    "⚠ AMD GPU {} power telemetry unavailable at initialization: energy will be estimated",
+                    "AMD GPU {} power telemetry unavailable at initialization: energy will be estimated",
                     index
                 );
             }
             if !usage_supported {
                 common::clog!(
-                    "⚠ AMD GPU {} usage telemetry unavailable at initialization: usage will be None",
+                    "AMD GPU {} usage telemetry unavailable at initialization: usage will be None",
                     index
                 );
             }
             if !vram_supported {
                 common::clog!(
-                    "⚠ AMD GPU {} VRAM telemetry unavailable at initialization: VRAM usage will be None",
+                    "AMD GPU {} VRAM telemetry unavailable at initialization: VRAM usage will be None",
                     index
                 );
             }
