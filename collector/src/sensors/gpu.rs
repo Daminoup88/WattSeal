@@ -232,6 +232,7 @@ mod amd_gpu {
     impl AmdGPUSensor {
         pub fn new(index: u32) -> Result<Self, SensorError> {
             let helper = AdlxHelper::new().map_err(|e| SensorError::ReadError(e.to_string()))?;
+            common::clog!("AMD GPU {}: ADLX {}", index, helper.full_version());
             let system = helper.system();
             let perfo = system
                 .performance_monitoring_services()
@@ -245,17 +246,38 @@ mod amd_gpu {
 
             let power_supported = supported_metrics
                 .is_supported_gpu_power()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+                .inspect_err(|e| {
+                    common::clog!(
+                        "⚠ AMD GPU {} power telemetry unavailable at initialization ({})",
+                        index,
+                        e
+                    );
+                })
+                .is_ok();
             let usage_supported = supported_metrics
                 .is_supported_gpu_usage()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+                .inspect_err(|e| {
+                    common::clog!(
+                        "⚠ AMD GPU {} usage telemetry unavailable at initialization ({})",
+                        index,
+                        e
+                    );
+                })
+                .is_ok();
             let vram_supported = supported_metrics
                 .is_supported_gpu_vram()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+                .inspect_err(|e| {
+                    common::clog!(
+                        "⚠ AMD GPU {} VRAM telemetry unavailable at initialization ({})",
+                        index,
+                        e
+                    );
+                })
+                .is_ok();
 
             if !power_supported && !usage_supported {
                 return Err(SensorError::ReadError(format!(
-                    "⚠ AMD GPU {} power and usage telemetry unavailable at initialization",
+                    "⚠ AMD GPU {} power and usage telemetry unavailable at initialization, sensor cannot be created",
                     index
                 )));
             }
