@@ -371,6 +371,7 @@ mod nvidia_gpu {
         EnergyCounter,
         PowerInstant, // fallback when energy counter isn't available
         PowerSamples, // fallback when neither counter nor instant reading is available
+        UsageOnly,    // fallback when no power telemetry is available
     }
 
     pub struct NvidiaGPUSensor {
@@ -398,9 +399,7 @@ mod nvidia_gpu {
                 .device_by_index(index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
 
-            device
-                .utilization_rates()
-                .map_err(|e| SensorError::ReadError(format!("NVIDIA GPU {} utilization unavailable: {}", index, e)))?;
+            let usage_supported = device.utilization_rates().is_ok();
 
             let mode = if device.total_energy_consumption().is_ok() {
                 common::clog!("NVIDIA GPU {}: using energy counter mode", index);
@@ -411,15 +410,21 @@ mod nvidia_gpu {
                     index
                 );
                 NvidiaReadMode::PowerInstant
-            } else if device.samples(Sampling::Power, None).is_ok() {
+            } else if device.samples(Sampling::Power, None).is_ok_and(|s| !s.is_empty()) {
                 common::clog!(
                     "NVIDIA GPU {}: instant power unavailable, falling back to sampled power (driver-side estimate)",
                     index
                 );
                 NvidiaReadMode::PowerSamples
+            } else if usage_supported {
+                common::clog!(
+                    "NVIDIA GPU {}: no power telemetry available, will be estimated from usage only",
+                    index
+                );
+                NvidiaReadMode::UsageOnly
             } else {
                 return Err(SensorError::ReadError(format!(
-                    "⚠ NVIDIA GPU {}: no power telemetry available",
+                    "⚠ NVIDIA GPU {}: no power telemetry available and usage telemetry unavailable, sensor cannot be created",
                     index
                 )));
             };
@@ -468,6 +473,7 @@ mod nvidia_gpu {
 
     impl Sensor for NvidiaGPUSensor {
         fn read_full_data(&self) -> Result<SensorData, SensorError> {
+            // CRITICAL: If device not reachable, return error
             let device = self
                 .nvml
                 .device_by_index(self.device_index)
@@ -475,85 +481,146 @@ mod nvidia_gpu {
 
             let now = Instant::now();
 
+            // NON-CRITICAL: Can still read usage if power fails
             let energy = match self.mode {
-                NvidiaReadMode::EnergyCounter => {
-                    let current_energy_mj = device
-                        .total_energy_consumption()
-                        .map_err(|e| SensorError::ReadError(e.to_string()))?;
-                    let mut last_energy_mj = self
-                        .last_energy_mj
-                        .try_borrow_mut()
-                        .map_err(|_| SensorError::ReadError("Failed to borrow last energy".to_string()))?;
-                    let energy_mj = if *last_energy_mj == 0 {
-                        0
-                    } else {
-                        current_energy_mj.saturating_sub(*last_energy_mj)
-                    };
-                    *last_energy_mj = current_energy_mj;
-                    EnergyUj::from_millijoules(energy_mj)
-                }
-                NvidiaReadMode::PowerInstant => {
-                    let mw = device
-                        .power_usage()
-                        .map_err(|e| SensorError::ReadError(e.to_string()))?;
-                    let mut last_instant = self
-                        .last_power_instant
-                        .try_borrow_mut()
-                        .map_err(|_| SensorError::ReadError("Failed to borrow last power instant".to_string()))?;
-                    let energy = match *last_instant {
-                        None => EnergyUj::from_joules(0.0),
-                        Some(last) => {
-                            let dt = now.duration_since(last).as_secs_f64();
-                            EnergyUj::from_joules(mw as f64 / 1000.0 * dt)
-                        }
-                    };
-                    *last_instant = Some(now);
-                    energy
-                }
-                NvidiaReadMode::PowerSamples => {
-                    let mut last_ts = self
-                        .last_sample_timestamp
-                        .try_borrow_mut()
-                        .map_err(|_| SensorError::ReadError("Failed to borrow last sample timestamp".to_string()))?;
+                NvidiaReadMode::UsageOnly => None,
 
-                    let samples = device
-                        .samples(Sampling::Power, *last_ts)
-                        .map_err(|e| SensorError::ReadError(e.to_string()))?;
-
-                    if samples.is_empty() {
-                        EnergyUj::from_joules(0.0)
-                    } else {
-                        let avg_mw: f64 = samples
-                            .iter()
-                            .filter_map(|s| match s.value {
-                                SampleValue::F64(v) => Some(v),
-                                SampleValue::U32(v) => Some(v as f64),
-                                SampleValue::U64(v) => Some(v as f64),
-                                _ => None,
+                NvidiaReadMode::EnergyCounter => device
+                    .total_energy_consumption()
+                    .inspect_err(|e| {
+                        common::logging::log_component_error("NVML", &format!("Failed to read energy counter: {e}"))
+                    })
+                    .ok()
+                    .and_then(|current_energy_mj| {
+                        self.last_energy_mj
+                            .try_borrow_mut()
+                            .inspect_err(|_| {
+                                common::logging::log_component_error("NVML", "Failed to borrow last_energy_mj")
                             })
-                            .sum::<f64>()
-                            / samples.len().max(1) as f64;
+                            .ok()
+                            .map(|mut last_energy_mj| {
+                                let energy_mj = if *last_energy_mj == 0 {
+                                    0
+                                } else {
+                                    current_energy_mj.saturating_sub(*last_energy_mj)
+                                };
+                                *last_energy_mj = current_energy_mj;
+                                EnergyUj::from_millijoules(energy_mj)
+                            })
+                    }),
 
-                        *last_ts = samples.last().map(|s| s.timestamp).or(*last_ts);
+                NvidiaReadMode::PowerInstant => device
+                    .power_usage()
+                    .inspect_err(|e| {
+                        common::logging::log_component_error("NVML", &format!("Failed to read power usage: {e}"))
+                    })
+                    .ok()
+                    .and_then(|mw| {
+                        self.last_power_instant
+                            .try_borrow_mut()
+                            .inspect_err(|_| {
+                                common::logging::log_component_error("NVML", "Failed to borrow last_power_instant")
+                            })
+                            .ok()
+                            .map(|mut last_instant| {
+                                let energy = match *last_instant {
+                                    None => EnergyUj::from_joules(0.0),
+                                    Some(last) => {
+                                        let dt = now.duration_since(last).as_secs_f64();
+                                        EnergyUj::from_joules(mw as f64 / 1000.0 * dt)
+                                    }
+                                };
+                                *last_instant = Some(now);
+                                energy
+                            })
+                    }),
 
-                        let dt = now
-                            .duration_since(self.last_power_instant.borrow().unwrap_or(now))
-                            .as_secs_f64();
-                        *self.last_power_instant.borrow_mut() = Some(now);
+                NvidiaReadMode::PowerSamples => self
+                    .last_sample_timestamp
+                    .try_borrow()
+                    .inspect_err(|_| {
+                        common::logging::log_component_error("NVML", "Failed to borrow last_sample_timestamp")
+                    })
+                    .ok()
+                    .and_then(|last_ts_guard| {
+                        let last_ts = *last_ts_guard;
+                        drop(last_ts_guard);
 
-                        EnergyUj::from_joules((avg_mw / 1000.0) * dt)
-                    }
-                }
+                        device
+                            .samples(Sampling::Power, last_ts)
+                            .inspect_err(|e| {
+                                common::logging::log_component_error(
+                                    "NVML",
+                                    &format!("Failed to fetch power samples: {e}"),
+                                )
+                            })
+                            .ok()
+                            .and_then(|samples| {
+                                if samples.is_empty() {
+                                    Some(EnergyUj::from_joules(0.0))
+                                } else {
+                                    let avg_mw: f64 = samples
+                                        .iter()
+                                        .filter_map(|s| match s.value {
+                                            SampleValue::F64(v) => Some(v),
+                                            SampleValue::U32(v) => Some(v as f64),
+                                            SampleValue::U64(v) => Some(v as f64),
+                                            _ => None,
+                                        })
+                                        .sum::<f64>()
+                                        / samples.len().max(1) as f64;
+
+                                    if let Ok(mut last_ts_lock) = self.last_sample_timestamp.try_borrow_mut() {
+                                        *last_ts_lock = samples.last().map(|s| s.timestamp).or(last_ts);
+                                    } else {
+                                        common::logging::log_component_error(
+                                            "NVML",
+                                            "Failed to borrow_mut last_sample_timestamp for update",
+                                        );
+                                    }
+
+                                    self.last_power_instant
+                                        .try_borrow_mut()
+                                        .inspect_err(|_| {
+                                            common::logging::log_component_error(
+                                                "NVML",
+                                                "Failed to borrow_mut last_power_instant",
+                                            )
+                                        })
+                                        .ok()
+                                        .map(|mut last_instant| {
+                                            let dt = now.duration_since(last_instant.unwrap_or(now)).as_secs_f64();
+                                            *last_instant = Some(now);
+                                            EnergyUj::from_joules((avg_mw / 1000.0) * dt)
+                                        })
+                                }
+                            })
+                    }),
             };
 
+            // NON-CRITICAL: Evaluate utilization rates with logging
             let utilization = device
                 .utilization_rates()
-                .map_err(|e| SensorError::ReadError(e.to_string()))?;
+                .inspect_err(|e| {
+                    common::logging::log_component_error("NVML", &format!("Failed to read utilization rates: {e}"))
+                })
+                .ok();
+
+            let usage_percent = utilization.as_ref().map(|u| u.gpu as f64);
+            let vram_usage_percent = utilization.as_ref().map(|u| u.memory as f64);
+
+            // CRITICAL ERROR CHECK: Only fail if BOTH energy and usage failed
+            if energy.is_none() && usage_percent.is_none() {
+                return Err(SensorError::ReadError(format!(
+                    "⚠ NVIDIA GPU {}: Neither energy nor usage telemetry could be retrieved",
+                    self.device_index
+                )));
+            }
 
             Ok(GPUData {
-                total_energy: Some(energy),
-                usage_percent: Some(utilization.gpu as f64),
-                vram_usage_percent: Some(utilization.memory as f64),
+                total_energy: energy,
+                usage_percent,
+                vram_usage_percent,
                 name: None,
             }
             .into())
