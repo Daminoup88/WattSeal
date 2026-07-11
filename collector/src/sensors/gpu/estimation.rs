@@ -19,6 +19,19 @@ use common::types::EnergyUj;
 
 /// Typical board power budget (TDP, in watts) for common discrete GPU models.
 static GPU_TDP_TABLE: &[(&str, f64)] = &[
+    // Mobile GPUs (laptops)
+    ("RTX 4090 Laptop", 120.0),
+    ("RTX 4080 Laptop", 110.0),
+    ("RTX 4070 Laptop", 115.0),
+    ("RTX 4060 Laptop", 115.0),
+    ("RTX 3080 Laptop", 115.0),
+    ("RTX 3070 Laptop", 115.0),
+    ("RTX 3060 Laptop", 80.0),
+    ("RX 7900M", 180.0),
+    ("RX 7800M", 180.0),
+    ("RX 6800M", 145.0),
+    ("RX 6700M", 135.0),
+    ("Laptop", 75.0),
     // NVIDIA
     ("RTX 4090", 450.0),
     ("RTX 4080", 320.0),
@@ -31,13 +44,17 @@ static GPU_TDP_TABLE: &[(&str, f64)] = &[
     ("GTX 1660", 120.0),
     ("T1000", 50.0),
     // AMD
-    ("RX 7900", 300.0),
-    ("RX 7800", 263.0),
-    ("RX 7700", 245.0),
-    ("RX 6950", 335.0),
+    ("RX 7900 XT", 300.0),
+    ("RX 7800 XT", 263.0),
+    ("RX 7700 XT", 245.0),
+    ("RX 7700", 200.0),
+    ("RX 6950 XT", 335.0),
     ("RX 6800", 250.0),
     ("RX 6700", 230.0),
-    ("RX 9060", 160.0),
+    ("RX 9060 XT", 132.0),
+    ("RX 9060", 132.0),
+    ("RX 9070 XT", 304.0),
+    ("RX 9070", 220.0),
     // Intel
     ("Arc A770", 225.0),
     ("Arc A750", 225.0),
