@@ -36,6 +36,13 @@ pub fn averaging_and_purging_data(
     #[cfg(debug_assertions)]
     let start = Instant::now();
     log_step("Purging old events", purge_old_events(database, purge_until_time));
+    database
+        .conn
+        .execute("PRAGMA incremental_vacuum(200)", [])
+        .inspect_err(|e| {
+            crate::clog!("✗ Vacuum failed: {}", e);
+        })
+        .ok();
     #[cfg(debug_assertions)]
     println!("Purging old events took {} millis", start.elapsed().as_millis());
     Ok(())
@@ -83,7 +90,7 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
                 END AS bucket_start,
                 SUM(d.total_energy_uj) AS total_energy
              FROM timestamp t
-             JOIN total_data d ON t.id = d.timestamp_id
+             JOIN total_data d ON t.sampling_period = d.sampling_period AND t.timestamp = d.timestamp
              WHERE t.timestamp >= ?1
                AND t.timestamp < ?2
                AND t.sampling_period = ?5
@@ -120,14 +127,6 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
         .transaction()
         .map_err(|e| format!("Failed to start transaction: {}", e))?;
 
-    let mut insert_ts_stmt = tx
-        .prepare("INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)")
-        .map_err(|e| format!("Failed to prepare timestamp insert: {}", e))?;
-
-    let mut insert_total_stmt = tx
-        .prepare("INSERT INTO total_data (timestamp_id, total_energy_uj) VALUES (?1, ?2)")
-        .map_err(|e| format!("Failed to prepare total_data insert: {}", e))?;
-
     for (bucket_start, total_energy) in aggregated {
         let event_timestamp = if bucket_start == first_timestamp {
             bucket_start - (bucket_start % HOUR_MS)
@@ -135,18 +134,18 @@ fn averaging_total_data(database: &mut Database, duration_in_hours: i64) -> Resu
             bucket_start
         };
 
-        insert_ts_stmt
-            .execute(params![event_timestamp, HOURLY_SAMPLING_PERIOD_SECONDS])
-            .map_err(|e| format!("Failed to insert timestamp: {}", e))?;
-        let timestamp_id = tx.last_insert_rowid();
+        tx.execute(
+            "INSERT OR IGNORE INTO timestamp (sampling_period, timestamp) VALUES (?1, ?2)",
+            params![HOURLY_SAMPLING_PERIOD_SECONDS, event_timestamp],
+        )
+        .map_err(|e| format!("Failed to insert timestamp: {}", e))?;
 
-        insert_total_stmt
-            .execute(params![timestamp_id, total_energy])
-            .map_err(|e| format!("Failed to insert averaged event: {}", e))?;
+        tx.execute(
+            "INSERT OR IGNORE INTO total_data (sampling_period, timestamp, total_energy_uj) VALUES (?1, ?2, ?3)",
+            params![HOURLY_SAMPLING_PERIOD_SECONDS, event_timestamp, total_energy],
+        )
+        .map_err(|e| format!("Failed to insert averaged event: {}", e))?;
     }
-
-    drop(insert_total_stmt);
-    drop(insert_ts_stmt);
 
     tx.commit()
         .map_err(|e| format!("Failed to commit transaction: {}", e))?;
@@ -164,7 +163,7 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
         .conn
         .prepare(
             "SELECT 1 FROM timestamp t \
-             JOIN process_data p ON t.id = p.timestamp_id \
+             JOIN process_data p ON t.sampling_period = p.sampling_period AND t.timestamp = p.timestamp \
              WHERE t.sampling_period = ?2 AND t.timestamp < ?1 \
              LIMIT 1",
         )
@@ -185,8 +184,9 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
         .prepare(
             "SELECT
                 (t.timestamp / ?2) * ?2 AS bucket_start,
-                p.app_name,
-                MAX(p.process_exe_path) AS process_exe_path,
+                p.app_id,
+                a.name AS app_name,
+                a.exe_path AS exe_path,
                 SUM(COALESCE(p.process_energy_uj, 0)) AS process_energy_uj,
                 SUM(COALESCE(p.process_cpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_cpu_usage,
                 SUM(COALESCE(p.process_gpu_usage, 0.0))   / MAX(1, COUNT(*)) AS process_gpu_usage,
@@ -195,10 +195,11 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
                 SUM(COALESCE(p.written_bytes, 0))/ MAX(1, COUNT(*)) AS written_bytes,
                 MAX(p.subprocess_count) AS subprocess_count
              FROM timestamp t
-             JOIN process_data p ON t.id = p.timestamp_id
+             JOIN process_data p ON t.sampling_period = p.sampling_period AND t.timestamp = p.timestamp
+             JOIN apps a ON p.app_id = a.id
              WHERE t.sampling_period = ?3
                AND t.timestamp < ?1
-             GROUP BY bucket_start, p.app_name
+             GROUP BY bucket_start, p.app_id
              ORDER BY bucket_start, process_energy_uj DESC",
         )
         .map_err(|e| format!("prepare process avg: {}", e))?;
@@ -209,34 +210,30 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
             params![cutoff_end_timestamp, HOUR_MS, LIVE_SAMPLING_PERIOD_SECONDS],
             |row| {
                 Ok((
-                    row.get::<_, i64>(0)?,            // bucket_start
-                    row.get::<_, String>(1)?,         // app_name
-                    row.get::<_, Option<String>>(2)?, // exe_path
-                    row.get::<_, EnergyUj>(3)?,       // energy
-                    row.get::<_, f64>(4)?,            // cpu
-                    row.get::<_, f64>(5)?,            // gpu
-                    row.get::<_, f64>(6)?,            // mem
-                    row.get::<_, Byte>(7)?,           // read
-                    row.get::<_, Byte>(8)?,           // write
-                    row.get::<_, u32>(9)?,            // subprocs
+                    row.get::<_, i64>(0)?,      // bucket_start
+                    row.get::<_, i64>(1)?,      // app_id
+                    row.get::<_, EnergyUj>(4)?, // energy
+                    row.get::<_, f64>(5)?,      // cpu
+                    row.get::<_, f64>(6)?,      // gpu
+                    row.get::<_, f64>(7)?,      // mem
+                    row.get::<_, Byte>(8)?,     // read
+                    row.get::<_, Byte>(9)?,     // write
+                    row.get::<_, u32>(10)?,     // subprocs
                 ))
             },
         )
         .map_err(|e| format!("query process avg: {}", e))?;
 
     // Keep only top-10 per bucket
-    let mut buckets: Vec<(
-        i64,
-        Vec<(String, Option<String>, EnergyUj, f64, f64, f64, Byte, Byte, u32)>,
-    )> = Vec::new();
+    let mut buckets: Vec<(i64, Vec<(i64, EnergyUj, f64, f64, f64, Byte, Byte, u32)>)> = Vec::new();
     for row in rows {
-        let (bucket, app, exe, euj, cpu, gpu, mem, rd, wr, sub) = row.map_err(|e| format!("row: {}", e))?;
+        let (bucket, app_id, euj, cpu, gpu, mem, rd, wr, sub) = row.map_err(|e| format!("row: {}", e))?;
         if buckets.last().map_or(true, |(b, _)| *b != bucket) {
             buckets.push((bucket, Vec::new()));
         }
         let procs = &mut buckets.last_mut().unwrap().1;
         if procs.len() < 10 {
-            procs.push((app, exe, euj, cpu, gpu, mem, rd, wr, sub));
+            procs.push((app_id, euj, cpu, gpu, mem, rd, wr, sub));
         }
     }
     drop(stmt);
@@ -247,32 +244,37 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
 
     let tx = database.conn.transaction().map_err(|e| format!("tx: {}", e))?;
 
-    let mut insert_ts = tx
-        .prepare("INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)")
-        .map_err(|e| format!("prepare ts: {}", e))?;
-    let mut insert_proc = tx
-        .prepare(
-            "INSERT INTO process_data (timestamp_id, app_name, process_exe_path, \
-             process_energy_uj, process_cpu_usage, process_gpu_usage, \
-             process_mem_usage, read_bytes, written_bytes, \
-             subprocess_count) VALUES (?1,?2,?3,?4,?5,?6,?7,?8,?9,?10)",
-        )
-        .map_err(|e| format!("prepare proc: {}", e))?;
-
     for (bucket_start, procs) in &buckets {
-        insert_ts
-            .execute(params![bucket_start, HOURLY_SAMPLING_PERIOD_SECONDS])
-            .map_err(|e| format!("insert ts: {}", e))?;
-        let ts_id = tx.last_insert_rowid();
-        for (app, exe, pw, cpu, gpu, mem, rd, wr, sub) in procs {
-            insert_proc
-                .execute(params![ts_id, app, exe, pw, cpu, gpu, mem, rd, wr, sub])
-                .map_err(|e| format!("insert proc: {}", e))?;
+        tx.execute(
+            "INSERT OR IGNORE INTO timestamp (sampling_period, timestamp) VALUES (?1, ?2)",
+            params![HOURLY_SAMPLING_PERIOD_SECONDS, bucket_start],
+        )
+        .map_err(|e| format!("insert ts: {}", e))?;
+
+        for (app_id, pw, cpu, gpu, mem, rd, wr, sub) in procs {
+            tx.execute(
+                "INSERT OR IGNORE INTO process_data \
+                 (sampling_period, timestamp, app_id, process_energy_uj, \
+                  process_cpu_usage, process_gpu_usage, process_mem_usage, \
+                  read_bytes, written_bytes, subprocess_count) \
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                params![
+                    HOURLY_SAMPLING_PERIOD_SECONDS,
+                    bucket_start,
+                    app_id,
+                    pw,
+                    cpu,
+                    gpu,
+                    mem,
+                    rd,
+                    wr,
+                    sub
+                ],
+            )
+            .map_err(|e| format!("insert proc: {}", e))?;
         }
     }
 
-    drop(insert_proc);
-    drop(insert_ts);
     tx.commit().map_err(|e| format!("commit: {}", e))?;
 
     Ok(())

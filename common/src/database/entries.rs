@@ -10,7 +10,7 @@ use crate::types::{
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;
     fn table_name_static() -> &'static str;
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql>;
+    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql>;
     fn columns_static() -> &'static [(&'static str, &'static str)];
     fn from_row(row: &Row) -> rusqlite::Result<Self>
     where
@@ -26,8 +26,8 @@ pub trait DatabaseEntry {
     fn insert_sql() -> String {
         let cols = Self::columns_static();
         let col_names: Vec<&str> = cols.iter().map(|(name, _)| *name).collect();
-        let all_cols = format!("timestamp_id, {}", col_names.join(", "));
-        let params: Vec<String> = (1..=cols.len() + 1).map(|i| format!("?{}", i)).collect();
+        let all_cols = format!("sampling_period, timestamp, {}", col_names.join(", "));
+        let params: Vec<String> = (1..=cols.len() + 2).map(|i| format!("?{}", i)).collect();
         format!(
             "INSERT INTO {} ({}) VALUES ({})",
             Self::table_name_static(),
@@ -37,22 +37,7 @@ pub trait DatabaseEntry {
     }
 
     fn create_table_sql() -> String {
-        let mut col_defs = vec![
-            "id INTEGER PRIMARY KEY".to_string(),
-            "timestamp_id INTEGER NOT NULL REFERENCES timestamp(id) ON DELETE CASCADE".to_string(),
-        ];
-        for (name, type_) in Self::columns_static() {
-            col_defs.push(format!("{} {}", name, type_));
-        }
-        let table_name = Self::table_name_static();
-        format!(
-            "CREATE TABLE IF NOT EXISTS {} ({});\
-             CREATE INDEX IF NOT EXISTS idx_{}_timestamp_id ON {}(timestamp_id)",
-            table_name,
-            col_defs.join(", "),
-            table_name,
-            table_name,
-        )
+        String::new()
     }
 
     fn avg_columns_sql(prefix: &str) -> String {
@@ -62,6 +47,23 @@ pub trait DatabaseEntry {
             .collect::<Vec<String>>()
             .join(", ")
     }
+}
+
+fn simple_table_sql(table_name: &str, col_defs_extra: &[(&str, &str)]) -> String {
+    let mut cols = vec![
+        "sampling_period INTEGER NOT NULL".to_string(),
+        "timestamp       INTEGER NOT NULL".to_string(),
+    ];
+    for (name, type_) in col_defs_extra {
+        cols.push(format!("{} {}", name, type_));
+    }
+    format!(
+        "CREATE TABLE IF NOT EXISTS {table} ({cols}, \
+         FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
+         PRIMARY KEY (sampling_period, timestamp)) WITHOUT ROWID",
+        table = table_name,
+        cols = cols.join(", "),
+    )
 }
 
 macro_rules! impl_database_entry {
@@ -88,8 +90,8 @@ macro_rules! impl_database_entry {
                 &[ $(($col_name, $sql_type)),* ]
             }
 
-            fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
-                let mut params: Vec<&'a dyn ToSql> = vec![timestamp_id];
+            fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+                let mut params: Vec<&'a dyn ToSql> = vec![sampling_period, timestamp];
                 $( params.push(&self.$field); )*
                 params
             }
@@ -100,33 +102,24 @@ macro_rules! impl_database_entry {
                     $(, $($extra_field: $extra_val),* )?
                 })
             }
+
+            fn create_table_sql() -> String {
+                simple_table_sql(
+                    $table_name,
+                    &[ $(($col_name, $sql_type)),* ],
+                )
+            }
         }
     };
 }
 
 impl_database_entry! {
-    struct CPUData {
-        generic_name: "CPU",
-        table_name: "cpu_data",
+    struct RamData {
+        generic_name: "RAM",
+        table_name: "ram_data",
         mappings: {
-            total_energy: "total_energy_uj" => "INTEGER",
-            pp0_energy: "pp0_energy_uj" => "INTEGER",
-            pp1_energy: "pp1_energy_uj" => "INTEGER",
-            dram_energy: "dram_energy_uj" => "INTEGER",
-            usage_percent: "usage_percent" => "REAL",
-        }
-    }
-}
-
-impl_database_entry! {
-    struct GPUData {
-        generic_name: "GPU",
-        table_name: "gpu_data",
-        mappings: {
-            total_energy: "total_energy_uj" => "INTEGER",
-            usage_percent: "usage_percent" => "REAL",
-            vram_usage_percent: "vram_usage_percent" => "REAL",
-            name: "gpu_name" => "TEXT",
+            total_energy:  "total_energy_uj" => "INTEGER",
+            usage_percent: "usage_percent"   => "REAL",
         }
     }
 }
@@ -136,20 +129,9 @@ impl_database_entry! {
         generic_name: "Disk",
         table_name: "disk_data",
         mappings: {
-            total_energy: "total_energy_uj" => "INTEGER",
-            read_bytes: "read_bytes" => "INTEGER",
-            written_bytes: "written_bytes" => "INTEGER",
-        }
-    }
-}
-
-impl_database_entry! {
-    struct RamData {
-        generic_name: "RAM",
-        table_name: "ram_data",
-        mappings: {
-            total_energy: "total_energy_uj" => "INTEGER",
-            usage_percent: "usage_percent" => "REAL",
+            total_energy:  "total_energy_uj" => "INTEGER",
+            read_bytes:    "read_bytes"       => "INTEGER",
+            written_bytes: "written_bytes"    => "INTEGER",
         }
     }
 }
@@ -159,9 +141,9 @@ impl_database_entry! {
         generic_name: "Network",
         table_name: "network_data",
         mappings: {
-            total_energy: "total_energy_uj" => "INTEGER",
-            downloaded_bytes: "downloaded_bytes" => "INTEGER",
-            uploaded_bytes: "uploaded_bytes" => "INTEGER",
+            total_energy:      "total_energy_uj"   => "INTEGER",
+            downloaded_bytes:  "downloaded_bytes"  => "INTEGER",
+            uploaded_bytes:    "uploaded_bytes"    => "INTEGER",
         }
     }
 }
@@ -176,6 +158,110 @@ impl_database_entry! {
     }
 }
 
+impl DatabaseEntry for CPUData {
+    fn generic_name() -> &'static str {
+        "CPU"
+    }
+
+    fn table_name_static() -> &'static str {
+        "cpu_data"
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("total_energy_uj", "INTEGER"),
+            ("pp0_energy_uj", "INTEGER"),
+            ("dram_energy_uj", "INTEGER"),
+            ("usage_percent", "REAL"),
+        ]
+    }
+
+    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            sampling_period,
+            timestamp,
+            &self.total_energy,
+            &self.pp0_energy,
+            &self.dram_energy,
+            &self.usage_percent,
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(CPUData {
+            total_energy: row.get("total_energy_uj")?,
+            pp0_energy: row.get("pp0_energy_uj")?,
+            pp1_energy: None,
+            dram_energy: row.get("dram_energy_uj")?,
+            usage_percent: row.get("usage_percent")?,
+        })
+    }
+
+    fn create_table_sql() -> String {
+        "CREATE TABLE IF NOT EXISTS cpu_data (\
+            sampling_period    INTEGER NOT NULL, \
+            timestamp          INTEGER NOT NULL, \
+            total_energy_uj    INTEGER, \
+            pp0_energy_uj      INTEGER, \
+            dram_energy_uj     INTEGER, \
+            usage_percent      REAL, \
+            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
+            PRIMARY KEY (sampling_period, timestamp)) WITHOUT ROWID"
+            .to_string()
+    }
+}
+
+impl DatabaseEntry for GPUData {
+    fn generic_name() -> &'static str {
+        "GPU"
+    }
+
+    fn table_name_static() -> &'static str {
+        "gpu_data"
+    }
+
+    fn columns_static() -> &'static [(&'static str, &'static str)] {
+        &[
+            ("device_id", "INTEGER NOT NULL"),
+            ("total_energy_uj", "INTEGER"),
+            ("usage_percent", "REAL"),
+            ("vram_usage_percent", "REAL"),
+        ]
+    }
+
+    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+        vec![
+            sampling_period,
+            timestamp,
+            &self.total_energy,
+            &self.usage_percent,
+            &self.vram_usage_percent,
+        ]
+    }
+
+    fn from_row(row: &Row) -> rusqlite::Result<Self> {
+        Ok(GPUData {
+            total_energy: row.get("total_energy_uj")?,
+            usage_percent: row.get("usage_percent")?,
+            vram_usage_percent: row.get("vram_usage_percent")?,
+            name: None, // resolved from devices table when needed
+        })
+    }
+
+    fn create_table_sql() -> String {
+        "CREATE TABLE IF NOT EXISTS gpu_data (\
+            sampling_period    INTEGER NOT NULL, \
+            timestamp          INTEGER NOT NULL, \
+            device_id          INTEGER NOT NULL REFERENCES devices(id), \
+            total_energy_uj    INTEGER, \
+            usage_percent      REAL, \
+            vram_usage_percent REAL, \
+            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
+            PRIMARY KEY (sampling_period, timestamp, device_id)) WITHOUT ROWID"
+            .to_string()
+    }
+}
+
 impl DatabaseEntry for ProcessData {
     fn generic_name() -> &'static str {
         "Processes"
@@ -187,8 +273,7 @@ impl DatabaseEntry for ProcessData {
 
     fn columns_static() -> &'static [(&'static str, &'static str)] {
         &[
-            ("app_name", "TEXT NOT NULL"),
-            ("process_exe_path", "TEXT"),
+            ("app_id", "INTEGER NOT NULL"),
             ("process_energy_uj", "INTEGER"),
             ("process_cpu_usage", "REAL"),
             ("process_gpu_usage", "REAL"),
@@ -199,11 +284,10 @@ impl DatabaseEntry for ProcessData {
         ]
     }
 
-    fn insert_params<'a>(&'a self, timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
-            timestamp_id,
-            &self.measured.app_name,
-            &self.measured.process_exe_path,
+            sampling_period,
+            timestamp,
             &self.process_energy,
             &self.measured.process_cpu_usage,
             &self.measured.process_gpu_usage,
@@ -220,7 +304,7 @@ impl DatabaseEntry for ProcessData {
             measured: MeasuredProcessData {
                 pid: None,
                 app_name: row.get("app_name")?,
-                process_exe_path: row.get("process_exe_path")?,
+                process_exe_path: row.get("exe_path")?,
                 process_cpu_usage: row.get("process_cpu_usage")?,
                 process_gpu_usage: row.get("process_gpu_usage")?,
                 process_mem_usage: row.get("process_mem_usage")?,
@@ -232,6 +316,23 @@ impl DatabaseEntry for ProcessData {
             icon: None,
         })
     }
+
+    fn create_table_sql() -> String {
+        "CREATE TABLE IF NOT EXISTS process_data (\
+            sampling_period    INTEGER NOT NULL, \
+            timestamp          INTEGER NOT NULL, \
+            app_id             INTEGER NOT NULL REFERENCES apps(id), \
+            process_energy_uj  INTEGER, \
+            process_cpu_usage  REAL, \
+            process_gpu_usage  REAL, \
+            process_mem_usage  REAL, \
+            read_bytes         INTEGER, \
+            written_bytes      INTEGER, \
+            subprocess_count   INTEGER, \
+            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
+            PRIMARY KEY (sampling_period, timestamp, app_id)) WITHOUT ROWID"
+            .to_string()
+    }
 }
 
 // Manual fallback block preserved for custom structure handling
@@ -242,7 +343,7 @@ impl DatabaseEntry for AllTimeData {
     fn table_name_static() -> &'static str {
         "all_time_data"
     }
-    fn insert_params<'a>(&'a self, _timestamp_id: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, _sampling_period: &'a i64, _timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![]
     }
     fn columns_static() -> &'static [(&'static str, &'static str)] {
