@@ -61,26 +61,25 @@ fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
         INSERT OR IGNORE INTO timestamp (sampling_period, timestamp)
         SELECT CASE WHEN period_type > 0 THEN period_type ELSE 1 END, timestamp FROM timestamp_old;
 
-        -- 2. Migrate cpu_data table (Watts -> Microjoules, remove pp1)
+        -- 2. Migrate cpu_data table (Watts -> Microjoules, remove pp1 and dram)
         ALTER TABLE cpu_data RENAME TO cpu_data_old;
         CREATE TABLE cpu_data (
             sampling_period INTEGER NOT NULL,
             timestamp       INTEGER NOT NULL,
             total_energy_uj INTEGER,
             pp0_energy_uj   INTEGER,
-            dram_energy_uj  INTEGER,
             usage_percent   REAL,
             FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE,
             PRIMARY KEY (sampling_period, timestamp)
         ) WITHOUT ROWID;
-        INSERT OR IGNORE INTO cpu_data (sampling_period, timestamp, total_energy_uj, pp0_energy_uj, dram_energy_uj, usage_percent)
+        INSERT OR IGNORE INTO cpu_data (sampling_period, timestamp, total_energy_uj, pp0_energy_uj, usage_percent)
         SELECT CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END, t.timestamp, 
                CAST(c.total_power_watts * 1000000 * CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS INTEGER), 
                CAST(c.pp0_power_watts * 1000000 * CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS INTEGER), 
-               CAST(c.dram_power_watts * 1000000 * CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS INTEGER), 
                c.usage_percent 
         FROM cpu_data_old c JOIN timestamp_old t ON c.timestamp_id = t.id;
-        DROP TABLE cpu_data_old;
+        -- Note: cpu_data_old is dropped later, after DRAM data is merged into ram_data
+
 
         -- 3. Populate devices and migrate gpu_data table
         ALTER TABLE gpu_data RENAME TO gpu_data_old;
@@ -124,6 +123,19 @@ fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
                CAST(r.total_power_watts * 1000000 * CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS INTEGER), 
                r.usage_percent 
         FROM ram_data_old r JOIN timestamp_old t ON r.timestamp_id = t.id;
+        -- Add historical DRAM energy (from cpu_data_old) into ram_data for timestamps that exist
+        UPDATE ram_data
+        SET total_energy_uj = COALESCE(ram_data.total_energy_uj, 0) + dram.dram_uj
+        FROM (
+            SELECT CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS sp,
+                   t.timestamp AS ts,
+                   CAST(c.dram_power_watts * 1000000 * CASE WHEN t.period_type > 0 THEN t.period_type ELSE 1 END AS INTEGER) AS dram_uj
+            FROM cpu_data_old c
+            JOIN timestamp_old t ON c.timestamp_id = t.id
+            WHERE c.dram_power_watts IS NOT NULL AND c.dram_power_watts > 0
+        ) AS dram
+        WHERE ram_data.sampling_period = dram.sp AND ram_data.timestamp = dram.ts;
+        DROP TABLE cpu_data_old;
         DROP TABLE ram_data_old;
 
         -- 5. Migrate disk_data table

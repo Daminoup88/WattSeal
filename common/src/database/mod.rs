@@ -543,7 +543,6 @@ impl Database {
     pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
         let mut records = Vec::<(SystemTime, ComputedSensorData)>::new();
 
-        // Fetch last N (sampling_period, timestamp) pairs ordered by timestamp DESC
         let mut stmt = self
             .conn
             .prepare("SELECT sampling_period, timestamp FROM timestamp ORDER BY timestamp DESC LIMIT ?1")?;
@@ -576,7 +575,7 @@ impl Database {
                     continue;
                 }
 
-                // Aggregate multiple GPU rows per timestamp into one
+                // TODO: unify the query when the UI can handle several gpu values per timestamp
                 let query = if table_name == GPUData::table_name_static() {
                     format!(
                         "SELECT d.timestamp, \
@@ -921,10 +920,6 @@ impl Database {
     }
 }
 
-// ---------------------------------------------------------------------------
-// Upsert helpers for devices and apps normalization tables
-// ---------------------------------------------------------------------------
-
 /// Returns the id of the device row matching (kind, name), inserting if absent.
 pub fn get_or_create_device_id(conn: &Connection, kind: &str, name: &str) -> rusqlite::Result<i64> {
     conn.query_row(
@@ -951,10 +946,6 @@ pub fn get_or_create_app_id(
         |row| row.get(0),
     )
 }
-
-// ---------------------------------------------------------------------------
-// Private helpers
-// ---------------------------------------------------------------------------
 
 #[derive(Clone, Copy)]
 enum WindowedSource {

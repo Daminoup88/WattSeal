@@ -171,7 +171,6 @@ impl DatabaseEntry for CPUData {
         &[
             ("total_energy_uj", "INTEGER"),
             ("pp0_energy_uj", "INTEGER"),
-            ("dram_energy_uj", "INTEGER"),
             ("usage_percent", "REAL"),
         ]
     }
@@ -182,7 +181,6 @@ impl DatabaseEntry for CPUData {
             timestamp,
             &self.total_energy,
             &self.pp0_energy,
-            &self.dram_energy,
             &self.usage_percent,
         ]
     }
@@ -192,7 +190,7 @@ impl DatabaseEntry for CPUData {
             total_energy: row.get("total_energy_uj")?,
             pp0_energy: row.get("pp0_energy_uj")?,
             pp1_energy: None,
-            dram_energy: row.get("dram_energy_uj")?,
+            dram_energy: None,
             usage_percent: row.get("usage_percent")?,
         })
     }
@@ -203,7 +201,6 @@ impl DatabaseEntry for CPUData {
             timestamp          INTEGER NOT NULL, \
             total_energy_uj    INTEGER, \
             pp0_energy_uj      INTEGER, \
-            dram_energy_uj     INTEGER, \
             usage_percent      REAL, \
             FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
             PRIMARY KEY (sampling_period, timestamp)) WITHOUT ROWID"
@@ -304,7 +301,7 @@ impl DatabaseEntry for ProcessData {
             measured: MeasuredProcessData {
                 pid: None,
                 app_name: row.get("app_name")?,
-                process_exe_path: row.get("exe_path")?,
+                process_exe_path: row.get("process_exe_path")?,
                 process_cpu_usage: row.get("process_cpu_usage")?,
                 process_gpu_usage: row.get("process_gpu_usage")?,
                 process_mem_usage: row.get("process_mem_usage")?,
@@ -371,7 +368,6 @@ mod tests {
                 assert_eq!(cpu.total_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.pp0_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.pp1_energy, Some(EnergyUj::from_u64(0)));
-                assert_eq!(cpu.dram_energy, Some(EnergyUj::from_u64(0)));
                 assert_eq!(cpu.usage_percent, Some(0.0));
             }
             _ => panic!("CPUData::zero() returned wrong SensorData variant"),
