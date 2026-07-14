@@ -38,7 +38,7 @@ pub fn averaging_and_purging_data(
     log_step("Purging old events", purge_old_events(database, purge_until_time));
     database
         .conn
-        .execute("PRAGMA incremental_vacuum(200)", [])
+        .pragma_update(None, "incremental_vacuum", 200)
         .inspect_err(|e| {
             crate::clog!("✗ Vacuum failed: {}", e);
         })
