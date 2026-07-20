@@ -10,7 +10,7 @@ use crate::types::{
 pub trait DatabaseEntry {
     fn generic_name() -> &'static str;
     fn table_name_static() -> &'static str;
-    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql>;
+    fn insert_params<'a>(&'a self, timestamp: &'a i64, duration_ms: &'a i64) -> Vec<&'a dyn ToSql>;
     fn columns_static() -> &'static [(&'static str, &'static str)];
     fn from_row(row: &Row) -> rusqlite::Result<Self>
     where
@@ -26,7 +26,7 @@ pub trait DatabaseEntry {
     fn insert_sql() -> String {
         let cols = Self::columns_static();
         let col_names: Vec<&str> = cols.iter().map(|(name, _)| *name).collect();
-        let all_cols = format!("sampling_period, timestamp, {}", col_names.join(", "));
+        let all_cols = format!("timestamp, duration_ms, {}", col_names.join(", "));
         let params: Vec<String> = (1..=cols.len() + 2).map(|i| format!("?{}", i)).collect();
         format!(
             "INSERT INTO {} ({}) VALUES ({})",
@@ -51,16 +51,15 @@ pub trait DatabaseEntry {
 
 fn simple_table_sql(table_name: &str, col_defs_extra: &[(&str, &str)]) -> String {
     let mut cols = vec![
-        "sampling_period INTEGER NOT NULL".to_string(),
         "timestamp       INTEGER NOT NULL".to_string(),
+        "duration_ms     INTEGER NOT NULL".to_string(),
     ];
     for (name, type_) in col_defs_extra {
         cols.push(format!("{} {}", name, type_));
     }
     format!(
         "CREATE TABLE IF NOT EXISTS {table} ({cols}, \
-         FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
-         PRIMARY KEY (sampling_period, timestamp)) WITHOUT ROWID",
+         PRIMARY KEY (timestamp, duration_ms)) WITHOUT ROWID",
         table = table_name,
         cols = cols.join(", "),
     )
@@ -90,8 +89,8 @@ macro_rules! impl_database_entry {
                 &[ $(($col_name, $sql_type)),* ]
             }
 
-            fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
-                let mut params: Vec<&'a dyn ToSql> = vec![sampling_period, timestamp];
+            fn insert_params<'a>(&'a self, timestamp: &'a i64, duration_ms: &'a i64) -> Vec<&'a dyn ToSql> {
+                let mut params: Vec<&'a dyn ToSql> = vec![timestamp, duration_ms];
                 $( params.push(&self.$field); )*
                 params
             }
@@ -175,10 +174,10 @@ impl DatabaseEntry for CPUData {
         ]
     }
 
-    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, timestamp: &'a i64, duration_ms: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
-            sampling_period,
             timestamp,
+            duration_ms,
             &self.total_energy,
             &self.pp0_energy,
             &self.usage_percent,
@@ -197,13 +196,12 @@ impl DatabaseEntry for CPUData {
 
     fn create_table_sql() -> String {
         "CREATE TABLE IF NOT EXISTS cpu_data (\
-            sampling_period    INTEGER NOT NULL, \
             timestamp          INTEGER NOT NULL, \
+            duration_ms        INTEGER NOT NULL, \
             total_energy_uj    INTEGER, \
             pp0_energy_uj      INTEGER, \
             usage_percent      REAL, \
-            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
-            PRIMARY KEY (sampling_period, timestamp)) WITHOUT ROWID"
+            PRIMARY KEY (timestamp, duration_ms)) WITHOUT ROWID"
             .to_string()
     }
 }
@@ -226,10 +224,10 @@ impl DatabaseEntry for GPUData {
         ]
     }
 
-    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, timestamp: &'a i64, duration_ms: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
-            sampling_period,
             timestamp,
+            duration_ms,
             &self.total_energy,
             &self.usage_percent,
             &self.vram_usage_percent,
@@ -247,14 +245,13 @@ impl DatabaseEntry for GPUData {
 
     fn create_table_sql() -> String {
         "CREATE TABLE IF NOT EXISTS gpu_data (\
-            sampling_period    INTEGER NOT NULL, \
             timestamp          INTEGER NOT NULL, \
+            duration_ms        INTEGER NOT NULL, \
             device_id          INTEGER NOT NULL REFERENCES devices(id), \
             total_energy_uj    INTEGER, \
             usage_percent      REAL, \
             vram_usage_percent REAL, \
-            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
-            PRIMARY KEY (sampling_period, timestamp, device_id)) WITHOUT ROWID"
+            PRIMARY KEY (timestamp, duration_ms, device_id)) WITHOUT ROWID"
             .to_string()
     }
 }
@@ -281,10 +278,10 @@ impl DatabaseEntry for ProcessData {
         ]
     }
 
-    fn insert_params<'a>(&'a self, sampling_period: &'a i64, timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, timestamp: &'a i64, duration_ms: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![
-            sampling_period,
             timestamp,
+            duration_ms,
             &self.process_energy,
             &self.measured.process_cpu_usage,
             &self.measured.process_gpu_usage,
@@ -316,8 +313,8 @@ impl DatabaseEntry for ProcessData {
 
     fn create_table_sql() -> String {
         "CREATE TABLE IF NOT EXISTS process_data (\
-            sampling_period    INTEGER NOT NULL, \
             timestamp          INTEGER NOT NULL, \
+            duration_ms        INTEGER NOT NULL, \
             app_id             INTEGER NOT NULL REFERENCES apps(id), \
             process_energy_uj  INTEGER, \
             process_cpu_usage  REAL, \
@@ -326,9 +323,12 @@ impl DatabaseEntry for ProcessData {
             read_bytes         INTEGER, \
             written_bytes      INTEGER, \
             subprocess_count   INTEGER, \
-            FOREIGN KEY (sampling_period, timestamp) REFERENCES timestamp(sampling_period, timestamp) ON DELETE CASCADE, \
-            PRIMARY KEY (sampling_period, timestamp, app_id)) WITHOUT ROWID"
+            PRIMARY KEY (timestamp, duration_ms, app_id)) WITHOUT ROWID"
             .to_string()
+    }
+
+    fn zero() -> ComputedSensorData {
+        ComputedSensorData::Process(Vec::new())
     }
 }
 
@@ -340,7 +340,7 @@ impl DatabaseEntry for AllTimeData {
     fn table_name_static() -> &'static str {
         "all_time_data"
     }
-    fn insert_params<'a>(&'a self, _sampling_period: &'a i64, _timestamp: &'a i64) -> Vec<&'a dyn ToSql> {
+    fn insert_params<'a>(&'a self, _timestamp: &'a i64, _duration_ms: &'a i64) -> Vec<&'a dyn ToSql> {
         vec![]
     }
     fn columns_static() -> &'static [(&'static str, &'static str)] {

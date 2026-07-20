@@ -196,9 +196,9 @@ impl App {
                 }
 
                 let data = self.load_latest_data(1);
-                for (timestamp, sensor_data) in data.iter() {
+                for (timestamp, duration_ms, sensor_data) in data.iter() {
                     if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
-                        sensor.push_data(*timestamp, sensor_data);
+                        sensor.push_data(*timestamp, *duration_ms, sensor_data);
                     }
                 }
                 self.refresh_all_time_data();
@@ -360,7 +360,7 @@ impl App {
             Message::UpdateChartData(data) => {
                 for (timestamp, sensor_data) in data.iter() {
                     if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
-                        sensor.push_data(*timestamp, sensor_data);
+                        sensor.push_data(*timestamp, 0, sensor_data);
                     }
                 }
                 Task::none()
@@ -394,8 +394,13 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, ComputedSensorData)> {
-        from_db(self.database.select_last_n_records(n))
+    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, i64, ComputedSensorData)> {
+        self.database
+            .select_last_n_records(n)
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(ts, dur, data)| (ts.into(), dur, data))
+            .collect()
     }
 
     fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, ComputedSensorData)> {

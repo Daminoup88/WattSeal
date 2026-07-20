@@ -254,7 +254,7 @@ impl CollectorApp {
                     {
                         let start = Instant::now();
 
-                        let result = database.insert_event_and_update_energy(&computed_event, 1);
+                        let result = database.insert_event_and_update_energy(&computed_event, since_last_update);
                         let duration = start.elapsed();
                         match result {
                             Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
@@ -263,7 +263,7 @@ impl CollectorApp {
                     }
 
                     #[cfg(not(debug_assertions))]
-                    let _ = database.insert_event_and_update_energy(&computed_event, 1);
+                    let _ = database.insert_event_and_update_energy(&computed_event, since_last_update);
                 }
             }
 
