@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: ["main"]
 
+permissions:
+  contents: read
+
 jobs:
   fmt:
     name: Formatting
@@ -28,6 +31,7 @@ jobs:
     name: Check
     if: github.event_name == 'pull_request'
     needs: fmt
+    permissions: {}
     uses: ./.github/workflows/build.yml
     with:
       check-only: true
@@ -36,8 +40,8 @@ jobs:
     name: Build
     if: github.event_name == 'push'
     needs: fmt
+    permissions: {}
     uses: ./.github/workflows/build.yml
-    
     with:
       version-suffix: "-beta"
       upload-artifacts: true
