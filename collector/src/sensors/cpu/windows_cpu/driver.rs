@@ -13,6 +13,11 @@ impl ScaphandreMsrReader {
         Ok(Self { driver, cpu_index: 0 })
     }
 
+    /// Starts the Scaphandre driver service (requires Administrator privileges).
+    pub fn start() -> Result<(), String> {
+        ScaphandreDriver::install().map_err(|e| format!("Failed to start Scaphandre driver: {e}"))
+    }
+
     /// Reads a Model-Specific Register by address.
     pub fn read_msr(&self, msr: u32) -> Result<u64, String> {
         self.driver
@@ -23,6 +28,11 @@ impl ScaphandreMsrReader {
     /// Returns whether the driver is installed on the system.
     pub fn is_installed() -> Result<bool, String> {
         ScaphandreDriver::is_installed().map_err(|e| format!("Failed to query Scaphandre driver status: {e}"))
+    }
+
+    /// Returns whether the driver needs to be updated.
+    pub fn needs_update() -> Result<bool, String> {
+        ScaphandreDriver::needs_update().map_err(|e| format!("Failed to check Scaphandre driver version: {e}"))
     }
 
     /// Installs the driver (requires Administrator privileges).
@@ -47,19 +57,13 @@ impl ScaphandreMsrReader {
             true => {}
         }
 
-        let mut driver = match ScaphandreDriver::new() {
-            Ok(driver) => driver,
-            Err(e) => return Err(format!("Failed to open Scaphandre driver for uninstall: {e}")),
-        };
-
-        match driver.uninstall() {
+        match ScaphandreDriver::uninstall_service() {
             Ok(()) => Ok(()),
             Err(e) => {
                 let message = format!("{e}");
                 let code = extract_windows_error_code(&message);
                 if code == Some(1072) {
-                    // Already marked for deletion: treat as successful uninstall.
-                    Ok(())
+                    Ok(()) // already marked for deletion, treat as success
                 } else {
                     Err(format!(
                         "Failed to uninstall Scaphandre driver: {message}. {}",

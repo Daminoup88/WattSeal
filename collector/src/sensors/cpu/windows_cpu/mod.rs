@@ -42,15 +42,24 @@ pub fn setup() {
             false
         }
     };
+    let outdated = installed && ScaphandreMsrReader::needs_update().unwrap_or(false);
 
-    if installed && ScaphandreMsrReader::new().is_ok() {
-        return;
+    if installed && !outdated {
+        if ScaphandreMsrReader::new().is_ok() {
+            return;
+        }
     }
 
-    if installed {
-        crate::clog!("\u{26a0} CPU MSR driver is installed but not running. Admin approval is required to start it.");
-    } else {
-        crate::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.");
+    match (installed, outdated) {
+        (true, true) => {
+            crate::clog!("\u{26a0} CPU MSR driver is installed but outdated. Admin approval is required to update it.")
+        }
+        (true, false) => crate::clog!(
+            "\u{26a0} CPU MSR driver is installed but not running. Admin approval is required to start it."
+        ),
+        (false, _) => {
+            crate::clog!("\u{26a0} CPU MSR driver not installed. Admin approval is required once to install it.")
+        }
     }
 
     if let Ok(exe) = std::env::current_exe() {

@@ -279,13 +279,13 @@ fn main() {
     #[cfg(target_os = "windows")]
     {
         if options.install_cpu_driver {
-            collector::sensors::cpu::windows_cpu::install();
-            return;
+            let ok = collector::sensors::cpu::windows_cpu::install();
+            std::process::exit(if ok { 0 } else { 1 });
         }
 
         if options.uninstall_cpu_driver {
-            collector::sensors::cpu::windows_cpu::uninstall();
-            return;
+            let ok = collector::sensors::cpu::windows_cpu::uninstall();
+            std::process::exit(if ok { 0 } else { 1 });
         }
 
         // Prevent UI process from trying to setup the driver again
