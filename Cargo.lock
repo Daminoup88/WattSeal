@@ -783,10 +783,10 @@ dependencies = [
  "common",
  "display-info",
  "mqtt",
+ "msr-driver-rs",
  "nvml-wrapper",
  "rumqttc",
  "runas",
- "scaphandre-driver-rs",
  "sysinfo",
  "windows 0.62.2",
 ]
@@ -3098,6 +3098,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "msr-driver-rs"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "26f0ba8be0db55b8f59c96e9a70e1fae281c6854c3eaae6bc5605424032773d8"
+dependencies = [
+ "windows-sys 0.61.2",
+]
+
+[[package]]
 name = "muda"
 version = "0.19.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4702,15 +4711,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "93fc1dc3aaa9bfed95e02e6eadabb4baf7e3078b0bd1b4d7b6b0b68378900502"
 dependencies = [
  "winapi-util",
-]
-
-[[package]]
-name = "scaphandre-driver-rs"
-version = "1.0.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "702879edec2624b839db4cfcbfca67dbe52fffdc83c1e8208ec497ee77106fd4"
-dependencies = [
- "windows-sys 0.61.2",
 ]
 
 [[package]]

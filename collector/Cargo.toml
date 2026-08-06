@@ -4,7 +4,7 @@ version.workspace = true
 edition = "2024"
 
 [target.'cfg(windows)'.dependencies]
-scaphandre-driver-rs = "1.0.7"
+msr-driver-rs = "1.0.1"
 adlx = "0.0.0-alpha.1"
 runas = "1.2"
 windows = { version = "0.62.2", features = [

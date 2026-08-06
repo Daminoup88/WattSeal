@@ -1,21 +1,16 @@
-use scaphandre_driver_rs::ScaphandreDriver;
+use msr_driver_rs::MsrDriver;
 
-/// Safe wrapper around the Scaphandre RAPL driver for MSR access.
-pub struct ScaphandreMsrReader {
-    driver: ScaphandreDriver,
+/// Safe wrapper around the RAPL driver for MSR access.
+pub struct MsrDriverReader {
+    driver: MsrDriver,
     cpu_index: u32,
 }
 
-impl ScaphandreMsrReader {
-    /// Opens the Scaphandre driver device for MSR access.
+impl MsrDriverReader {
+    /// Opens the MSR driver device for MSR access.
     pub fn new() -> Result<Self, String> {
-        let driver = ScaphandreDriver::new().map_err(|e| format!("Failed to open Scaphandre driver: {e}"))?;
+        let driver = MsrDriver::new().map_err(|e| format!("Failed to open MSR driver: {e}"))?;
         Ok(Self { driver, cpu_index: 0 })
-    }
-
-    /// Starts the Scaphandre driver service (requires Administrator privileges).
-    pub fn start() -> Result<(), String> {
-        ScaphandreDriver::install().map_err(|e| format!("Failed to start Scaphandre driver: {e}"))
     }
 
     /// Reads a Model-Specific Register by address.
@@ -27,23 +22,23 @@ impl ScaphandreMsrReader {
 
     /// Returns whether the driver is installed on the system.
     pub fn is_installed() -> Result<bool, String> {
-        ScaphandreDriver::is_installed().map_err(|e| format!("Failed to query Scaphandre driver status: {e}"))
+        MsrDriver::is_installed().map_err(|e| format!("Failed to query MSR driver status: {e}"))
     }
 
     /// Returns whether the driver needs to be updated.
     pub fn needs_update() -> Result<bool, String> {
-        ScaphandreDriver::needs_update().map_err(|e| format!("Failed to check Scaphandre driver version: {e}"))
+        MsrDriver::needs_update().map_err(|e| format!("Failed to check MSR driver version: {e}"))
     }
 
     /// Installs the driver (requires Administrator privileges).
     pub fn install() -> Result<(), String> {
         // 1072 means the service is marked for deletion.
-        match ScaphandreDriver::install() {
+        match MsrDriver::install() {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let message = format!("{e}");
                 return Err(format!(
-                    "Failed to install Scaphandre driver: {message}. {}",
+                    "Failed to install MSR driver: {message}. {}",
                     explain_windows_error_code(extract_windows_error_code(&message).unwrap_or(0))
                 ));
             }
@@ -57,7 +52,7 @@ impl ScaphandreMsrReader {
             true => {}
         }
 
-        match ScaphandreDriver::uninstall_service() {
+        match MsrDriver::uninstall_service() {
             Ok(()) => Ok(()),
             Err(e) => {
                 let message = format!("{e}");
@@ -66,7 +61,7 @@ impl ScaphandreMsrReader {
                     Ok(()) // already marked for deletion, treat as success
                 } else {
                     Err(format!(
-                        "Failed to uninstall Scaphandre driver: {message}. {}",
+                        "Failed to uninstall MSR driver: {message}. {}",
                         explain_windows_error_code(code.unwrap_or(0))
                     ))
                 }
@@ -75,7 +70,7 @@ impl ScaphandreMsrReader {
     }
 }
 
-impl Drop for ScaphandreMsrReader {
+impl Drop for MsrDriverReader {
     fn drop(&mut self) {
         let _ = self.driver.close();
     }
@@ -96,7 +91,7 @@ fn extract_windows_error_code(message: &str) -> Option<u32> {
 fn explain_windows_error_code(code: u32) -> &'static str {
     match code {
         1072 => {
-            "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the Scaphandre driver), then retry. If it persists, reboot Windows."
+            "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the MSR driver), then retry. If it persists, reboot Windows."
         }
         5 => "Administrator privileges are required.",
         _ => "Unknown error code.",
