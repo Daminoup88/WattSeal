@@ -4706,9 +4706,9 @@ dependencies = [
 
 [[package]]
 name = "scaphandre-driver-rs"
-version = "1.0.0"
+version = "1.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4d659d55e0eef145f9222fbe444fc9f356a7766c7ffe118c3a8f6034e655392c"
+checksum = "702879edec2624b839db4cfcbfca67dbe52fffdc83c1e8208ec497ee77106fd4"
 dependencies = [
  "windows-sys 0.61.2",
 ]
