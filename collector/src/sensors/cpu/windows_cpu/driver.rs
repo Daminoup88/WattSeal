@@ -75,7 +75,7 @@ impl Drop for MsrDriverReader {
             Err(e) => crate::clog!("Error closing WinRing0 driver: {}", e),
         }
         crate::clog!("Uninstalling WinRing0 driver...");
-        match self.driver.uninstall() {
+        match Self::uninstall() {
             Ok(_) => crate::clog!("WinRing0 driver uninstalled successfully."),
             Err(e) => crate::clog!("Error uninstalling WinRing0 driver: {}", e),
         }
@@ -98,6 +98,9 @@ fn explain_windows_error_code(code: u32) -> &'static str {
     match code {
         1072 => {
             "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the MSR driver), then retry. If it persists, reboot Windows."
+        }
+        433 => {
+            "The driver is already used by another process. Close any other WattSeal instances (or any tool using the MSR driver) and retry."
         }
         5 => "Administrator privileges are required.",
         _ => "Unknown error code.",
