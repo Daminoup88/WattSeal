@@ -20,11 +20,14 @@ on:
         type: string
         default: ""
 
+permissions: {}
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
   build:
+    permissions: {}
     name: ${{ matrix.os-name }}
     strategy:
       fail-fast: false

@@ -5,8 +5,8 @@ The sources of the metrics collected and estimated by WattSeal for every sensor 
 1. CPU Metrics
 
   Windows
-   * Library: scaphandre-driver-rs (custom Rust wrapper for the Scaphandre driver).
-   * Driver: Scaphandre RAPL Driver (requires admin rights once for installation).
+   * Library: msr-driver-rs (custom Rust wrapper for the Scaphandre and WinRing0 drivers).
+   * Driver: WinRing0 RAPL Driver (requires admin rights for installation and start).
    * Source: Model-Specific Registers (MSR).
        * Intel: Reads MSR_PKG_ENERGY_STATUS (0x611), MSR_PP0_ENERGY_STATUS (0x639), MSR_PP1_ENERGY_STATUS (0x641), and
          MSR_DRAM_ENERGY_STATUS (0x618) ([Intel 64 and IA-32 Architectures Software Developer’s Manual, Volume 3B, Section 14.9](https://www.intel.com/content/dam/www/public/us/en/documents/manuals/64-ia-32-architectures-software-developer-vol-3b-part-2-manual.pdf)).

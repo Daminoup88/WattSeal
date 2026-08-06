@@ -77,7 +77,7 @@ impl MQTTInfo {
 
 impl CollectorApp {
     /// Creates a new collector with a database connection.
-    pub fn new(enable_save_db: bool, mqtt_infos: Option<MQTTInfo>) -> Result<Self, String> {
+    pub fn new(enable_save_db: bool, mqtt_info: Option<MQTTInfo>) -> Result<Self, String> {
         let database;
         if enable_save_db {
             database = Some(Database::new().map_err(|e| format!("Failed to create database: {e}"))?);
@@ -87,7 +87,7 @@ impl CollectorApp {
         let s = System::new_all();
         Ok(CollectorApp {
             database,
-            mqtt_info: mqtt_infos,
+            mqtt_info,
             sensors: Vec::new(),
             system: Rc::new(RefCell::new(s)),
             last_update: Instant::now(),

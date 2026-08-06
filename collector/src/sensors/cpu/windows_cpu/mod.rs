@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 
 use common::types::EnergyUj;
-use driver::ScaphandreMsrReader;
+use driver::MsrDriverReader;
 
 use super::{CPUVendor, Sensor, SensorError};
 use crate::database::{CPUData, SensorData};
@@ -9,7 +9,7 @@ use crate::database::{CPUData, SensorData};
 mod driver;
 
 pub fn install() -> bool {
-    match ScaphandreMsrReader::install() {
+    match MsrDriverReader::install() {
         Ok(()) => {
             crate::clog!("✓ CPU MSR driver installed successfully");
             true
@@ -22,7 +22,7 @@ pub fn install() -> bool {
 }
 
 pub fn uninstall() -> bool {
-    match ScaphandreMsrReader::uninstall() {
+    match MsrDriverReader::uninstall() {
         Ok(()) => {
             crate::clog!("✓ CPU MSR driver uninstalled successfully");
             true
@@ -35,7 +35,7 @@ pub fn uninstall() -> bool {
 }
 
 pub fn setup() {
-    let installed = match ScaphandreMsrReader::is_installed() {
+    let installed = match MsrDriverReader::is_installed() {
         Ok(installed) => installed,
         Err(e) => {
             crate::clog!("\u{26a0} {e}");
@@ -43,7 +43,7 @@ pub fn setup() {
         }
     };
 
-    if installed && ScaphandreMsrReader::new().is_ok() {
+    if installed && MsrDriverReader::new().is_ok() {
         return;
     }
 
@@ -89,18 +89,18 @@ impl Default for CPUValues {
     }
 }
 
-/// Windows CPU energy sensor using MSR (Model-Specific Registers) via Scaphandre.
+/// Windows CPU energy sensor using MSR (Model-Specific Registers) via Winring0.
 pub struct WindowsCPUSensor {
     msr_reader: MSRReader,
     last_energy_measurement: RefCell<CPUValues>,
 }
 
 impl WindowsCPUSensor {
-    /// Initializes the Scaphandre driver and MSR reader for the given CPU vendor.
+    /// Initializes the Winring0 driver and MSR reader for the given CPU vendor.
     pub fn new(vendor_id: &str) -> Result<Self, SensorError> {
         let vendor = CPUVendor::from_str(vendor_id);
-        let msr_driver = ScaphandreMsrReader::new()
-            .map_err(|e| SensorError::ReadError(format!("Scaphandre driver init failed: {}", e)))?;
+        let msr_driver = MsrDriverReader::new()
+            .map_err(|e| SensorError::ReadError(format!("Winring0 driver init failed: {}", e)))?;
         let msr_reader = MSRReader::new(msr_driver, vendor);
 
         Ok(WindowsCPUSensor {
@@ -141,13 +141,13 @@ impl Sensor for WindowsCPUSensor {
 }
 
 struct MSRReader {
-    msr_reader: ScaphandreMsrReader,
+    msr_reader: MsrDriverReader,
     vendor: CPUVendor,
     energy_unit: f64,
 }
 
 impl MSRReader {
-    fn new(msr_reader: ScaphandreMsrReader, vendor: CPUVendor) -> Self {
+    fn new(msr_reader: MsrDriverReader, vendor: CPUVendor) -> Self {
         let energy_unit = Self::read_energy_unit(&msr_reader, &vendor).unwrap_or(0.0);
         MSRReader {
             msr_reader,
@@ -156,7 +156,7 @@ impl MSRReader {
         }
     }
 
-    fn read_energy_unit(msr_reader: &ScaphandreMsrReader, vendor: &CPUVendor) -> Result<f64, SensorError> {
+    fn read_energy_unit(msr_reader: &MsrDriverReader, vendor: &CPUVendor) -> Result<f64, SensorError> {
         let read_fn = match vendor {
             CPUVendor::Intel => IntelMSR::read_energy_unit,
             CPUVendor::Amd => AMDMSR::read_energy_unit,
@@ -217,7 +217,7 @@ trait MSR {
         ((edx as u64) << 32) | (eax as u64)
     }
     fn read_msr<T>(
-        msr_reader: &ScaphandreMsrReader,
+        msr_reader: &MsrDriverReader,
         msr_addr: u32,
         expression: fn(edx: u32, eax: u32) -> T,
     ) -> Result<T, String> {
@@ -228,7 +228,7 @@ trait MSR {
         Ok(result)
     }
     fn read_optional_energy_domain(
-        msr_reader: &ScaphandreMsrReader,
+        msr_reader: &MsrDriverReader,
         msr_addr: u32,
         domain_label: &'static str,
     ) -> Option<u64> {
@@ -241,8 +241,8 @@ trait MSR {
             })
             .ok()
     }
-    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String>;
-    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String>;
+    fn read_energy_unit(msr_reader: &MsrDriverReader) -> Result<f64, String>;
+    fn read_energy_value(msr_reader: &MsrDriverReader) -> Result<CPUValues, String>;
 }
 
 #[allow(non_camel_case_types)]
@@ -251,7 +251,7 @@ enum IntelMSR {
     MSR_PKG_ENERGY_STATUS = 0x611,
     MSR_PP0_ENERGY_STATUS = 0x639,
     MSR_PP1_ENERGY_STATUS = 0x641,
-    MSR_DRAM_ENERGY_STATUS = 0x618,
+    MSR_DRAM_ENERGY_STATUS = 0x619,
 }
 
 impl MSR for IntelMSR {
@@ -259,14 +259,14 @@ impl MSR for IntelMSR {
         let energy_unit_raw = (eax >> Self::ENERGY_UNIT_OFFSET) & Self::ENERGY_UNIT_MASK;
         1.0 / (1u64 << energy_unit_raw) as f64
     }
-    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String> {
+    fn read_energy_unit(msr_reader: &MsrDriverReader) -> Result<f64, String> {
         Self::read_msr(
             msr_reader,
             Self::MSR_RAPL_POWER_UNIT as u32,
             Self::energy_unit_expression,
         )
     }
-    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
+    fn read_energy_value(msr_reader: &MsrDriverReader) -> Result<CPUValues, String> {
         let pkg_energy = Self::read_msr(msr_reader, Self::MSR_PKG_ENERGY_STATUS as u32, Self::energy_expression)?;
         let pp0_energy = Self::read_optional_energy_domain(msr_reader, Self::MSR_PP0_ENERGY_STATUS as u32, "pp0");
         let pp1_energy = Self::read_optional_energy_domain(msr_reader, Self::MSR_PP1_ENERGY_STATUS as u32, "pp1");
@@ -294,7 +294,7 @@ impl MSR for AMDMSR {
         1.0 / (1u64 << energy_unit_raw) as f64
     }
 
-    fn read_energy_unit(msr_reader: &ScaphandreMsrReader) -> Result<f64, String> {
+    fn read_energy_unit(msr_reader: &MsrDriverReader) -> Result<f64, String> {
         Self::read_msr(
             msr_reader,
             Self::ENERGY_PWR_UNIT_MSR as u32,
@@ -302,7 +302,7 @@ impl MSR for AMDMSR {
         )
     }
 
-    fn read_energy_value(msr_reader: &ScaphandreMsrReader) -> Result<CPUValues, String> {
+    fn read_energy_value(msr_reader: &MsrDriverReader) -> Result<CPUValues, String> {
         let pkg_energy = Self::read_msr(msr_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
         let pp0_energy = Self::read_msr(msr_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
 

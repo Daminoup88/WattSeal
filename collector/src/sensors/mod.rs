@@ -155,7 +155,7 @@ pub fn create_event_from_sensors(
     }
 
     // --- Integrated-GPU energy resolution ---
-    // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
+    // Priority 1: Real PP1 reading from MSR (WinRing0).
     if let Some(igpu_energy) = integrated_gpu_energy {
         let mut merged = false;
         // Try to merge into the tracked integrated GPU first
@@ -341,14 +341,14 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
     sensors_info.push(InitialInfo::System(system_info));
 
     // Display info
-    let display_infos = DisplayInfo::all().unwrap_or_default();
+    let display_info = DisplayInfo::all().unwrap_or_default();
     let mut display_names = Vec::new();
-    let mut screen_infos = Vec::new();
-    for display_info in display_infos {
+    let mut screen_info = Vec::new();
+    for display_info in display_info {
         let resolution = format!("{}x{}", display_info.width, display_info.height);
         let friendly_name = display_info.friendly_name.clone();
         display_names.push(friendly_name.clone());
-        screen_infos.push(ScreenInfo {
+        screen_info.push(ScreenInfo {
             model: friendly_name,
             resolution: resolution,
             refresh_rate_hz: display_info.frequency as u32,
@@ -357,10 +357,10 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
     }
     crate::clog!(
         "✓ Added {} display(s): [{}]",
-        screen_infos.len(),
+        screen_info.len(),
         display_names.join(", ")
     );
-    sensors_info.push(InitialInfo::Displays(screen_infos));
+    sensors_info.push(InitialInfo::Displays(screen_info));
 
     // Battery info
     let battery_info = BatteryInfo {

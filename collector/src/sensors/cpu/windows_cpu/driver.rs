@@ -1,15 +1,15 @@
-use scaphandre_driver_rs::ScaphandreDriver;
+use msr_driver_rs::MsrDriver;
 
-/// Safe wrapper around the Scaphandre RAPL driver for MSR access.
-pub struct ScaphandreMsrReader {
-    driver: ScaphandreDriver,
+/// Safe wrapper around the MSR RAPL driver for MSR access.
+pub struct MsrDriverReader {
+    driver: MsrDriver,
     cpu_index: u32,
 }
 
-impl ScaphandreMsrReader {
-    /// Opens the Scaphandre driver device for MSR access.
+impl MsrDriverReader {
+    /// Opens the MSR driver device for MSR access.
     pub fn new() -> Result<Self, String> {
-        let driver = ScaphandreDriver::new().map_err(|e| format!("Failed to open Scaphandre driver: {e}"))?;
+        let driver = MsrDriver::new().map_err(|e| format!("Failed to open MSR driver: {e}"))?;
         Ok(Self { driver, cpu_index: 0 })
     }
 
@@ -22,18 +22,18 @@ impl ScaphandreMsrReader {
 
     /// Returns whether the driver is installed on the system.
     pub fn is_installed() -> Result<bool, String> {
-        ScaphandreDriver::is_installed().map_err(|e| format!("Failed to query Scaphandre driver status: {e}"))
+        MsrDriver::is_installed().map_err(|e| format!("Failed to query MSR driver status: {e}"))
     }
 
     /// Installs the driver (requires Administrator privileges).
     pub fn install() -> Result<(), String> {
         // 1072 means the service is marked for deletion.
-        match ScaphandreDriver::install() {
+        match MsrDriver::install() {
             Ok(()) => return Ok(()),
             Err(e) => {
                 let message = format!("{e}");
                 return Err(format!(
-                    "Failed to install Scaphandre driver: {message}. {}",
+                    "Failed to install MSR driver: {message}. {}",
                     explain_windows_error_code(extract_windows_error_code(&message).unwrap_or(0))
                 ));
             }
@@ -47,12 +47,7 @@ impl ScaphandreMsrReader {
             true => {}
         }
 
-        let mut driver = match ScaphandreDriver::new() {
-            Ok(driver) => driver,
-            Err(e) => return Err(format!("Failed to open Scaphandre driver for uninstall: {e}")),
-        };
-
-        match driver.uninstall() {
+        match MsrDriver::uninstall_service() {
             Ok(()) => Ok(()),
             Err(e) => {
                 let message = format!("{e}");
@@ -62,7 +57,7 @@ impl ScaphandreMsrReader {
                     Ok(())
                 } else {
                     Err(format!(
-                        "Failed to uninstall Scaphandre driver: {message}. {}",
+                        "Failed to uninstall MSR driver: {message}. {}",
                         explain_windows_error_code(code.unwrap_or(0))
                     ))
                 }
@@ -71,9 +66,19 @@ impl ScaphandreMsrReader {
     }
 }
 
-impl Drop for ScaphandreMsrReader {
+impl Drop for MsrDriverReader {
+    /// Security specific for WinRing0: close and uninstall the driver when the reader is dropped.
     fn drop(&mut self) {
-        let _ = self.driver.close();
+        crate::clog!("Closing WinRing0 driver...");
+        match self.driver.close() {
+            Ok(_) => crate::clog!("WinRing0 driver closed successfully."),
+            Err(e) => crate::clog!("Error closing WinRing0 driver: {}", e),
+        }
+        crate::clog!("Uninstalling WinRing0 driver...");
+        match self.driver.uninstall() {
+            Ok(_) => crate::clog!("WinRing0 driver uninstalled successfully."),
+            Err(e) => crate::clog!("Error uninstalling WinRing0 driver: {}", e),
+        }
     }
 }
 
@@ -92,7 +97,7 @@ fn extract_windows_error_code(message: &str) -> Option<u32> {
 fn explain_windows_error_code(code: u32) -> &'static str {
     match code {
         1072 => {
-            "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the Scaphandre driver), then retry. If it persists, reboot Windows."
+            "Windows reports the service is marked for deletion; close running WattSeal instances (and any tool using the MSR driver), then retry. If it persists, reboot Windows."
         }
         5 => "Administrator privileges are required.",
         _ => "Unknown error code.",
