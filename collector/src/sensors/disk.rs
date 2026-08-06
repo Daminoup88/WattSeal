@@ -84,7 +84,7 @@ impl Sensor for DiskSensor {
             .try_borrow()
             .map_err(|e| SensorError::ReadError(format!("Failed to borrow disks: {}", e)))?;
 
-        let mut disk_infos = Vec::new();
+        let mut disk_info = Vec::new();
         for disk in disks.list() {
             let name = disk.name().to_string_lossy().to_string();
             let mount = disk.mount_point().display().to_string();
@@ -94,7 +94,7 @@ impl Sensor for DiskSensor {
             let used = total - avail;
             let fs = disk.file_system().to_string_lossy().to_string();
 
-            disk_infos.push(DiskInfo {
+            disk_info.push(DiskInfo {
                 name: name.clone(),
                 mount_point: mount.clone(),
                 file_system: fs,
@@ -103,7 +103,7 @@ impl Sensor for DiskSensor {
                 used_bytes: used,
             });
         }
-        Ok(InitialInfo::Disks(disk_infos))
+        Ok(InitialInfo::Disks(disk_info))
     }
 
     fn read_name(&self) -> Result<String, SensorError> {

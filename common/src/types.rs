@@ -366,23 +366,23 @@ impl HardwareInfo {
 }
 
 impl From<Vec<InitialInfo>> for HardwareInfo {
-    fn from(infos: Vec<InitialInfo>) -> Self {
+    fn from(info: Vec<InitialInfo>) -> Self {
         let mut system_info = None;
         let mut cpu_info = None;
         let mut memory_info = None;
         let mut gpu_list = None;
-        let mut disk_infos = None;
-        let mut display_infos = None;
+        let mut disk_info = None;
+        let mut display_info = None;
         let mut battery_info = None;
 
-        for info in infos {
+        for info in info {
             match info {
                 InitialInfo::System(sys) => system_info = Some(sys),
                 InitialInfo::CPU(cpu) => cpu_info = Some(cpu),
                 InitialInfo::Memory(mem) => memory_info = Some(mem),
                 InitialInfo::Gpus(gpus) => gpu_list = Some(gpus),
-                InitialInfo::Disks(disks) => disk_infos = Some(disks),
-                InitialInfo::Displays(displays) => display_infos = Some(displays),
+                InitialInfo::Disks(disks) => disk_info = Some(disks),
+                InitialInfo::Displays(displays) => display_info = Some(displays),
                 InitialInfo::Battery(battery) => battery_info = Some(battery),
             }
         }
@@ -392,8 +392,8 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
             cpu: cpu_info.unwrap_or_default(),
             memory: memory_info.unwrap_or_default(),
             gpus: gpu_list.unwrap_or_default(),
-            disks: disk_infos.unwrap_or_default(),
-            displays: display_infos.unwrap_or_default(),
+            disks: disk_info.unwrap_or_default(),
+            displays: display_info.unwrap_or_default(),
             battery: battery_info.unwrap_or_default(),
         }
     }

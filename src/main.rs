@@ -261,9 +261,9 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
 }
 
 /// Initializes the collector
-fn start_collector(enable_save_db: bool, mqtt_infos: Option<MQTTInfo>) -> Result<CollectorApp, String> {
+fn start_collector(enable_save_db: bool, mqtt_info: Option<MQTTInfo>) -> Result<CollectorApp, String> {
     let mut app =
-        CollectorApp::new(enable_save_db, mqtt_infos).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
+        CollectorApp::new(enable_save_db, mqtt_info).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
     app.initialize()
         .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
     Ok(app)
@@ -328,7 +328,7 @@ fn main() {
         }
     };
 
-    let mqtt_infos = if let Some(mqtt_addr) = options.mqtt_addr {
+    let mqtt_info = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
         let unit = options.mqtt_unit;
         Some(MQTTInfo::new(&id, &mqtt_addr, unit, options.mqtt_raw))
@@ -337,7 +337,7 @@ fn main() {
     };
 
     if options.headless_mode {
-        match start_collector(options.db_mode, mqtt_infos) {
+        match start_collector(options.db_mode, mqtt_info) {
             Ok(mut app) => app.run(),
             Err(e) => common::clog!("✗ {e}"),
         }
@@ -348,7 +348,7 @@ fn main() {
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
     thread::spawn(move || {
-        let mut app = match start_collector(options.db_mode, mqtt_infos) {
+        let mut app = match start_collector(options.db_mode, mqtt_info) {
             Ok(app) => app,
             Err(e) => {
                 common::clog!("✗ {e}");
