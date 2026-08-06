@@ -37,7 +37,7 @@ impl CPUSensor {
     pub fn power_mode_labels(&self) -> (&'static str, &'static str) {
         match &self.sensor {
             #[cfg(target_os = "windows")]
-            CPUOS::WindowsRAPL(_) => ("windows", "scaphandre"),
+            CPUOS::WindowsRAPL(_) => ("windows", "winring0"),
             #[cfg(target_os = "linux")]
             CPUOS::LinuxRAPL(_) => ("linux", "rapl"),
             CPUOS::Estimation(_) => ("estimation", "tdp"),

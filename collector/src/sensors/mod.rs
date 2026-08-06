@@ -135,7 +135,7 @@ pub fn create_event_from_sensors(
     }
 
     // --- Integrated-GPU energy resolution ---
-    // Priority 1: Real PP1 reading from MSR (Scaphandre driver).
+    // Priority 1: Real PP1 reading from MSR (WinRing0).
     if let Some(igpu_energy) = integrated_gpu_energy {
         let mut merged = false;
         // Try to merge into the tracked integrated GPU first

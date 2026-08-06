@@ -4,9 +4,9 @@ version.workspace = true
 edition = "2024"
 
 [target.'cfg(windows)'.dependencies]
-scaphandre-driver-rs = "1.0.0"
-adlx = "0.0.0-alpha.1"
 runas = "1.2"
+msr-driver-rs = { version = "1.0.1", default-features = false, features = ["winring0"] }
+adlx = "0.0.0-alpha.1"
 windows = { version = "0.62.2", features = [
     "Win32_Graphics_Dxgi",
     "Win32_Foundation",

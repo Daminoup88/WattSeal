@@ -44,6 +44,9 @@ chrono = "0.4.44"
 image = { version = "0.25", default-features = false, features = ["png"] }
 bpaf = { version = "0.9.26", features = ["derive", "dull-color"] }
 
+[target.'cfg(windows)'.dependencies]
+runas = "1.2"
+
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 winit = "0.30.13"
 
