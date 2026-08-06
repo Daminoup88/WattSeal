@@ -8,7 +8,7 @@ use std::{
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
     ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData,
-    SecondaryValues, TotalData, database::LIVE_SAMPLING_PERIOD_SECONDS, utils::load_icon_and_name,
+    SecondaryValues, TotalData, utils::load_icon_and_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
@@ -383,7 +383,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<ComputedSensorData>,
+    latest_reading: Option<(ComputedSensorData, i64)>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -423,7 +423,7 @@ impl SensorState {
 
     /// Returns the most recent sensor reading.
     pub fn get_latest_reading(&self) -> Option<&ComputedSensorData> {
-        self.latest_reading.as_ref()
+        self.latest_reading.as_ref().map(|(data, _)| data)
     }
 
     /// Returns the highest-power process, if this is a process sensor.
@@ -499,26 +499,22 @@ impl SensorState {
 
     /// Switches the displayed metric (power, usage, or speed).
     pub fn set_metric_type(&mut self, metric_type: MetricKind) {
+        let secondary_values = self.get_latest_reading().and_then(|d| d.secondary_values());
+        let language = self.language;
+        let is_energy = self.time_range.is_energy_mode();
         if let SensorCategory::Component(state) = &mut self.sensor_category {
-            let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
-            state.update_metric_type(
-                metric_type,
-                &self.display_name,
-                self.language,
-                secondary_values,
-                self.time_range.is_energy_mode(),
-            );
+            state.update_metric_type(metric_type, &self.display_name, language, secondary_values, is_energy);
         }
     }
 
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, data: &ComputedSensorData) {
+    pub fn push_data(&mut self, timestamp: DateTime<Local>, duration_ms: i64, data: &ComputedSensorData) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
 
         let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
-        self.latest_reading = Some(data.clone());
+        self.latest_reading = Some((data.clone(), duration_ms));
 
         if self.time_range.is_real_time() {
             match &mut self.sensor_category {
@@ -597,7 +593,7 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(state) => {
                 state.power_graph.chart.update_language(language);
-                let secondary_values = self.latest_reading.as_ref().and_then(|d| d.secondary_values());
+                let secondary_values = self.latest_reading.as_ref().and_then(|(d, _)| d.secondary_values());
                 state.update_metric_type(
                     state.metric_type,
                     &self.display_name,
@@ -914,14 +910,18 @@ impl SensorState {
         let power = self
             .latest_reading
             .as_ref()
-            .and_then(|d| d.total_energy())
-            .map(|energy| energy.as_watts_for_seconds(LIVE_SAMPLING_PERIOD_SECONDS as f64));
+            .and_then(|(d, dur_ms)| d.total_energy().map(|e| (e, *dur_ms)))
+            .map(|(energy, dur_ms)| {
+                let duration_secs = if dur_ms > 0 { dur_ms as f64 / 1000.0 } else { 1.0 };
+                energy.as_watts_for_seconds(duration_secs)
+            });
 
+        let latest_data = self.get_latest_reading();
         match &self.sensor_category {
             SensorCategory::Component(state) => {
-                let snapshot = state.snapshot_row(self.latest_reading.as_ref(), self.language);
+                let snapshot = state.snapshot_row(latest_data, self.language);
                 let metric_selector = if show_secondary {
-                    let metrics = state.available_metrics(self.latest_reading.as_ref());
+                    let metrics = state.available_metrics(latest_data);
                     if metrics.len() > 1 {
                         let translated: Vec<TranslatedMetricType> = metrics
                             .into_iter()

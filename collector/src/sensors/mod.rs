@@ -98,8 +98,10 @@ pub fn create_event_from_sensors(
     let mut data: Vec<SensorData> = Vec::new();
 
     let mut integrated_gpu_energy: Option<EnergyUj> = None;
+    let mut dram_energy: Option<EnergyUj> = None;
     let mut has_pp1_source = false;
     let mut integrated_gpu_indice: Option<usize> = None;
+    let mut ram_indice: Option<usize> = None;
     let mut gpu_indices: Vec<(usize, String)> = Vec::new();
     for sensor in sensors {
         let sensor_data = sensor.read_full_data();
@@ -115,6 +117,11 @@ pub fn create_event_from_sensors(
                             integrated_gpu_energy = Some(pp1);
                         }
                     }
+                    if let Some(dram) = cpu.dram_energy.take() {
+                        if dram > 0.0 {
+                            dram_energy = Some(dram);
+                        }
+                    }
                 }
 
                 // Track integrated Intel GPUs for estimation fallback.
@@ -125,12 +132,25 @@ pub fn create_event_from_sensors(
                     gpu_indices.push((data.len(), gpu_sensor.name()));
                 }
 
+                if let SensorData::Ram(_) = d {
+                    ram_indice = Some(data.len());
+                }
+
                 data.push(d);
             }
             Err(e) => common::logging::log_component_error(
                 sensor.table_name(),
                 &format!("Failed to read sensor data: {:?}", e),
             ),
+        }
+    }
+
+    // Add DRAM energy (from CPU MSR) to the RAM sensor reading.
+    if let Some(dram) = dram_energy {
+        if let Some(idx) = ram_indice {
+            if let Some(SensorData::Ram(ram)) = data.get_mut(idx) {
+                *ram.total_energy.get_or_insert(EnergyUj::from_u64(0)) += dram;
+            }
         }
     }
 
@@ -207,6 +227,7 @@ pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
     let (mut gpu_energy, mut gpu_usage, mut nb_gpus) = (EnergyUj::from_u64(0), 0.0, 0);
 
     let mut total_energy = EnergyUj::from_u64(0);
+    let mut process_index = None;
 
     for sensor_data in sensors_event.data().iter() {
         if let Some(energy) = sensor_data.total_energy() {
@@ -224,6 +245,10 @@ pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
                 nb_gpus += 1;
             }
         }
+        if let SensorData::Process(_) = sensor_data {
+            process_index = Some(data.len());
+            continue;
+        }
         data.push(sensor_data.clone().into());
     }
 
@@ -232,18 +257,15 @@ pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
     cpu_usage /= nb_cpus.max(1) as f64;
     gpu_usage /= nb_gpus.max(1) as f64;
     let computed_process_data = compute_processes_energy(
-        sensors_event
-            .data()
-            .iter()
-            .filter_map(|d| {
-                if let SensorData::Process(measured_processes) = d {
+        process_index
+            .and_then(|idx| {
+                if let SensorData::Process(measured_processes) = &sensors_event.data()[idx] {
                     Some(measured_processes.to_vec())
                 } else {
                     None
                 }
             })
-            .flatten()
-            .collect(),
+            .unwrap_or_default(),
         cpu_energy,
         cpu_usage,
         gpu_energy,

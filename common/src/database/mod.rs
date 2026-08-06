@@ -3,7 +3,10 @@ mod migration;
 pub mod purge;
 
 use core::time;
-use std::{collections::HashMap, time::SystemTime};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime},
+};
 
 pub use entries::DatabaseEntry;
 pub use purge::averaging_and_purging_data;
@@ -21,6 +24,11 @@ pub static DATABASE_PATH: &str = "power_monitoring.db";
 pub const DATABASE_TARGET_VERSION: i32 = 2;
 pub const LIVE_SAMPLING_PERIOD_SECONDS: i64 = 1;
 pub const HOURLY_SAMPLING_PERIOD_SECONDS: i64 = 3600;
+pub const HOUR_MS: i64 = 3_600_000;
+
+pub fn is_live_duration(duration_ms: i64) -> bool {
+    duration_ms < HOUR_MS
+}
 
 macro_rules! dispatch_entry {
     // Static method dispatch based on table name
@@ -48,25 +56,6 @@ macro_rules! dispatch_entry {
         else if $table_name == ProcessData::table_name_static() { Some($instance.$method::<ProcessData, $generic_p>($($arg),*)) }
         else { None }
     }};
-}
-
-macro_rules! match_sensor_variant {
-    ($val:expr, $inner:ident => $body:expr) => {
-        match $val {
-            ComputedSensorData::CPU($inner) => $body,
-            ComputedSensorData::GPU($inner) => $body,
-            ComputedSensorData::Ram($inner) => $body,
-            ComputedSensorData::Disk($inner) => $body,
-            ComputedSensorData::Network($inner) => $body,
-            ComputedSensorData::Total($inner) => $body,
-            ComputedSensorData::Process(processes) => {
-                for $inner in processes {
-                    $body?;
-                }
-                Ok(())
-            }
-        }
-    };
 }
 
 /// Returns `true` if the table name is in the known list of sensor tables.
@@ -130,14 +119,15 @@ impl Database {
         let current_version: i32 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;
 
         if current_version == 0 {
-            // Differentiate between a fresh DB and a version 0 DB
-            let timestamp_table_exists: bool = conn.query_row(
+            // Differentiate between a fresh DB and a version 0 DB:
+            // v0 legacy databases have the old `timestamp` table.
+            let is_legacy_v0: bool = conn.query_row(
                 "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='timestamp')",
                 [],
                 |row| row.get(0),
             )?;
 
-            if timestamp_table_exists {
+            if is_legacy_v0 {
                 // Legacy Version 0
                 migration::run_migrations(&mut conn)?;
             } else {
@@ -155,21 +145,31 @@ impl Database {
 
     fn create_base_tables(conn: &Connection) -> Result<(), DatabaseError> {
         conn.execute_batch(
-            "CREATE TABLE IF NOT EXISTS timestamp (
-            id              INTEGER PRIMARY KEY,
-            timestamp       INTEGER NOT NULL,
-            sampling_period INTEGER NOT NULL
-         );
-         CREATE TABLE IF NOT EXISTS hardware_info (
-            id                 INTEGER PRIMARY KEY,
-            tables             TEXT,
-            hardware_data      TEXT
-         );
-         CREATE TABLE IF NOT EXISTS component_all_time_data (
-            id              INTEGER PRIMARY KEY,
-            component_name  TEXT UNIQUE NOT NULL,
-            total_energy_uj INTEGER NOT NULL DEFAULT 0
-         );",
+            "CREATE TABLE IF NOT EXISTS devices (
+                id   INTEGER PRIMARY KEY,
+                kind TEXT NOT NULL,
+                name TEXT NOT NULL,
+                UNIQUE(kind, name)
+            );
+
+            CREATE TABLE IF NOT EXISTS apps (
+                id       INTEGER PRIMARY KEY,
+                identity TEXT NOT NULL UNIQUE,
+                name     TEXT NOT NULL,
+                exe_path TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS hardware_info (
+                id            INTEGER PRIMARY KEY,
+                tables        TEXT,
+                hardware_data TEXT
+            );
+
+            CREATE TABLE IF NOT EXISTS component_all_time_data (
+                id              INTEGER PRIMARY KEY,
+                component_name  TEXT UNIQUE NOT NULL,
+                total_energy_uj INTEGER NOT NULL DEFAULT 0
+            );",
         )?;
         Ok(())
     }
@@ -185,6 +185,7 @@ impl Database {
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;
         conn.pragma_update(None, "foreign_keys", "ON")?;
+        conn.pragma_update(None, "auto_vacuum", "INCREMENTAL")?;
         Self::create_settings_table_if_not_exists(&conn)?;
         Ok(conn)
     }
@@ -261,19 +262,14 @@ impl Database {
     pub fn insert_event_and_update_energy(
         &mut self,
         event: &Event<ComputedSensorData>,
-        sampling_period: u32,
+        real_duration: Duration,
     ) -> Result<(), DatabaseError> {
+        let timestamp_ms = event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
+        let duration_ms = real_duration.as_millis().max(1) as i64;
+
         let tx = self.conn.transaction()?;
-        tx.execute(
-            "INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)",
-            params![
-                event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64,
-                sampling_period as i64
-            ],
-        )?;
-        let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
+            Self::insert_sensor_data(&tx, timestamp_ms, duration_ms, sensor_data)?;
         }
 
         // Batch energy updates in the same transaction
@@ -291,18 +287,17 @@ impl Database {
     }
 
     /// Inserts a sensor event with all its readings.
-    pub fn insert_event(&mut self, event: &Event<ComputedSensorData>) -> Result<(), DatabaseError> {
+    pub fn insert_event(
+        &mut self,
+        event: &Event<ComputedSensorData>,
+        real_duration: Duration,
+    ) -> Result<(), DatabaseError> {
+        let timestamp_ms = event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
+        let duration_ms = real_duration.as_millis().max(1) as i64;
+
         let tx = self.conn.transaction()?;
-        tx.execute(
-            "INSERT INTO timestamp (timestamp, sampling_period) VALUES (?1, ?2)",
-            params![
-                event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64,
-                1 as i64
-            ],
-        )?;
-        let timestamp_id = tx.last_insert_rowid();
         for sensor_data in event.data() {
-            Self::insert_sensor_data(&tx, &timestamp_id, sensor_data)?;
+            Self::insert_sensor_data(&tx, timestamp_ms, duration_ms, sensor_data)?;
         }
         tx.commit()?;
         Ok(())
@@ -400,15 +395,79 @@ impl Database {
 
     fn insert_sensor_data(
         tx: &Transaction,
-        timestamp_id: &i64,
+        timestamp_ms: i64,
+        duration_ms: i64,
         sensor_data: &ComputedSensorData,
     ) -> Result<(), DatabaseError> {
-        match_sensor_variant!(sensor_data, data => Self::insert_entry(tx, timestamp_id, data))
+        match sensor_data {
+            ComputedSensorData::GPU(gpu) => {
+                let device_id = get_or_create_device_id(tx, "gpu", gpu.name.as_deref().unwrap_or("unknown"))?;
+                tx.execute(
+                    "INSERT OR IGNORE INTO gpu_data \
+                     (timestamp, duration_ms, device_id, total_energy_uj, usage_percent, vram_usage_percent) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                    params![
+                        timestamp_ms,
+                        duration_ms,
+                        device_id,
+                        gpu.total_energy,
+                        gpu.usage_percent,
+                        gpu.vram_usage_percent
+                    ],
+                )?;
+                Ok(())
+            }
+            ComputedSensorData::Process(processes) => {
+                for process in processes {
+                    let identity = process
+                        .measured
+                        .process_exe_path
+                        .as_deref()
+                        .unwrap_or(&process.measured.app_name);
+                    let app_id = get_or_create_app_id(
+                        tx,
+                        identity,
+                        &process.measured.app_name,
+                        process.measured.process_exe_path.as_deref(),
+                    )?;
+                    tx.execute(
+                        "INSERT OR IGNORE INTO process_data \
+                         (timestamp, duration_ms, app_id, process_energy_uj, \
+                          process_cpu_usage, process_gpu_usage, process_mem_usage, \
+                          read_bytes, written_bytes, subprocess_count) \
+                         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                        params![
+                            timestamp_ms,
+                            duration_ms,
+                            app_id,
+                            process.process_energy,
+                            process.measured.process_cpu_usage,
+                            process.measured.process_gpu_usage,
+                            process.measured.process_mem_usage,
+                            process.measured.read_bytes,
+                            process.measured.written_bytes,
+                            process.subprocess_count
+                        ],
+                    )?;
+                }
+                Ok(())
+            }
+            ComputedSensorData::CPU(data) => Self::insert_entry(tx, timestamp_ms, duration_ms, data),
+            ComputedSensorData::Ram(data) => Self::insert_entry(tx, timestamp_ms, duration_ms, data),
+            ComputedSensorData::Disk(data) => Self::insert_entry(tx, timestamp_ms, duration_ms, data),
+            ComputedSensorData::Network(data) => Self::insert_entry(tx, timestamp_ms, duration_ms, data),
+            ComputedSensorData::Total(data) => Self::insert_entry(tx, timestamp_ms, duration_ms, data),
+        }
     }
 
-    fn insert_entry<T: DatabaseEntry>(tx: &Transaction, timestamp_id: &i64, entry: &T) -> Result<(), DatabaseError> {
+    fn insert_entry<T: DatabaseEntry>(
+        tx: &Transaction,
+        timestamp_ms: i64,
+        duration_ms: i64,
+        entry: &T,
+    ) -> Result<(), DatabaseError> {
         let sql = T::insert_sql();
-        let params = entry.insert_params(timestamp_id);
+        let params = entry.insert_params(&timestamp_ms, &duration_ms);
         tx.execute(&sql, params.as_slice())?;
         Ok(())
     }
@@ -480,61 +539,90 @@ impl Database {
     }
 
     /// Returns the most recent N timestamped records.
-    pub fn select_last_n_records(&mut self, n: i64) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
-        let mut records = Vec::<(SystemTime, ComputedSensorData)>::new();
-        let mut stmt = self
-            .conn
-            .prepare("SELECT id, timestamp FROM timestamp ORDER BY id DESC LIMIT ?1")?;
-        let timestamps: Vec<(i64, SystemTime)> = stmt
-            .query_map(params![n], |row| {
-                let id: i64 = row.get(0)?;
-                let timestamp_millis: i64 = row.get(1)?;
-                let timestamp = SystemTime::UNIX_EPOCH + time::Duration::from_millis(timestamp_millis as u64);
-                Ok((id, timestamp))
-            })?
-            .collect::<rusqlite::Result<Vec<_>>>()?;
+    pub fn select_last_n_records(
+        &mut self,
+        n: i64,
+    ) -> Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError> {
+        let mut records = Vec::<(SystemTime, i64, ComputedSensorData)>::new();
 
-        if timestamps.is_empty() {
+        let tables = match &self.tables {
+            Some(t) => t.clone(),
+            None => return Ok(records),
+        };
+
+        let union_parts: Vec<String> = tables
+            .iter()
+            .filter(|t| is_valid_table_name(t) && t.as_str() != ProcessData::table_name_static())
+            .map(|t| format!("SELECT timestamp, duration_ms FROM {t}"))
+            .collect();
+
+        if union_parts.is_empty() {
             return Ok(records);
         }
 
-        let mut id_vec = Vec::new();
-        let mut timestamps_map = HashMap::new();
+        let union_sql = format!(
+            "SELECT DISTINCT timestamp, duration_ms FROM ({}) \
+             WHERE duration_ms < {HOUR_MS} \
+             ORDER BY timestamp DESC LIMIT ?1",
+            union_parts.join(" UNION ALL ")
+        );
 
-        for timestamp in timestamps.iter() {
-            id_vec.push(timestamp.0.to_string());
-            timestamps_map.insert(timestamp.0, timestamp.1);
+        let ts_pairs: Vec<(i64, i64)> = self
+            .conn
+            .prepare(&union_sql)?
+            .query_map(params![n], |row| Ok((row.get::<_, i64>(0)?, row.get::<_, i64>(1)?)))?
+            .collect::<rusqlite::Result<Vec<_>>>()?;
+
+        if ts_pairs.is_empty() {
+            return Ok(records);
         }
-        let id_list = id_vec.join(",");
 
-        if let Some(tables) = &self.tables {
-            for table_name in tables {
-                if table_name == ProcessData::table_name_static() {
-                    continue;
-                }
-                if !is_valid_table_name(table_name) {
-                    continue;
-                }
-                // TODO: unify the query when the UI can handle several gpu values per timestamp
-                let query = if table_name == GPUData::table_name_static() {
-                    format!(
-                        "SELECT timestamp_id, SUM(total_energy_uj) AS total_energy_uj, \
-                         AVG(usage_percent) AS usage_percent, AVG(vram_usage_percent) AS vram_usage_percent, \
-                         NULL AS gpu_name \
-                         FROM {} WHERE timestamp_id IN ({}) GROUP BY timestamp_id",
-                        table_name, id_list
-                    )
-                } else {
-                    format!(
-                        "SELECT timestamp_id, * FROM {} WHERE timestamp_id IN ({})",
-                        table_name, id_list
-                    )
-                };
-                let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
-                for (ts_id, sensor_data) in sensor_data_list {
-                    if let Some(ts) = timestamps_map.get(&ts_id) {
-                        records.push((*ts, sensor_data));
-                    }
+        // Build a map from timestamp_ms -> (SystemTime, duration_ms)
+        let mut ts_map: HashMap<i64, (SystemTime, i64)> = HashMap::new();
+        for &(ts_ms, dur_ms) in &ts_pairs {
+            ts_map.entry(ts_ms).or_insert_with(|| {
+                (
+                    SystemTime::UNIX_EPOCH + time::Duration::from_millis(ts_ms as u64),
+                    dur_ms,
+                )
+            });
+        }
+
+        // Build the IN-clause for timestamp values
+        let ts_list: Vec<String> = ts_pairs.iter().map(|(ts, _)| ts.to_string()).collect();
+        let ts_in = ts_list.join(",");
+
+        for table_name in &tables {
+            if table_name == ProcessData::table_name_static() {
+                continue;
+            }
+            if !is_valid_table_name(table_name) {
+                continue;
+            }
+
+            // TODO: unify the query when the UI can handle several gpu values per timestamp
+            let query = if table_name == GPUData::table_name_static() {
+                format!(
+                    "SELECT d.timestamp, \
+                     SUM(d.total_energy_uj) AS total_energy_uj, \
+                     AVG(d.usage_percent) AS usage_percent, \
+                     AVG(d.vram_usage_percent) AS vram_usage_percent \
+                     FROM gpu_data d \
+                     WHERE d.timestamp IN ({ts_in}) AND d.duration_ms < {HOUR_MS} \
+                     GROUP BY d.timestamp",
+                )
+            } else {
+                format!(
+                    "SELECT d.timestamp, d.* FROM {table} d \
+                     WHERE d.timestamp IN ({ts_in}) AND d.duration_ms < {HOUR_MS}",
+                    table = table_name,
+                )
+            };
+
+            let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
+            for (ts_ms, sensor_data) in sensor_data_list {
+                if let Some(&(sys_time, dur_ms)) = ts_map.get(&ts_ms) {
+                    records.push((sys_time, dur_ms, sensor_data));
                 }
             }
         }
@@ -597,24 +685,24 @@ impl Database {
                 table_name
             )));
         }
-        // TODO: unify the query when the UI can handle several gpu values per timestamp
+        // Aggregate multiple GPU device rows into a single reading per timestamp
         let query = if table_name == GPUData::table_name_static() {
-            "SELECT t.timestamp, d.* FROM timestamp t JOIN ( \
-                 SELECT timestamp_id, \
-                        SUM(total_energy_uj) AS total_energy_uj, \
-                        AVG(usage_percent) AS usage_percent, \
-                        AVG(vram_usage_percent) AS vram_usage_percent, \
-                        NULL AS gpu_name \
-                 FROM gpu_data \
-                 GROUP BY timestamp_id \
-             ) d ON t.id = d.timestamp_id \
-             WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC"
+            "SELECT timestamp, \
+                  SUM(total_energy_uj) AS total_energy_uj, \
+                  AVG(usage_percent) AS usage_percent, \
+                  AVG(vram_usage_percent) AS vram_usage_percent \
+              FROM gpu_data \
+              WHERE timestamp >= ?1 AND timestamp <= ?2 \
+              GROUP BY timestamp \
+              ORDER BY timestamp ASC"
                 .to_string()
         } else {
             format!(
-                "SELECT t.timestamp, d.* FROM timestamp t JOIN {} d ON t.id = d.timestamp_id \
-                 WHERE t.timestamp >= ?1 AND t.timestamp <= ?2 ORDER BY t.timestamp ASC",
-                table_name
+                "SELECT timestamp, {table}.* \
+                  FROM {table} \
+                  WHERE timestamp >= ?1 AND timestamp <= ?2 \
+                  ORDER BY timestamp ASC",
+                table = table_name
             )
         };
 
@@ -636,63 +724,57 @@ impl Database {
         }
         let live_cols = get_windowed_columns(table_name, "d.", window_seconds, WindowedSource::Live)?;
         let hourly_cols = get_windowed_columns(table_name, "d.", window_seconds, WindowedSource::Hourly)?;
-        let query = |cols: &str| {
+        let query = |cols: &str, is_live: bool| {
+            let dur_filter = if is_live {
+                format!("d.duration_ms < {HOUR_MS}")
+            } else {
+                format!("d.duration_ms >= {HOUR_MS}")
+            };
             if table_name == "gpu_data" {
                 format!(
                     "SELECT \
-                        (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        (d.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
                         {} \
-                     FROM timestamp t \
-                     JOIN ( \
-                        SELECT timestamp_id, \
+                     FROM ( \
+                        SELECT duration_ms, timestamp, \
                                SUM(total_energy_uj) AS total_energy_uj, \
                                SUM(usage_percent) AS usage_percent, \
-                               SUM(vram_usage_percent) AS vram_usage_percent, \
-                               NULL AS gpu_name \
+                               SUM(vram_usage_percent) AS vram_usage_percent \
                         FROM gpu_data \
-                        GROUP BY timestamp_id \
-                     ) d ON t.id = d.timestamp_id \
-                     WHERE t.timestamp >= ?1 AND t.timestamp < ?3 \
-                       AND t.sampling_period = ?4 \
+                        GROUP BY duration_ms, timestamp \
+                     ) d \
+                     WHERE d.timestamp >= ?1 AND d.timestamp < ?3 \
+                       AND {} \
                      GROUP BY window_start \
                      ORDER BY window_start ASC",
-                    cols
+                    cols, dur_filter
                 )
             } else {
                 format!(
                     "SELECT \
-                        (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        (d.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
                         {} \
-                     FROM timestamp t \
-                     JOIN {} d ON t.id = d.timestamp_id \
-                     WHERE t.timestamp >= ?1 AND t.timestamp < ?3 \
-                       AND t.sampling_period = ?4 \
+                     FROM {table} d \
+                     WHERE d.timestamp >= ?1 AND d.timestamp < ?3 \
+                       AND {} \
                      GROUP BY window_start \
                      ORDER BY window_start ASC",
-                    cols, table_name
+                    cols,
+                    dur_filter,
+                    table = table_name
                 )
             }
         };
 
         let live_rows = self.execute_sensor_query(
             table_name,
-            &query(&live_cols),
-            params![
-                start_window_start,
-                window_seconds,
-                end_exclusive,
-                LIVE_SAMPLING_PERIOD_SECONDS
-            ],
+            &query(&live_cols, true),
+            params![start_window_start, window_seconds, end_exclusive],
         )?;
         let hourly_rows = self.execute_sensor_query(
             table_name,
-            &query(&hourly_cols),
-            params![
-                start_window_start,
-                window_seconds,
-                end_exclusive,
-                HOURLY_SAMPLING_PERIOD_SECONDS
-            ],
+            &query(&hourly_cols, false),
+            params![start_window_start, window_seconds, end_exclusive],
         )?;
 
         let mut live_by_window = HashMap::new();
@@ -729,47 +811,35 @@ impl Database {
         window_seconds: i64,
     ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
         let second_query = "SELECT \
-                (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
-                CAST(SUM(COALESCE(d.total_energy_uj, 0)) / ?2 AS INTEGER) AS total_energy_uj \
-             FROM timestamp t \
-             JOIN total_data d ON t.id = d.timestamp_id \
-             WHERE t.sampling_period = ?4 \
-               AND t.timestamp >= ?1 \
-               AND t.timestamp < ?3 \
+                (timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                CAST(SUM(COALESCE(total_energy_uj, 0)) / ?2 AS INTEGER) AS total_energy_uj \
+             FROM total_data \
+             WHERE duration_ms < ?4 \
+               AND timestamp >= ?1 \
+               AND timestamp < ?3 \
              GROUP BY window_start \
              ORDER BY window_start ASC";
 
         let hour_query = "SELECT \
-                (t.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
-                CAST(AVG(COALESCE(d.total_energy_uj, 0)) / ?4 AS INTEGER) AS total_energy_uj \
-             FROM timestamp t \
-             JOIN total_data d ON t.id = d.timestamp_id \
-             WHERE t.sampling_period = ?4 \
-               AND t.timestamp >= ?1 \
-               AND t.timestamp < ?3 \
+                (timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                CAST(AVG(COALESCE(total_energy_uj, 0)) / (?4 / 1000) AS INTEGER) AS total_energy_uj \
+             FROM total_data \
+             WHERE duration_ms >= ?4 \
+               AND timestamp >= ?1 \
+               AND timestamp < ?3 \
              GROUP BY window_start \
              ORDER BY window_start ASC";
 
         let second_rows = self.execute_sensor_query(
             TotalData::table_name_static(),
             second_query,
-            params![
-                start_window_start,
-                window_seconds,
-                end_exclusive,
-                LIVE_SAMPLING_PERIOD_SECONDS
-            ],
+            params![start_window_start, window_seconds, end_exclusive, HOUR_MS],
         )?;
 
         let hour_rows = self.execute_sensor_query(
             TotalData::table_name_static(),
             hour_query,
-            params![
-                start_window_start,
-                window_seconds,
-                end_exclusive,
-                HOURLY_SAMPLING_PERIOD_SECONDS
-            ],
+            params![start_window_start, window_seconds, end_exclusive, HOUR_MS],
         )?;
 
         let mut second_by_window = HashMap::new();
@@ -815,22 +885,23 @@ impl Database {
         let now_ms = to_epoch_millis(SystemTime::now())?;
         let start = now_ms - n_seconds * 1000;
 
+        // JOIN apps to recover app_name and exe_path
         let query = "\
                 SELECT \
                     ?2 AS timestamp, \
-                    p.app_name AS app_name, \
-                    MAX(p.process_exe_path) AS process_exe_path, \
+                    a.name AS app_name, \
+                    a.exe_path AS process_exe_path, \
                     CAST(SUM(COALESCE(p.process_energy_uj, 0)) AS INTEGER) AS process_energy_uj, \
-                    MIN(SUM(COALESCE(p.process_cpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_cpu_usage, \
-                    MIN(SUM(COALESCE(p.process_gpu_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_gpu_usage, \
-                    MIN(SUM(COALESCE(p.process_mem_usage, 0.0) * t.sampling_period) / SUM(t.sampling_period), 100.0) AS process_mem_usage, \
-                    CAST(SUM(COALESCE(p.read_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS read_bytes, \
-                    CAST(SUM(COALESCE(p.written_bytes, 0)) * 1.0 / SUM(t.sampling_period) AS INTEGER) AS written_bytes, \
+                    MIN(SUM(COALESCE(p.process_cpu_usage, 0.0) * p.duration_ms) / SUM(p.duration_ms), 100.0) AS process_cpu_usage, \
+                    MIN(SUM(COALESCE(p.process_gpu_usage, 0.0) * p.duration_ms) / SUM(p.duration_ms), 100.0) AS process_gpu_usage, \
+                    MIN(SUM(COALESCE(p.process_mem_usage, 0.0) * p.duration_ms) / SUM(p.duration_ms), 100.0) AS process_mem_usage, \
+                    CAST(SUM(COALESCE(p.read_bytes, 0)) * 1000.0 / SUM(p.duration_ms) AS INTEGER) AS read_bytes, \
+                    CAST(SUM(COALESCE(p.written_bytes, 0)) * 1000.0 / SUM(p.duration_ms) AS INTEGER) AS written_bytes, \
                     CAST(MAX(p.subprocess_count) AS INTEGER) AS subprocess_count \
-                FROM timestamp t \
-                JOIN process_data p ON t.id = p.timestamp_id \
-                WHERE t.timestamp >= ?1 AND t.timestamp < ?2 \
-                GROUP BY p.app_name \
+                FROM process_data p \
+                JOIN apps a ON p.app_id = a.id \
+                WHERE p.timestamp >= ?1 AND p.timestamp < ?2 \
+                GROUP BY p.app_id \
                 ORDER BY process_energy_uj DESC \
                 LIMIT ?3";
 
@@ -853,6 +924,33 @@ impl Database {
     }
 }
 
+/// Returns the id of the device row matching (kind, name), inserting if absent.
+pub fn get_or_create_device_id(conn: &Connection, kind: &str, name: &str) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "INSERT INTO devices (kind, name) VALUES (?1, ?2)
+         ON CONFLICT (kind, name) DO UPDATE SET kind = excluded.kind
+         RETURNING id",
+        params![kind, name],
+        |row| row.get(0),
+    )
+}
+
+/// Returns the id of the app row matching identity, inserting or updating if absent.
+pub fn get_or_create_app_id(
+    conn: &Connection,
+    identity: &str,
+    name: &str,
+    exe_path: Option<&str>,
+) -> rusqlite::Result<i64> {
+    conn.query_row(
+        "INSERT INTO apps (identity, name, exe_path) VALUES (?1, ?2, ?3)
+         ON CONFLICT (identity) DO UPDATE SET name = excluded.name
+         RETURNING id",
+        params![identity, name, exe_path],
+        |row| row.get(0),
+    )
+}
+
 #[derive(Clone, Copy)]
 enum WindowedSource {
     Live,
@@ -870,6 +968,7 @@ fn get_windowed_columns(
 
     let aggregated = columns
         .iter()
+        .filter(|(name, _)| *name != "device_id" && *name != "app_id")
         .map(|(name, sql_type)| windowed_column_expr(prefix, name, sql_type, window_seconds, source))
         .collect::<Vec<_>>()
         .join(", ");
@@ -919,7 +1018,7 @@ fn to_epoch_millis(ts: SystemTime) -> Result<i64, DatabaseError> {
 }
 
 fn from_epoch_millis(ts_millis: i64) -> SystemTime {
-    SystemTime::UNIX_EPOCH + std::time::Duration::from_millis(ts_millis as u64)
+    SystemTime::UNIX_EPOCH + Duration::from_millis(ts_millis as u64)
 }
 
 fn to_system_time_records(records: Vec<(i64, ComputedSensorData)>) -> Vec<(SystemTime, ComputedSensorData)> {

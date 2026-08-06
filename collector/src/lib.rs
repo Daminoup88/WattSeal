@@ -219,8 +219,14 @@ impl CollectorApp {
 
     /// Runs the collection loop, sampling sensors every second.
     pub fn run(&mut self) {
+        let start = Instant::now();
         // Purge/averaging runs in a separate thread so collection starts immediately.
         self.purge_and_average();
+        // Wait at least 1 second before first collection to avoid skewed readings
+        let duration = start.elapsed();
+        if duration < Duration::from_secs(1) {
+            thread::sleep(Duration::from_secs(1) - duration);
+        }
 
         #[cfg(debug_assertions)]
         println!(
@@ -254,7 +260,7 @@ impl CollectorApp {
                     {
                         let start = Instant::now();
 
-                        let result = database.insert_event_and_update_energy(&computed_event, 1);
+                        let result = database.insert_event_and_update_energy(&computed_event, since_last_update);
                         let duration = start.elapsed();
                         match result {
                             Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
@@ -263,7 +269,7 @@ impl CollectorApp {
                     }
 
                     #[cfg(not(debug_assertions))]
-                    let _ = database.insert_event_and_update_energy(&computed_event, 1);
+                    let _ = database.insert_event_and_update_energy(&computed_event, since_last_update);
                 }
             }
 
