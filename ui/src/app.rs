@@ -34,7 +34,7 @@ use crate::{
         info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
         setup_choose_language, setup_confirm, setup_welcome_title,
     },
-    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, SensorRecord, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -196,14 +196,14 @@ impl App {
                 }
 
                 let data = self.load_latest_data(1);
-                for (timestamp, duration_ms, sensor_data) in data.iter() {
-                    if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
-                        sensor.push_data(*timestamp, *duration_ms, sensor_data);
+                for record in &data {
+                    if let Some(sensor) = self.sensors.get_mut(record.data.table_name()) {
+                        sensor.push_data(record);
                     }
                 }
                 self.refresh_all_time_data();
                 self.tick_count += 1;
-                if self.tick_count % 10 == 0 {
+                if self.tick_count == 1 || self.tick_count % 10 == 0 {
                     let table_name = ProcessData::table_name_static();
                     let time_range = self
                         .sensors
@@ -358,9 +358,9 @@ impl App {
                 Task::none()
             }
             Message::UpdateChartData(data) => {
-                for (timestamp, sensor_data) in data.iter() {
-                    if let Some(sensor) = self.sensors.get_mut(sensor_data.table_name()) {
-                        sensor.push_data(*timestamp, 0, sensor_data);
+                for record in &data {
+                    if let Some(sensor) = self.sensors.get_mut(record.data.table_name()) {
+                        sensor.push_data(record);
                     }
                 }
                 Task::none()
@@ -394,16 +394,20 @@ impl App {
         }
     }
 
-    fn load_latest_data(&mut self, n: i64) -> Vec<(DateTime<Local>, i64, ComputedSensorData)> {
+    fn load_latest_data(&mut self, n: i64) -> Vec<SensorRecord> {
         self.database
             .select_last_n_records(n)
             .unwrap_or_default()
             .into_iter()
-            .map(|(ts, dur, data)| (ts.into(), dur, data))
+            .map(|(ts, duration_ms, data)| SensorRecord { timestamp: ts.into(), duration_ms, data })
             .collect()
     }
 
-    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<(DateTime<Local>, ComputedSensorData)> {
+    fn load_history(
+        &mut self,
+        table_name: &str,
+        time_range: TimeRange,
+    ) -> Vec<SensorRecord> {
         if table_name == ProcessData::table_name_static() {
             return self.load_process_data(time_range);
         }
@@ -419,11 +423,14 @@ impl App {
                     .select_last_n_seconds_average(time_range.seconds(), table_name, window)
             }
         };
-        from_db(result)
+        from_db_with_duration(result)
     }
 
-    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<(DateTime<Local>, ComputedSensorData)> {
+    fn load_process_data(&mut self, time_range: TimeRange) -> Vec<SensorRecord> {
         from_db(self.database.select_top_processes_average(time_range.seconds(), 10))
+            .into_iter()
+            .map(|(timestamp, data)| SensorRecord { timestamp, duration_ms: 0, data })
+            .collect()
     }
 
     /// Builds the root UI element tree.
@@ -929,5 +936,14 @@ fn from_db(
     data.unwrap_or_default()
         .into_iter()
         .map(|(ts, data)| (ts.into(), data))
+        .collect()
+}
+
+fn from_db_with_duration(
+    data: Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError>,
+) -> Vec<SensorRecord> {
+    data.unwrap_or_default()
+        .into_iter()
+        .map(|(ts, duration_ms, data)| SensorRecord { timestamp: ts.into(), duration_ms, data })
         .collect()
 }

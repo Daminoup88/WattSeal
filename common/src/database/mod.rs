@@ -478,12 +478,12 @@ impl Database {
         table_name: &str,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
         let sensor_data_list = self.select_table_between_millis(table_name, start_time_millis, end_time_millis)?;
-        Ok(to_system_time_records(sensor_data_list))
+        Ok(to_system_time_records_with_duration(sensor_data_list))
     }
 
     /// Queries all sensor tables between two timestamps.
@@ -491,11 +491,11 @@ impl Database {
         &mut self,
         start_time: SystemTime,
         end_time: SystemTime,
-    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError> {
         let start_time_millis = to_epoch_millis(start_time)?;
         let end_time_millis = to_epoch_millis(end_time)?;
 
-        let mut records = Vec::<(i64, ComputedSensorData)>::new();
+        let mut records = Vec::<(i64, i64, ComputedSensorData)>::new();
         if let Some(tables) = &self.tables {
             for table_name in tables {
                 let mut table_records =
@@ -503,7 +503,7 @@ impl Database {
                 records.append(&mut table_records);
             }
         }
-        Ok(to_system_time_records(records))
+        Ok(to_system_time_records_with_duration(records))
     }
 
     /// Returns windowed averages over the last N seconds.
@@ -512,7 +512,7 @@ impl Database {
         n: i64,
         table_name: &str,
         window_seconds: i64,
-    ) -> Result<Vec<(SystemTime, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError> {
         if n <= 0 || window_seconds <= 0 {
             return Ok(Vec::new());
         }
@@ -535,7 +535,7 @@ impl Database {
             self.select_windowed_table_data(table_name, start_window_start, query_end_exclusive, window_seconds)?
         };
 
-        Ok(to_system_time_records(sensor_data_list))
+        Ok(to_system_time_records_with_duration(sensor_data_list))
     }
 
     /// Returns the most recent N timestamped records.
@@ -620,7 +620,7 @@ impl Database {
             };
 
             let sensor_data_list = self.execute_sensor_query(table_name, &query, [])?;
-            for (ts_ms, sensor_data) in sensor_data_list {
+            for (ts_ms, _, sensor_data) in sensor_data_list {
                 if let Some(&(sys_time, dur_ms)) = ts_map.get(&ts_ms) {
                     records.push((sys_time, dur_ms, sensor_data));
                 }
@@ -651,14 +651,14 @@ impl Database {
         table_name: &str,
         query: &str,
         params: P,
-    ) -> rusqlite::Result<Vec<(i64, ComputedSensorData)>>
+    ) -> rusqlite::Result<Vec<(i64, i64, ComputedSensorData)>>
     where
         P: rusqlite::Params,
     {
         dispatch_entry!(table_name, self, query_sensor_table, P, (query, params)).unwrap_or_else(|| Ok(Vec::new()))
     }
 
-    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, ComputedSensorData)>>
+    fn query_sensor_table<T, P>(&self, query: &str, params: P) -> rusqlite::Result<Vec<(i64, i64, ComputedSensorData)>>
     where
         T: DatabaseEntry + Into<ComputedSensorData>,
         P: rusqlite::Params,
@@ -666,8 +666,9 @@ impl Database {
         let mut stmt = self.conn.prepare(query)?;
         let rows = stmt.query_map(params, |row| {
             let ts_id_or_millis: i64 = row.get(0)?;
+            let duration_ms: i64 = row.get(1)?;
             let data = T::from_row(row)?;
-            Ok((ts_id_or_millis, data.into()))
+            Ok((ts_id_or_millis, duration_ms, data.into()))
         })?;
 
         rows.collect()
@@ -678,7 +679,7 @@ impl Database {
         table_name: &str,
         start_time_millis: i64,
         end_time_millis: i64,
-    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, i64, ComputedSensorData)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -688,6 +689,7 @@ impl Database {
         // Aggregate multiple GPU device rows into a single reading per timestamp
         let query = if table_name == GPUData::table_name_static() {
             "SELECT timestamp, \
+                  MAX(duration_ms) AS duration_ms, \
                   SUM(total_energy_uj) AS total_energy_uj, \
                   AVG(usage_percent) AS usage_percent, \
                   AVG(vram_usage_percent) AS vram_usage_percent \
@@ -698,7 +700,7 @@ impl Database {
                 .to_string()
         } else {
             format!(
-                "SELECT timestamp, {table}.* \
+                "SELECT timestamp, duration_ms, {table}.* \
                   FROM {table} \
                   WHERE timestamp >= ?1 AND timestamp <= ?2 \
                   ORDER BY timestamp ASC",
@@ -715,7 +717,7 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, i64, ComputedSensorData)>, DatabaseError> {
         if !is_valid_table_name(table_name) {
             return Err(DatabaseError::QueryError(format!(
                 "Rejected table name: {}",
@@ -734,6 +736,7 @@ impl Database {
                 format!(
                     "SELECT \
                         (d.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        (?2 * 1000) AS duration_ms, \
                         {} \
                      FROM ( \
                         SELECT duration_ms, timestamp, \
@@ -753,6 +756,7 @@ impl Database {
                 format!(
                     "SELECT \
                         (d.timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+                        (?2 * 1000) AS duration_ms, \
                         {} \
                      FROM {table} d \
                      WHERE d.timestamp >= ?1 AND d.timestamp < ?3 \
@@ -778,26 +782,26 @@ impl Database {
         )?;
 
         let mut live_by_window = HashMap::new();
-        for (window_start, data) in live_rows {
-            live_by_window.insert(window_start, data);
+        for (window_start, duration_ms, data) in live_rows {
+            live_by_window.insert(window_start, (duration_ms, data));
         }
 
         let mut hourly_by_window = HashMap::new();
-        for (window_start, data) in hourly_rows {
-            hourly_by_window.insert(window_start, data);
+        for (window_start, duration_ms, data) in hourly_rows {
+            hourly_by_window.insert(window_start, (duration_ms, data));
         }
 
         let mut filled = Vec::new();
         let mut current = start_window_start;
         while current < end_exclusive {
-            let data = live_by_window
+            let (duration_ms, data) = live_by_window
                 .remove(&current)
                 .or_else(|| hourly_by_window.remove(&current))
-                .or_else(|| zero_sensor_data(table_name))
+                .or_else(|| zero_sensor_data(table_name).map(|data| (window_seconds * 1000, data)))
                 .ok_or_else(|| {
                     DatabaseError::QueryError(format!("Unsupported table for windowed average: {}", table_name))
                 })?;
-            filled.push((current, data));
+            filled.push((current, duration_ms, data));
             current += window_seconds * 1000;
         }
 
@@ -809,9 +813,10 @@ impl Database {
         start_window_start: i64,
         end_exclusive: i64,
         window_seconds: i64,
-    ) -> Result<Vec<(i64, ComputedSensorData)>, DatabaseError> {
+    ) -> Result<Vec<(i64, i64, ComputedSensorData)>, DatabaseError> {
         let second_query = "SELECT \
                 (timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+            (?2 * 1000) AS duration_ms, \
                 CAST(SUM(COALESCE(total_energy_uj, 0)) / ?2 AS INTEGER) AS total_energy_uj \
              FROM total_data \
              WHERE duration_ms < ?4 \
@@ -822,6 +827,7 @@ impl Database {
 
         let hour_query = "SELECT \
                 (timestamp / (?2 * 1000)) * (?2 * 1000) AS window_start, \
+            (?2 * 1000) AS duration_ms, \
                 CAST(AVG(COALESCE(total_energy_uj, 0)) / (?4 / 1000) AS INTEGER) AS total_energy_uj \
              FROM total_data \
              WHERE duration_ms >= ?4 \
@@ -843,29 +849,32 @@ impl Database {
         )?;
 
         let mut second_by_window = HashMap::new();
-        for (window_start, data) in second_rows {
-            second_by_window.insert(window_start, data);
+        for (window_start, duration_ms, data) in second_rows {
+            second_by_window.insert(window_start, (duration_ms, data));
         }
 
         let mut hour_by_window = HashMap::new();
-        for (window_start, data) in hour_rows {
-            hour_by_window.insert(window_start, data);
+        for (window_start, duration_ms, data) in hour_rows {
+            hour_by_window.insert(window_start, (duration_ms, data));
         }
 
         let mut filled = Vec::new();
         let mut current = start_window_start;
         while current < end_exclusive {
-            let data = if let Some(second_data) = second_by_window.remove(&current) {
+            let (duration_ms, data) = if let Some(second_data) = second_by_window.remove(&current) {
                 second_data
             } else if let Some(hour_data) = hour_by_window.remove(&current) {
                 hour_data
             } else {
-                ComputedSensorData::Total(TotalData {
-                    total_energy: EnergyUj::from_u64(0),
-                })
+                (
+                    window_seconds * 1000,
+                    ComputedSensorData::Total(TotalData {
+                        total_energy: EnergyUj::from_u64(0),
+                    }),
+                )
             };
 
-            filled.push((current, data));
+            filled.push((current, duration_ms, data));
             current += window_seconds * 1000;
         }
 
@@ -889,6 +898,7 @@ impl Database {
         let query = "\
                 SELECT \
                     ?2 AS timestamp, \
+                    (?2 - ?1) AS duration_ms, \
                     a.name AS app_name, \
                     a.exe_path AS process_exe_path, \
                     CAST(SUM(COALESCE(p.process_energy_uj, 0)) AS INTEGER) AS process_energy_uj, \
@@ -912,7 +922,7 @@ impl Database {
         )?;
 
         let mut processes = Vec::new();
-        for (_, data) in rows {
+        for (_, _, data) in rows {
             if let ComputedSensorData::Process(mut proc_data) = data {
                 processes.append(&mut proc_data);
             }
@@ -1021,10 +1031,12 @@ fn from_epoch_millis(ts_millis: i64) -> SystemTime {
     SystemTime::UNIX_EPOCH + Duration::from_millis(ts_millis as u64)
 }
 
-fn to_system_time_records(records: Vec<(i64, ComputedSensorData)>) -> Vec<(SystemTime, ComputedSensorData)> {
+fn to_system_time_records_with_duration(
+    records: Vec<(i64, i64, ComputedSensorData)>,
+) -> Vec<(SystemTime, i64, ComputedSensorData)> {
     records
         .into_iter()
-        .map(|(ts_millis, data)| (from_epoch_millis(ts_millis), data))
+        .map(|(ts_millis, duration_ms, data)| (from_epoch_millis(ts_millis), duration_ms, data))
         .collect()
 }
 

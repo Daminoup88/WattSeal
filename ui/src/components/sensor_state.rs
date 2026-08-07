@@ -40,7 +40,7 @@ use crate::{
         TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_type_name, na,
         power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
     },
-    types::{AppLanguage, TimeRange},
+    types::{AppLanguage, SensorRecord, TimeRange},
 };
 
 const SNAPSHOT_AREA_HEIGHT: f32 = 34.0;
@@ -383,7 +383,7 @@ pub struct SensorState {
     table_name: String,
     display_name: String,
     sensor_category: SensorCategory,
-    latest_reading: Option<(ComputedSensorData, i64)>,
+    latest_reading: Option<SensorRecord>,
     time_range: TimeRange,
     language: AppLanguage,
 }
@@ -423,7 +423,7 @@ impl SensorState {
 
     /// Returns the most recent sensor reading.
     pub fn get_latest_reading(&self) -> Option<&ComputedSensorData> {
-        self.latest_reading.as_ref().map(|(data, _)| data)
+        self.latest_reading.as_ref().map(|r| &r.data)
     }
 
     /// Returns the highest-power process, if this is a process sensor.
@@ -507,27 +507,31 @@ impl SensorState {
         }
     }
 
+    fn set_latest_reading(&mut self, record: &SensorRecord) {
+        self.latest_reading = Some(record.clone());
+    }
+
     /// Appends a real-time data point to the chart.
-    pub fn push_data(&mut self, timestamp: DateTime<Local>, duration_ms: i64, data: &ComputedSensorData) {
+    pub fn push_data(&mut self, record: &SensorRecord) {
         if matches!(self.sensor_category, SensorCategory::Processes(_)) {
             return;
         }
 
-        let timestamp = timestamp.with_nanosecond(0).unwrap_or(timestamp);
-        self.latest_reading = Some((data.clone(), duration_ms));
+        let timestamp = record.timestamp.with_nanosecond(0).unwrap_or(record.timestamp);
+        self.set_latest_reading(record);
 
         if self.time_range.is_real_time() {
             match &mut self.sensor_category {
                 SensorCategory::Component(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data, &self.time_range);
+                        state.append(timestamp, &record.data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
                 }
                 SensorCategory::Total(state) => {
                     if state.is_newer_than_latest(timestamp) {
-                        state.append(timestamp, data, &self.time_range);
+                        state.append(timestamp, &record.data, &self.time_range);
                     }
                     state.prune_before(timestamp - self.time_range.duration_seconds());
                     state.power_graph.chart.refresh_cache();
@@ -548,9 +552,9 @@ impl SensorState {
     }
 
     /// Replaces chart data with a full history batch.
-    pub fn load_history_batch(&mut self, data: &[(DateTime<Local>, ComputedSensorData)]) {
+    pub fn load_history_batch(&mut self, data: &[SensorRecord]) {
         if let SensorCategory::Processes(state) = &mut self.sensor_category {
-            if let Some((_, ComputedSensorData::Process(processes))) = data.last() {
+            if let Some(ComputedSensorData::Process(processes)) = data.last().map(|r| &r.data) {
                 state.update_from_snapshot(processes);
             }
             return;
@@ -558,8 +562,8 @@ impl SensorState {
 
         if let SensorCategory::Component(state) = &mut self.sensor_category {
             if let Some(initial_metric) = state.pending_initial_metric.take() {
-                if let Some((_, sensor_data)) = data.last() {
-                    let secondary = sensor_data.secondary_values();
+                if let Some(record) = data.last() {
+                    let secondary = record.data.secondary_values();
                     state.update_metric_type(
                         initial_metric,
                         &self.display_name,
@@ -572,8 +576,13 @@ impl SensorState {
         }
 
         self.clear_data();
-        for (timestamp, sensor) in data {
-            self.push_to_history_only(*timestamp, sensor);
+        for record in data {
+            self.push_to_history_only(record.timestamp, &record.data);
+        }
+        if let Some(record) = data.last() {
+            self.set_latest_reading(record);
+        } else {
+            self.latest_reading = None;
         }
         self.refresh_chart();
     }
@@ -593,7 +602,7 @@ impl SensorState {
         match &mut self.sensor_category {
             SensorCategory::Component(state) => {
                 state.power_graph.chart.update_language(language);
-                let secondary_values = self.latest_reading.as_ref().and_then(|(d, _)| d.secondary_values());
+                let secondary_values = self.latest_reading.as_ref().and_then(|r| r.data.secondary_values());
                 state.update_metric_type(
                     state.metric_type,
                     &self.display_name,
@@ -910,7 +919,7 @@ impl SensorState {
         let power = self
             .latest_reading
             .as_ref()
-            .and_then(|(d, dur_ms)| d.total_energy().map(|e| (e, *dur_ms)))
+            .and_then(|r| r.data.total_energy().map(|e| (e, r.duration_ms)))
             .map(|(energy, dur_ms)| {
                 let duration_secs = if dur_ms > 0 { dur_ms as f64 / 1000.0 } else { 1.0 };
                 energy.as_watts_for_seconds(duration_secs)

@@ -1,7 +1,15 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Duration, Local};
-use common::SECONDS_PER_HOUR;
+use common::{ComputedSensorData, SECONDS_PER_HOUR};
+
+/// A sensor data point with the sampling duration.
+#[derive(Debug, Clone)]
+pub struct SensorRecord {
+    pub timestamp: DateTime<Local>,
+    pub duration_ms: i64,
+    pub data: ComputedSensorData,
+}
 
 /// Selectable time window for chart data display.
 #[derive(Default, Clone, PartialEq, Debug)]
