@@ -1,6 +1,9 @@
 use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData, ProcessData, RamData, TotalData};
 
-use crate::types::{AppLanguage, TimeRange};
+use crate::{
+    themes::AppTheme,
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
+};
 
 // Window title
 
@@ -1171,5 +1174,126 @@ pub fn close_everything(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close everything",
         AppLanguage::French => "Tout fermer",
+    }
+}
+
+// Localized Theme & Country Presets
+
+pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
+    match language {
+        AppLanguage::English => theme.name(),
+        AppLanguage::French => match theme {
+            AppTheme::DeepOcean => "Chasse",
+            AppTheme::OceanLight => "Baignade",
+            AppTheme::EcoEnergy => "Dodo",
+            AppTheme::EcoEnergyLight => "Bataille d'eau",
+            AppTheme::GeothermalCore => "Bronzette",
+            AppTheme::SolarUmbra => "Détente",
+        },
+    }
+}
+
+pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str {
+    match language {
+        AppLanguage::English => label,
+        AppLanguage::French => match label {
+            "France" => "France",
+            "Germany" => "Allemagne",
+            "Spain" => "Espagne",
+            "Italy" => "Italie",
+            "Netherlands" => "Pays-Bas",
+            "Switzerland" => "Suisse",
+            "UK" => "Royaume-Uni",
+            "USA (average)" => "États-Unis (moyenne)",
+            "China" => "Chine",
+            "India" => "Inde",
+            "Sweden" => "Suède",
+            "Poland" => "Pologne",
+            "World average" => "Moyenne mondiale",
+            "Custom" => "Personnalisé",
+            other => other,
+        },
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranslatedTheme {
+    pub theme: AppTheme,
+    language: AppLanguage,
+}
+
+impl TranslatedTheme {
+    pub fn new(theme: AppTheme, language: AppLanguage) -> Self {
+        Self { theme, language }
+    }
+
+    pub fn all(language: AppLanguage) -> Vec<Self> {
+        AppTheme::all().iter().map(|&t| Self::new(t, language)).collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedTheme {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", theme_name(self.language, self.theme))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TranslatedCarbonIntensity {
+    pub intensity: CarbonIntensity,
+    language: AppLanguage,
+}
+
+impl TranslatedCarbonIntensity {
+    pub fn new(intensity: CarbonIntensity, language: AppLanguage) -> Self {
+        Self { intensity, language }
+    }
+
+    pub fn all(language: AppLanguage) -> Vec<Self> {
+        CarbonIntensity::PRESETS
+            .iter()
+            .map(|&p| Self::new(p, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedCarbonIntensity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let country = country_preset_name(self.language, self.intensity.label);
+        if self.intensity.is_custom() {
+            write!(f, "{}", country)
+        } else {
+            write!(f, "{} ({:.0} g/kWh)", country, self.intensity.g_per_kwh)
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TranslatedElectricityCost {
+    pub cost: ElectricityCost,
+    language: AppLanguage,
+}
+
+impl TranslatedElectricityCost {
+    pub fn new(cost: ElectricityCost, language: AppLanguage) -> Self {
+        Self { cost, language }
+    }
+
+    pub fn all(language: AppLanguage) -> Vec<Self> {
+        ElectricityCost::PRESETS
+            .iter()
+            .map(|&p| Self::new(p, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedElectricityCost {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let country = country_preset_name(self.language, self.cost.label);
+        if self.cost.is_custom() {
+            write!(f, "{}", country)
+        } else {
+            write!(f, "{} ({:.2} $/kWh)", country, self.cost.usd_per_kwh)
+        }
     }
 }

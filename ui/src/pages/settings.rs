@@ -16,7 +16,8 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
+        TranslatedCarbonIntensity, TranslatedElectricityCost, TranslatedTheme, custom_carbon_invalid,
+        custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
         settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language, settings_theme,
         settings_title,
     },
@@ -51,10 +52,14 @@ impl SettingsPage {
 
         let theme_row = settings_row(
             settings_theme(language),
-            pick_list(AppTheme::all(), Some(theme), Message::ChangeTheme)
-                .width(Length::FillPortion(3))
-                .padding(PADDING_MEDIUM)
-                .into(),
+            pick_list(
+                TranslatedTheme::all(language),
+                Some(TranslatedTheme::new(theme, language)),
+                |tt| Message::ChangeTheme(tt.theme),
+            )
+            .width(Length::FillPortion(3))
+            .padding(PADDING_MEDIUM)
+            .into(),
         );
 
         let language_row = settings_row(
@@ -114,9 +119,9 @@ fn carbon_intensity_row<'a>(
     let custom_valid = custom_carbon_input.parse::<f64>().ok().filter(|&v| v > 0.0).is_some();
 
     let picker = pick_list(
-        CarbonIntensity::PRESETS.to_vec(),
-        Some(carbon_intensity),
-        Message::ChangeCarbonIntensity,
+        TranslatedCarbonIntensity::all(language),
+        Some(TranslatedCarbonIntensity::new(carbon_intensity, language)),
+        |tci| Message::ChangeCarbonIntensity(tci.intensity),
     )
     .width(Length::FillPortion(3))
     .padding(PADDING_MEDIUM);
@@ -167,9 +172,9 @@ fn electricity_cost_row<'a>(
         .is_some();
 
     let picker = pick_list(
-        ElectricityCost::PRESETS.to_vec(),
-        Some(electricity_cost),
-        Message::ChangeElectricityCost,
+        TranslatedElectricityCost::all(language),
+        Some(TranslatedElectricityCost::new(electricity_cost, language)),
+        |tec| Message::ChangeElectricityCost(tec.cost),
     )
     .width(Length::FillPortion(3))
     .padding(PADDING_MEDIUM);

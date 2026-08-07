@@ -27,7 +27,7 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
+        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
         custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, database_migrating_description,
         database_migrating_title, info_modal_all_time_power, info_modal_all_time_top_consumer,
         info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
@@ -832,9 +832,9 @@ impl App {
 
         let ci_label = Text::new(setup_choose_carbon(language)).size(FONT_SIZE_BODY);
         let ci_picker = pick_list(
-            CarbonIntensity::PRESETS.to_vec(),
-            Some(self.carbon_intensity),
-            Message::ChangeCarbonIntensity,
+            TranslatedCarbonIntensity::all(language),
+            Some(TranslatedCarbonIntensity::new(self.carbon_intensity, language)),
+            |tci| Message::ChangeCarbonIntensity(tci.intensity),
         )
         .width(Length::Fill)
         .padding(8);
@@ -873,9 +873,9 @@ impl App {
 
         let ec_label = Text::new(setup_choose_electricity(language)).size(FONT_SIZE_BODY);
         let ec_picker = pick_list(
-            ElectricityCost::PRESETS.to_vec(),
-            Some(self.electricity_cost),
-            Message::ChangeElectricityCost,
+            TranslatedElectricityCost::all(language),
+            Some(TranslatedElectricityCost::new(self.electricity_cost, language)),
+            |tec| Message::ChangeElectricityCost(tec.cost),
         )
         .width(Length::Fill)
         .padding(8);
