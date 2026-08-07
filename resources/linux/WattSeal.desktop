@@ -1,10 +1,11 @@
 [Desktop Entry]
 Type=Application
 Name=WattSeal
-Comment=Real-time PC power consumption monitoring
+GenericName=Power Monitor
+Comment=Per-app power monitoring tool
 Exec=WattSeal
 Icon=WattSeal
 Terminal=false
 Categories=Utility;System;Monitor;
 Keywords=power;energy;monitoring;hardware;
-StartupNotify=true
+StartupWMClass=WattSeal
