@@ -145,7 +145,7 @@ fn carbon_intensity_row<'a>(
 
     Row::new()
         .spacing(SPACING_LARGE)
-        .align_y(Alignment::Start)
+        .align_y(Alignment::Center)
         .push(
             Text::new(settings_carbon_intensity(language))
                 .size(FONT_SIZE_BODY)
@@ -203,7 +203,7 @@ fn electricity_cost_row<'a>(
 
     Row::new()
         .spacing(SPACING_LARGE)
-        .align_y(Alignment::Start)
+        .align_y(Alignment::Center)
         .push(
             Text::new(settings_electricity_cost(language))
                 .size(FONT_SIZE_BODY)
