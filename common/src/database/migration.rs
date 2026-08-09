@@ -31,8 +31,18 @@ pub fn run_migrations(conn: &mut Connection) -> Result<(), DatabaseError> {
 }
 
 fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
-    tx.execute_batch(
-        r#"
+    let mut default_gpu = "unknown".to_string();
+    if let Ok(serialized) = tx.query_row("SELECT hardware_data FROM hardware_info WHERE id = 1", [], |row| {
+        row.get::<_, String>(0)
+    }) {
+        if let Ok(info) = serde_json::from_str::<crate::HardwareInfo>(&serialized) {
+            if let Some(first_gpu) = info.gpus.first() {
+                default_gpu = first_gpu.clone();
+            }
+        }
+    }
+
+    let sql = r#"
         -- Create centralisation tables first
         CREATE TABLE IF NOT EXISTS devices (
             id   INTEGER PRIMARY KEY,
@@ -230,8 +240,9 @@ fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
         DROP TABLE timestamp_old;
         DROP TABLE IF EXISTS timestamp;
         DROP TABLE IF EXISTS all_time_data;
-        "#,
-    )?;
+    "#.replace("'unknown'", &format!("'{}'", default_gpu.replace('\'', "''")));
+
+    tx.execute_batch(&sql)?;
 
     Ok(())
 }
