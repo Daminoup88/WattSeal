@@ -646,11 +646,12 @@ pub fn kwh_cost_placeholder(language: AppLanguage) -> &'static str {
     }
 }
 
-pub fn kwh_cost_invalid(language: AppLanguage) -> &'static str {
-    match language {
-        AppLanguage::English => "Please enter a positive number ($/kWh)",
-        AppLanguage::French => "Entrez un nombre positif ($/kWh)",
-    }
+pub fn kwh_cost_invalid(language: AppLanguage, currency_symbol: &str) -> String {
+    let text = match language {
+        AppLanguage::English => "Enter a positive number",
+        AppLanguage::French => "Entrez un nombre positif",
+    };
+    return format!("{} ({}/kWh)", text, currency_symbol);
 }
 
 pub fn setup_choose_electricity(language: AppLanguage) -> &'static str {
@@ -718,7 +719,7 @@ pub fn custom_carbon_placeholder(language: AppLanguage) -> &'static str {
 
 pub fn custom_carbon_invalid(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Please enter a positive number (g CO₂/kWh)",
+        AppLanguage::English => "Enter a positive number (g CO₂/kWh)",
         AppLanguage::French => "Entrez un nombre positif (g CO₂/kWh)",
     }
 }
@@ -1207,6 +1208,8 @@ pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str
             "USA (average)" => "États-Unis (moyenne)",
             "China" => "Chine",
             "India" => "Inde",
+            "Indonesia" => "Indonésie",
+            "Philippines" => "Philippines",
             "Sweden" => "Suède",
             "Poland" => "Pologne",
             "World average" => "Moyenne mondiale",
@@ -1293,7 +1296,52 @@ impl std::fmt::Display for TranslatedElectricityCost {
         if self.cost.is_custom() {
             write!(f, "{}", country)
         } else {
-            write!(f, "{} ({:.2} $/kWh)", country, self.cost.usd_per_kwh)
+            write!(
+                f,
+                "{} ({:.2} {}/kWh)",
+                country, self.cost.price_per_kwh, self.cost.currency_symbol
+            )
         }
+    }
+}
+
+// Unit Formatting (Information & Data Rates)
+
+pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
+    if bytes == 0 {
+        return na(language).to_string();
+    }
+    let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
+    let unit = match language {
+        AppLanguage::English => "GB",
+        AppLanguage::French => "Go",
+    };
+    format!("{:.2} {}", gb, unit)
+}
+
+pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
+    let unit = match language {
+        AppLanguage::English => "MB/s",
+        AppLanguage::French => "Mo/s",
+    };
+    format!("{:.1} {}", mb, unit)
+}
+
+pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
+    match metric {
+        MetricKind::Power => "W",
+        MetricKind::Usage => "%",
+        MetricKind::Speed => match language {
+            AppLanguage::English => "MB/s",
+            AppLanguage::French => "Mo/s",
+        },
+    }
+}
+
+pub fn metric_effective_unit(language: AppLanguage, metric: MetricKind, energy_mode: bool) -> &'static str {
+    if metric == MetricKind::Power && energy_mode {
+        "Wh"
+    } else {
+        metric_unit(language, metric)
     }
 }

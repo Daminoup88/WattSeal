@@ -81,6 +81,7 @@ pub struct UiSettings {
     pub carbon_intensity: String,
     pub kwh_cost: String,
     pub theme: String,
+    pub currency: String,
 }
 
 /// Error types for database operations.
@@ -197,9 +198,15 @@ impl Database {
                 language         TEXT NOT NULL DEFAULT 'EN',
                 carbon_intensity TEXT NOT NULL DEFAULT 'World average',
                 kwh_cost         TEXT NOT NULL DEFAULT 'World average',
-                theme            TEXT NOT NULL DEFAULT 'Hunting'
+                theme            TEXT NOT NULL DEFAULT 'Hunting',
+                currency         TEXT NOT NULL DEFAULT 'USD'
             )",
         )?;
+        // UI owned migration
+        let _ = conn.execute(
+            "ALTER TABLE ui_settings ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'",
+            [],
+        );
         Ok(())
     }
 
@@ -360,7 +367,7 @@ impl Database {
     /// Loads all persisted UI settings.
     pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
         let mut stmt = self.conn.prepare(
-            "SELECT language, carbon_intensity, kwh_cost, theme \
+            "SELECT language, carbon_intensity, kwh_cost, theme, currency \
              FROM ui_settings WHERE id = 1",
         )?;
         let result = stmt
@@ -370,6 +377,7 @@ impl Database {
                     carbon_intensity: row.get(1)?,
                     kwh_cost: row.get(2)?,
                     theme: row.get(3)?,
+                    currency: row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "USD".to_string()),
                 })
             })
             .optional()?;
@@ -379,15 +387,16 @@ impl Database {
     /// Persists all UI settings.
     pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme) \
-             VALUES (1, ?1, ?2, ?3, ?4) \
+            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency) \
+             VALUES (1, ?1, ?2, ?3, ?4, ?5) \
              ON CONFLICT(id) DO UPDATE SET \
-               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4",
+               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5",
             params![
                 settings.language,
                 settings.carbon_intensity,
                 settings.kwh_cost,
-                settings.theme
+                settings.theme,
+                settings.currency
             ],
         )?;
         Ok(())

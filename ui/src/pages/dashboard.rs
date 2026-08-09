@@ -22,7 +22,7 @@ use crate::{
     },
     themes::AppTheme,
     translations::{all_time, current_power_consumption, electricity_bill, emissions, zero_carbon_intensity_warning},
-    types::{AppLanguage, CarbonIntensity},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost},
 };
 
 /// Dashboard page showing total power, charts, and process summary.
@@ -35,14 +35,14 @@ impl DashboardPage {
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
-        kwh_cost_per_kwh: f64,
+        electricity_cost: ElectricityCost,
     ) -> Element<'a, Message, AppTheme> {
         let content = Column::new()
             .spacing(SPACING_XLARGE)
             .padding(Padding::from(PADDING_LARGE))
             .width(Length::Fill)
             .height(Length::Fill)
-            .push(self.view_power_summary(sensors, all_time_data, language, carbon_intensity, kwh_cost_per_kwh));
+            .push(self.view_power_summary(sensors, all_time_data, language, carbon_intensity, electricity_cost));
 
         let additional_content = Column::new()
             .spacing(SPACING_XLARGE)
@@ -69,7 +69,7 @@ impl DashboardPage {
         all_time_data: &'a AllTimeData,
         language: AppLanguage,
         carbon_intensity: CarbonIntensity,
-        kwh_cost_per_kwh: f64,
+        electricity_cost: ElectricityCost,
     ) -> Element<'a, Message, AppTheme> {
         let power_value = format!(
             "{:.1}",
@@ -112,7 +112,7 @@ impl DashboardPage {
             .unwrap_or(0.0);
 
         let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
-        let bill_usd = total_energy_wh / 1000.0 * kwh_cost_per_kwh;
+        let bill = (total_energy_wh / 1000.0) * electricity_cost.price_per_kwh;
 
         let help_button = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
@@ -159,8 +159,8 @@ impl DashboardPage {
             .align_x(Alignment::Center)
             .push(metric_tile(
                 electricity_bill(language),
-                format!("{:.2}", bill_usd.max(0.0)),
-                "$",
+                format!("{:.2}", bill.max(0.0)),
+                electricity_cost.currency_symbol,
                 TextStyle::Primary,
             ));
 

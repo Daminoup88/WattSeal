@@ -248,11 +248,7 @@ impl InfoPage {
 }
 
 fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
-    if bytes == 0 {
-        return na(language).to_string();
-    }
-    let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
-    format!("{:.2} GB", gb)
+    crate::translations::format_bytes_gb(bytes, language)
 }
 
 fn format_display_mode(resolution: &str, refresh_rate_hz: u32) -> String {

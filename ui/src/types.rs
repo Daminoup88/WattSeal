@@ -274,60 +274,359 @@ impl Display for CarbonIntensity {
     }
 }
 
+/// Supported currencies for energy cost calculations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Currency {
+    pub code: &'static str,
+    pub symbol: &'static str,
+}
+
+impl Currency {
+    pub const USD: Currency = Currency {
+        code: "USD",
+        symbol: "$",
+    };
+    pub const EUR: Currency = Currency {
+        code: "EUR",
+        symbol: "€",
+    };
+    pub const GBP: Currency = Currency {
+        code: "GBP",
+        symbol: "£",
+    };
+    pub const CHF: Currency = Currency {
+        code: "CHF",
+        symbol: "CHF",
+    };
+    pub const CAD: Currency = Currency {
+        code: "CAD",
+        symbol: "CA$",
+    };
+    pub const AUD: Currency = Currency {
+        code: "AUD",
+        symbol: "A$",
+    };
+    pub const JPY: Currency = Currency {
+        code: "JPY",
+        symbol: "¥",
+    };
+    pub const CNY: Currency = Currency {
+        code: "CNY",
+        symbol: "¥",
+    };
+    pub const INR: Currency = Currency {
+        code: "INR",
+        symbol: "₹",
+    };
+    pub const BRL: Currency = Currency {
+        code: "BRL",
+        symbol: "R$",
+    };
+    pub const RUB: Currency = Currency {
+        code: "RUB",
+        symbol: "₽",
+    };
+    pub const KRW: Currency = Currency {
+        code: "KRW",
+        symbol: "₩",
+    };
+    pub const MXN: Currency = Currency {
+        code: "MXN",
+        symbol: "MX$",
+    };
+    pub const SGD: Currency = Currency {
+        code: "SGD",
+        symbol: "S$",
+    };
+    pub const HKD: Currency = Currency {
+        code: "HKD",
+        symbol: "HK$",
+    };
+    pub const SEK: Currency = Currency {
+        code: "SEK",
+        symbol: "kr",
+    };
+    pub const NOK: Currency = Currency {
+        code: "NOK",
+        symbol: "kr",
+    };
+    pub const DKK: Currency = Currency {
+        code: "DKK",
+        symbol: "kr",
+    };
+    pub const PLN: Currency = Currency {
+        code: "PLN",
+        symbol: "zł",
+    };
+    pub const TRY: Currency = Currency {
+        code: "TRY",
+        symbol: "₺",
+    };
+    pub const ZAR: Currency = Currency {
+        code: "ZAR",
+        symbol: "R",
+    };
+    pub const PHP: Currency = Currency {
+        code: "PHP",
+        symbol: "₱",
+    };
+    pub const IDR: Currency = Currency {
+        code: "IDR",
+        symbol: "Rp",
+    };
+    pub const THB: Currency = Currency {
+        code: "THB",
+        symbol: "฿",
+    };
+    pub const MYR: Currency = Currency {
+        code: "MYR",
+        symbol: "RM",
+    };
+    pub const VND: Currency = Currency {
+        code: "VND",
+        symbol: "₫",
+    };
+    pub const ILS: Currency = Currency {
+        code: "ILS",
+        symbol: "₪",
+    };
+    pub const AED: Currency = Currency {
+        code: "AED",
+        symbol: "AED",
+    };
+    pub const SAR: Currency = Currency {
+        code: "SAR",
+        symbol: "SAR",
+    };
+    pub const NZD: Currency = Currency {
+        code: "NZD",
+        symbol: "NZ$",
+    };
+    pub const CZK: Currency = Currency {
+        code: "CZK",
+        symbol: "Kč",
+    };
+    pub const HUF: Currency = Currency {
+        code: "HUF",
+        symbol: "Ft",
+    };
+    pub const RON: Currency = Currency {
+        code: "RON",
+        symbol: "lei",
+    };
+    pub const BGN: Currency = Currency {
+        code: "BGN",
+        symbol: "лв",
+    };
+    pub const ARS: Currency = Currency {
+        code: "ARS",
+        symbol: "AR$",
+    };
+    pub const CLP: Currency = Currency {
+        code: "CLP",
+        symbol: "CLP$",
+    };
+    pub const COP: Currency = Currency {
+        code: "COP",
+        symbol: "COL$",
+    };
+    pub const EGP: Currency = Currency {
+        code: "EGP",
+        symbol: "E£",
+    };
+    pub const NGN: Currency = Currency {
+        code: "NGN",
+        symbol: "₦",
+    };
+    pub const PKR: Currency = Currency {
+        code: "PKR",
+        symbol: "Rs",
+    };
+    pub const BTC: Currency = Currency {
+        code: "BTC",
+        symbol: "₿",
+    };
+
+    pub const ALL: &'static [Currency] = &[
+        Currency::USD,
+        Currency::EUR,
+        Currency::GBP,
+        Currency::CHF,
+        Currency::CAD,
+        Currency::AUD,
+        Currency::JPY,
+        Currency::CNY,
+        Currency::INR,
+        Currency::BRL,
+        Currency::RUB,
+        Currency::KRW,
+        Currency::MXN,
+        Currency::SGD,
+        Currency::HKD,
+        Currency::SEK,
+        Currency::NOK,
+        Currency::DKK,
+        Currency::PLN,
+        Currency::TRY,
+        Currency::ZAR,
+        Currency::PHP,
+        Currency::IDR,
+        Currency::THB,
+        Currency::MYR,
+        Currency::VND,
+        Currency::ILS,
+        Currency::AED,
+        Currency::SAR,
+        Currency::NZD,
+        Currency::CZK,
+        Currency::HUF,
+        Currency::RON,
+        Currency::BGN,
+        Currency::ARS,
+        Currency::CLP,
+        Currency::COP,
+        Currency::EGP,
+        Currency::NGN,
+        Currency::PKR,
+        Currency::BTC,
+    ];
+
+    pub fn from_code(code: &str) -> Self {
+        Self::ALL
+            .iter()
+            .find(|c| c.code.eq_ignore_ascii_case(code))
+            .copied()
+            .unwrap_or(Currency::USD)
+    }
+}
+
+impl Default for Currency {
+    fn default() -> Self {
+        Currency::USD
+    }
+}
+
+impl Display for Currency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({})", self.code, self.symbol)
+    }
+}
+
 /// Electricity cost preset for common countries / regions.
 #[derive(Debug, Clone, Copy)]
 pub struct ElectricityCost {
     pub label: &'static str,
-    /// Price in $/kWh.
-    pub usd_per_kwh: f64,
+    /// Price per kWh in local currency.
+    pub price_per_kwh: f64,
+    /// Display currency symbol (e.g. "€", "$").
+    pub currency_symbol: &'static str,
+    /// ISO 4217 Currency code (e.g. "EUR", "USD").
+    pub currency_code: &'static str,
 }
 
 impl ElectricityCost {
-    /// Electricity cost presets for various countries and the world average (updated in 2026).
+    /// Household electricity prices and currencies by country/region (prices and change rates updated in 2026).
     // Source:
     // Statista, “Electricity prices around the world 2018 | Statista,” Statista, 2018. https://www.statista.com/statistics/263492/electricity-prices-in-selected-countries/
     // World average:
-    // Global Petrol Prices, “Electricity prices around the world, March 2019 | GlobalPetrolPrices.com,” GlobalPetrpPrices.com, 2023. https://www.globalpetrolprices.com/electricity_prices/
+    // Global Petrol Prices, "Household electricity prices around the world," GlobalPetrolPrices.com.
+    // Source URL: https://www.globalpetrolprices.com/electricity_prices/
     pub const PRESETS: &[ElectricityCost] = &[
         ElectricityCost {
             label: "France",
-            usd_per_kwh: 0.28,
+            price_per_kwh: 0.24,
+            currency_symbol: "€",
+            currency_code: "EUR",
+        },
+        ElectricityCost {
+            label: "China",
+            price_per_kwh: 0.51,
+            currency_symbol: "¥",
+            currency_code: "CNY",
+        },
+        ElectricityCost {
+            label: "India",
+            price_per_kwh: 7.33,
+            currency_symbol: "₹",
+            currency_code: "INR",
+        },
+        ElectricityCost {
+            label: "Indonesia",
+            price_per_kwh: 1_602.0,
+            currency_symbol: "Rp",
+            currency_code: "IDR",
+        },
+        ElectricityCost {
+            label: "Philippines",
+            price_per_kwh: 12.69,
+            currency_symbol: "₱",
+            currency_code: "PHP",
         },
         ElectricityCost {
             label: "Germany",
-            usd_per_kwh: 0.4,
+            price_per_kwh: 0.35,
+            currency_symbol: "€",
+            currency_code: "EUR",
         },
         ElectricityCost {
             label: "Spain",
-            usd_per_kwh: 0.25,
+            price_per_kwh: 0.22,
+            currency_symbol: "€",
+            currency_code: "EUR",
         },
         ElectricityCost {
             label: "Italy",
-            usd_per_kwh: 0.42,
+            price_per_kwh: 0.36,
+            currency_symbol: "€",
+            currency_code: "EUR",
         },
         ElectricityCost {
             label: "Netherlands",
-            usd_per_kwh: 0.28,
+            price_per_kwh: 0.25,
+            currency_symbol: "€",
+            currency_code: "EUR",
         },
         ElectricityCost {
             label: "Switzerland",
-            usd_per_kwh: 0.37,
+            price_per_kwh: 0.3,
+            currency_symbol: "CHF",
+            currency_code: "CHF",
         },
         ElectricityCost {
             label: "UK",
-            usd_per_kwh: 0.4,
+            price_per_kwh: 0.3,
+            currency_symbol: "£",
+            currency_code: "GBP",
         },
         ElectricityCost {
             label: "USA (average)",
-            usd_per_kwh: 0.18,
+            price_per_kwh: 0.19,
+            currency_symbol: "$",
+            currency_code: "USD",
+        },
+        ElectricityCost {
+            label: "Sweden",
+            price_per_kwh: 2.3,
+            currency_symbol: "kr",
+            currency_code: "SEK",
+        },
+        ElectricityCost {
+            label: "Poland",
+            price_per_kwh: 0.88,
+            currency_symbol: "zł",
+            currency_code: "PLN",
         },
         ElectricityCost {
             label: "World average",
-            usd_per_kwh: 0.17,
+            price_per_kwh: 0.17,
+            currency_symbol: "$",
+            currency_code: "USD",
         },
         ElectricityCost {
             label: "Custom",
-            usd_per_kwh: 0.0,
+            price_per_kwh: 0.0,
+            currency_symbol: "$",
+            currency_code: "USD",
         },
     ];
 
@@ -335,27 +634,37 @@ impl ElectricityCost {
         self.label == "Custom"
     }
 
+    /// Returns the Currency object for this cost setting.
+    pub fn currency(self) -> Currency {
+        Currency::from_code(self.currency_code)
+    }
+
     /// Finds the matching preset or creates a custom entry.
-    pub fn from_usd_per_kwh(value: f64) -> Self {
+    pub fn from_price_per_kwh(value: f64) -> Self {
         Self::PRESETS
             .iter()
-            .find(|p| !p.is_custom() && (p.usd_per_kwh - value).abs() < 0.001)
+            .find(|p| !p.is_custom() && (p.price_per_kwh - value).abs() < 0.001)
             .copied()
             .unwrap_or(ElectricityCost {
                 label: "Custom",
-                usd_per_kwh: value,
+                price_per_kwh: value,
+                currency_symbol: "$",
+                currency_code: "USD",
             })
     }
 
-    /// Resolves a stored string to a preset entry.
-    pub fn from_label(label: &str) -> Self {
+    /// Resolves stored label and optional currency code to a preset entry.
+    pub fn from_label_and_currency(label: &str, currency: Option<&str>) -> Self {
         if let Some(preset) = Self::PRESETS.iter().find(|p| !p.is_custom() && p.label == label) {
             return *preset;
         }
         if let Ok(value) = label.trim().parse::<f64>() {
+            let curr = currency.map(Currency::from_code).unwrap_or(Currency::USD);
             return ElectricityCost {
                 label: "Custom",
-                usd_per_kwh: value,
+                price_per_kwh: value,
+                currency_symbol: curr.symbol,
+                currency_code: curr.code,
             };
         }
         *Self::PRESETS.iter().find(|p| p.label == "World average").unwrap()
@@ -373,7 +682,11 @@ impl Display for ElectricityCost {
         if self.is_custom() {
             write!(f, "Custom")
         } else {
-            write!(f, "{} ({:.2} $/kWh)", self.label, self.usd_per_kwh)
+            write!(
+                f,
+                "{} ({:.2} {}/kWh)",
+                self.label, self.price_per_kwh, self.currency_symbol
+            )
         }
     }
 }

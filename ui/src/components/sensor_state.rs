@@ -37,8 +37,9 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, gpu, metric_type_name, na,
-        power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
+        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, format_mb_per_sec, gpu,
+        metric_effective_unit, metric_type_name, metric_unit, na, power_or_energy, power_or_energy_label, ram,
+        sensor_name, translate_label,
     },
     types::{AppLanguage, SensorRecord, TimeRange},
 };
@@ -74,7 +75,8 @@ impl PowerChartState {
 
     fn init_power_series(&mut self, display_name: &str, language: AppLanguage) {
         let metric_type = MetricKind::default();
-        self.chart.set_y_axis_unit(metric_type.unit());
+        self.chart
+            .set_y_axis_unit(metric_effective_unit(language, metric_type, false));
         let key = metric_type.legend(display_name);
         let display = metric_type_name(language, metric_type);
         self.chart
@@ -192,7 +194,7 @@ impl ComponentState {
         self.power_graph.chart.clear_all();
         self.power_graph
             .chart
-            .set_y_axis_unit(metric_type.effective_unit(energy_mode));
+            .set_y_axis_unit(metric_effective_unit(language, metric_type, energy_mode));
         match metric_type {
             MetricKind::Power => {
                 let key = metric_type.legend(display_name);
@@ -261,10 +263,14 @@ impl ComponentState {
                                 .class(TextStyle::Muted),
                         )
                         .push(
-                            Text::new(format!("{:.1} {}", value, secondary_values.metric_type.unit()))
-                                .size(FONT_SIZE_BODY)
-                                .class(style)
-                                .font(FONT_BOLD),
+                            Text::new(format!(
+                                "{:.1} {}",
+                                value,
+                                metric_unit(language, secondary_values.metric_type)
+                            ))
+                            .size(FONT_SIZE_BODY)
+                            .class(style)
+                            .font(FONT_BOLD),
                         ),
                 );
             }
@@ -462,9 +468,11 @@ impl SensorState {
             SensorCategory::Component(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
                 if s.metric_type == MetricKind::Power {
-                    s.power_graph
-                        .chart
-                        .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
+                    s.power_graph.chart.set_y_axis_unit(metric_effective_unit(
+                        self.language,
+                        MetricKind::Power,
+                        energy_mode,
+                    ));
                     s.power_graph
                         .chart
                         .set_all_display_labels(power_or_energy(self.language, energy_mode));
@@ -472,9 +480,11 @@ impl SensorState {
             }
             SensorCategory::Total(s) => {
                 s.power_graph.apply_time_settings(line_type, unit, duration);
-                s.power_graph
-                    .chart
-                    .set_y_axis_unit(MetricKind::Power.effective_unit(energy_mode));
+                s.power_graph.chart.set_y_axis_unit(metric_effective_unit(
+                    self.language,
+                    MetricKind::Power,
+                    energy_mode,
+                ));
                 s.power_graph.chart.set_all_line_types(line_type);
                 s.power_graph
                     .chart
@@ -876,14 +886,14 @@ impl SensorState {
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", p.measured.read_bytes.as_mb()),
+                        format_mb_per_sec(p.measured.read_bytes.as_mb(), self.language),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_DISK_READ_WIDTH),
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}MB/s", p.measured.written_bytes.as_mb()),
+                        format_mb_per_sec(p.measured.written_bytes.as_mb(), self.language),
                         table_font_size,
                         TextStyle::Tertiary,
                         Length::Fixed(PROCESS_DISK_WRITE_WIDTH),

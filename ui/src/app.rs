@@ -27,14 +27,15 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
-        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, database_migrating_description,
-        database_migrating_title, info_modal_all_time_power, info_modal_all_time_top_consumer,
-        info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
-        info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
-        setup_choose_language, setup_confirm, setup_welcome_title,
+        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description,
+        close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid, custom_carbon_placeholder,
+        custom_kwh_cost_placeholder, database_migrating_description, database_migrating_title,
+        info_modal_all_time_power, info_modal_all_time_top_consumer, info_modal_current_power,
+        info_modal_current_top_consumer, info_modal_description, info_modal_title, info_modal_top_process,
+        kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity, setup_choose_language,
+        setup_confirm, setup_welcome_title,
     },
-    types::{AppLanguage, CarbonIntensity, ElectricityCost, SensorRecord, TimeRange},
+    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, SensorRecord, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -84,7 +85,7 @@ impl App {
                 let lang = AppLanguage::from_code(&s.language);
                 let ci = CarbonIntensity::from_label(&s.carbon_intensity);
                 let theme = AppTheme::from_name(&s.theme);
-                let ec = ElectricityCost::from_label(&s.kwh_cost);
+                let ec = ElectricityCost::from_label_and_currency(&s.kwh_cost, Some(&s.currency));
                 (lang, ci, theme, ec, false)
             }
             _ => (
@@ -101,7 +102,7 @@ impl App {
             String::new()
         };
         let custom_kwh_cost_input = if electricity_cost.is_custom() {
-            format!("{:.4}", electricity_cost.usd_per_kwh)
+            format!("{:.4}", electricity_cost.price_per_kwh)
         } else {
             String::new()
         };
@@ -304,7 +305,9 @@ impl App {
                         .unwrap_or(0.0);
                     self.electricity_cost = ElectricityCost {
                         label: "Custom",
-                        usd_per_kwh: v,
+                        price_per_kwh: v,
+                        currency_symbol: self.electricity_cost.currency_symbol,
+                        currency_code: self.electricity_cost.currency_code,
                     };
                 } else {
                     self.electricity_cost = ec;
@@ -314,18 +317,34 @@ impl App {
             }
             Message::CustomKwhCostInput(text) => {
                 self.custom_kwh_cost_input = text.clone();
+                let sym = self.electricity_cost.currency_symbol;
+                let code = self.electricity_cost.currency_code;
                 if let Some(val) = text.parse::<f64>().ok().filter(|&v| v >= 0.0) {
                     self.electricity_cost = ElectricityCost {
                         label: "Custom",
-                        usd_per_kwh: val,
+                        price_per_kwh: val,
+                        currency_symbol: sym,
+                        currency_code: code,
                     };
                     self.persist_ui_settings();
                 } else {
                     self.electricity_cost = ElectricityCost {
                         label: "Custom",
-                        usd_per_kwh: 0.0,
+                        price_per_kwh: 0.0,
+                        currency_symbol: sym,
+                        currency_code: code,
                     };
                 }
+                Task::none()
+            }
+            Message::ChangeCustomCurrency(curr) => {
+                self.electricity_cost = ElectricityCost {
+                    label: "Custom",
+                    price_per_kwh: self.electricity_cost.price_per_kwh,
+                    currency_symbol: curr.symbol,
+                    currency_code: curr.code,
+                };
+                self.persist_ui_settings();
                 Task::none()
             }
             Message::ChangeChartMetricType(table_name, metric_type) => {
@@ -399,15 +418,15 @@ impl App {
             .select_last_n_records(n)
             .unwrap_or_default()
             .into_iter()
-            .map(|(ts, duration_ms, data)| SensorRecord { timestamp: ts.into(), duration_ms, data })
+            .map(|(ts, duration_ms, data)| SensorRecord {
+                timestamp: ts.into(),
+                duration_ms,
+                data,
+            })
             .collect()
     }
 
-    fn load_history(
-        &mut self,
-        table_name: &str,
-        time_range: TimeRange,
-    ) -> Vec<SensorRecord> {
+    fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<SensorRecord> {
         if table_name == ProcessData::table_name_static() {
             return self.load_process_data(time_range);
         }
@@ -429,7 +448,11 @@ impl App {
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<SensorRecord> {
         from_db(self.database.select_top_processes_average(time_range.seconds(), 10))
             .into_iter()
-            .map(|(timestamp, data)| SensorRecord { timestamp, duration_ms: 0, data })
+            .map(|(timestamp, data)| SensorRecord {
+                timestamp,
+                duration_ms: 0,
+                data,
+            })
             .collect()
     }
 
@@ -445,7 +468,7 @@ impl App {
                 &self.all_time_data,
                 self.language,
                 self.carbon_intensity,
-                self.electricity_cost.usd_per_kwh,
+                self.electricity_cost,
             ),
             Page::Info => self.info_page.view(&self.hardware_info, self.theme, self.language),
         };
@@ -769,7 +792,7 @@ impl App {
             self.carbon_intensity.label.to_string()
         };
         let kwh_str = if self.electricity_cost.is_custom() {
-            format!("{}", self.electricity_cost.usd_per_kwh)
+            format!("{}", self.electricity_cost.price_per_kwh)
         } else {
             self.electricity_cost.label.to_string()
         };
@@ -778,6 +801,7 @@ impl App {
             carbon_intensity: carbon_str,
             kwh_cost: kwh_str,
             theme: self.theme.name().to_string(),
+            currency: self.electricity_cost.currency_code.to_string(),
         };
         let _ = self.database.save_ui_settings(&settings);
     }
@@ -885,16 +909,23 @@ impl App {
                 .on_input(Message::CustomKwhCostInput)
                 .width(Length::Fill)
                 .padding(8);
+            let currency_picker = pick_list(
+                Currency::ALL,
+                Some(self.electricity_cost.currency()),
+                Message::ChangeCustomCurrency,
+            )
+            .padding(8);
             let mut col = Column::new().spacing(SPACING_SMALL).push(ec_picker).push(
                 Row::new()
                     .spacing(4)
                     .align_y(Alignment::Center)
-                    .push(input)
-                    .push(Text::new("$/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted)),
+                    .push(input.width(Length::FillPortion(2)))
+                    .push(currency_picker.width(Length::FillPortion(2)))
+                    .push(Text::new("/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted)),
             );
             if !self.custom_kwh_cost_input.is_empty() && !custom_kwh_valid {
                 col = col.push(
-                    Text::new(kwh_cost_invalid(language))
+                    Text::new(kwh_cost_invalid(language, self.electricity_cost.currency_symbol))
                         .size(FONT_SIZE_SMALL)
                         .class(TextStyle::Muted),
                 );
@@ -939,11 +970,13 @@ fn from_db(
         .collect()
 }
 
-fn from_db_with_duration(
-    data: Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError>,
-) -> Vec<SensorRecord> {
+fn from_db_with_duration(data: Result<Vec<(SystemTime, i64, ComputedSensorData)>, DatabaseError>) -> Vec<SensorRecord> {
     data.unwrap_or_default()
         .into_iter()
-        .map(|(ts, duration_ms, data)| SensorRecord { timestamp: ts.into(), duration_ms, data })
+        .map(|(ts, duration_ms, data)| SensorRecord {
+            timestamp: ts.into(),
+            duration_ms,
+            data,
+        })
         .collect()
 }

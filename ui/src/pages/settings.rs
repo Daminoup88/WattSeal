@@ -21,7 +21,7 @@ use crate::{
         settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language, settings_theme,
         settings_title,
     },
-    types::{AppLanguage, CarbonIntensity, ElectricityCost},
+    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
 
 /// Settings modal for theme, language, carbon intensity, and electricity cost.
@@ -184,11 +184,18 @@ fn electricity_cost_row<'a>(
             .on_input(Message::CustomKwhCostInput)
             .width(Length::Fill)
             .padding(PADDING_MEDIUM);
+        let currency_picker = pick_list(
+            Currency::ALL,
+            Some(electricity_cost.currency()),
+            Message::ChangeCustomCurrency,
+        )
+        .padding(PADDING_MEDIUM);
         let input_row = Row::new()
             .spacing(4)
             .align_y(Alignment::Center)
-            .push(input)
-            .push(Text::new("$/kWh").size(FONT_SIZE_BODY).class(TextStyle::Muted));
+            .push(input.width(Length::FillPortion(2)))
+            .push(currency_picker.width(Length::FillPortion(2)))
+            .push(Text::new("/kWh").size(FONT_SIZE_BODY).class(TextStyle::Muted));
         let mut col = Column::new()
             .width(Length::FillPortion(3))
             .spacing(4)
@@ -196,7 +203,7 @@ fn electricity_cost_row<'a>(
             .push(input_row);
         if !custom_kwh_cost_input.is_empty() && !custom_valid {
             col = col.push(
-                Text::new(kwh_cost_invalid(language))
+                Text::new(kwh_cost_invalid(language, electricity_cost.currency_symbol))
                     .size(FONT_SIZE_BODY)
                     .class(TextStyle::Muted),
             );
