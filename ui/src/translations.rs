@@ -308,16 +308,17 @@ pub fn capacity(language: AppLanguage) -> &'static str {
 }
 
 pub fn capacity_wh_cycles(language: AppLanguage, cap_wh: f32, cycles: u32) -> String {
+    let val = format_number(cap_wh as f64, 1, language);
     match language {
-        AppLanguage::English => format!("{:.1} Wh ({} cycles)", cap_wh, cycles),
-        AppLanguage::French => format!("{:.1} Wh ({} cycles)", cap_wh, cycles),
+        AppLanguage::English => format!("{} Wh ({} cycles)", val, cycles),
+        AppLanguage::French => format!("{} Wh ({} cycles)", val, cycles),
     }
 }
 
 pub fn capacity_wh_only(language: AppLanguage, cap_wh: f32) -> String {
+    let val = format_number(cap_wh as f64, 1, language);
     match language {
-        AppLanguage::English => format!("{:.1} Wh", cap_wh),
-        AppLanguage::French => format!("{:.1} Wh", cap_wh),
+        AppLanguage::English | AppLanguage::French => format!("{} Wh", val),
     }
 }
 
@@ -1316,7 +1317,7 @@ pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
         AppLanguage::English => "GB",
         AppLanguage::French => "Go",
     };
-    format!("{:.2} {}", gb, unit)
+    format!("{} {}", format_number(gb, 2, language), unit)
 }
 
 pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
@@ -1324,7 +1325,7 @@ pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
         AppLanguage::English => "MB/s",
         AppLanguage::French => "Mo/s",
     };
-    format!("{:.1} {}", mb, unit)
+    format!("{} {}", format_number(mb, 1, language), unit)
 }
 
 pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
@@ -1343,5 +1344,86 @@ pub fn metric_effective_unit(language: AppLanguage, metric: MetricKind, energy_m
         "Wh"
     } else {
         metric_unit(language, metric)
+    }
+}
+
+// Localized Number & Metric Unit Formatting
+
+/// Formats a floating point number with specified decimal precision and language-specific separators.
+pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String {
+    if val.is_nan() || val.is_infinite() {
+        return if decimals > 0 {
+            format!(
+                "0{}{}",
+                match language {
+                    AppLanguage::English => ".",
+                    AppLanguage::French => ",",
+                },
+                "0".repeat(decimals)
+            )
+        } else {
+            "0".to_string()
+        };
+    }
+
+    let thousands_sep = match language {
+        AppLanguage::English => ",",
+        AppLanguage::French => " ",
+    };
+    let decimal_sep = match language {
+        AppLanguage::English => ".",
+        AppLanguage::French => ",",
+    };
+
+    let is_negative = val < 0.0;
+    let formatted = format!("{:.1$}", val.abs(), decimals);
+    let parts: Vec<&str> = formatted.split('.').collect();
+    let int_digits = parts[0];
+
+    let mut formatted_int = String::with_capacity(int_digits.len() + int_digits.len() / 3);
+    let len = int_digits.len();
+    for (i, ch) in int_digits.chars().enumerate() {
+        if i > 0 && (len - i) % 3 == 0 {
+            formatted_int.push_str(thousands_sep);
+        }
+        formatted_int.push(ch);
+    }
+
+    let sign = if is_negative && (int_digits != "0" || parts.get(1).map_or(false, |d| d.chars().any(|c| c != '0'))) {
+        "-"
+    } else {
+        ""
+    };
+
+    if decimals > 0 && parts.len() > 1 {
+        format!("{}{}{}{}", sign, formatted_int, decimal_sep, parts[1])
+    } else {
+        format!("{}{}", sign, formatted_int)
+    }
+}
+
+/// Formats energy consumption in Wh into a localized value string and appropriate unit (Wh, kWh, MWh, GWh).
+pub fn format_energy(energy_wh: f64, language: AppLanguage) -> (String, &'static str) {
+    let energy_wh = energy_wh.max(0.0);
+    if energy_wh < 1_000.0 {
+        (format_number(energy_wh, 1, language), "Wh")
+    } else if energy_wh < 1_000_000.0 {
+        (format_number(energy_wh / 1_000.0, 1, language), "kWh")
+    } else if energy_wh < 1_000_000_000.0 {
+        (format_number(energy_wh / 1_000_000.0, 1, language), "MWh")
+    } else {
+        (format_number(energy_wh / 1_000_000_000.0, 1, language), "GWh")
+    }
+}
+
+/// Formats CO₂ emissions in grams into a localized value string and appropriate unit (g CO₂, kg CO₂, t CO₂).
+pub fn format_emissions(co2_grams: f64, language: AppLanguage) -> (String, &'static str) {
+    let co2_grams = co2_grams.max(0.0);
+    if co2_grams < 1_000.0 {
+        (format_number(co2_grams, 1, language), "g CO₂")
+    } else if co2_grams < 1_000_000.0 {
+        (format_number(co2_grams / 1_000.0, 1, language), "kg CO₂")
+    } else {
+        (format_number(co2_grams / 1_000_000.0, 1, language), "t CO₂")
     }
 }

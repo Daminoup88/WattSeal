@@ -37,9 +37,9 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, format_mb_per_sec, gpu,
-        metric_effective_unit, metric_type_name, metric_unit, na, power_or_energy, power_or_energy_label, ram,
-        sensor_name, translate_label,
+        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, format_mb_per_sec,
+        format_number, gpu, metric_effective_unit, metric_type_name, metric_unit, na, power_or_energy,
+        power_or_energy_label, ram, sensor_name, translate_label,
     },
     types::{AppLanguage, SensorRecord, TimeRange},
 };
@@ -264,8 +264,8 @@ impl ComponentState {
                         )
                         .push(
                             Text::new(format!(
-                                "{:.1} {}",
-                                value,
+                                "{} {}",
+                                format_number(value as f64, 1, language),
                                 metric_unit(language, secondary_values.metric_type)
                             ))
                             .size(FONT_SIZE_BODY)
@@ -720,7 +720,7 @@ impl SensorState {
 
         // Snapshot always shows CURRENT power in watts
         let power_text = power_value
-            .map(|p| format!("{:.1} W", p))
+            .map(|p| format!("{} W", format_number(p, 1, self.language)))
             .unwrap_or_else(|| na(self.language).to_string());
         let power_style = if power_value.is_some() {
             TextStyle::Primary
@@ -855,8 +855,12 @@ impl SensorState {
                     ))
                     .push(text_widget(
                         format!(
-                            "{:.1}{}",
-                            process_power_or_energy(p.process_energy, &self.time_range),
+                            "{}{}",
+                            format_number(
+                                process_power_or_energy(p.process_energy, &self.time_range),
+                                1,
+                                self.language
+                            ),
                             unit_str
                         ),
                         table_font_size,

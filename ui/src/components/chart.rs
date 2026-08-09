@@ -26,7 +26,7 @@ use plotters_iced2::{Chart, ChartWidget, DrawingArea, Renderer, plotters_backend
 use crate::{
     message::Message,
     themes::AppTheme,
-    translations::{tooltip_time, tooltip_value},
+    translations::{format_number, tooltip_time, tooltip_value},
     types::AppLanguage,
 };
 
@@ -140,9 +140,9 @@ impl TooltipContent {
         self
     }
 
-    fn value_text(&self) -> String {
+    fn value_text(&self, language: AppLanguage) -> String {
         let decimals = if self.value < 1.0 { 2 } else { 1 };
-        format!("{:.*}{}", decimals, self.value, self.unit)
+        format!("{}{}", format_number(self.value as f64, decimals, language), self.unit)
     }
 
     fn timestamp_text(&self) -> String {
@@ -507,7 +507,7 @@ impl SensorChart {
 
     fn format_y_label(&self, y: f32) -> String {
         let decimals = if y < 1.0 && y.fract() > 0.0 { 2 } else { 0 };
-        format!("{:.*}{}", decimals, y, self.y_unit)
+        format!("{}{}", format_number(y as f64, decimals, self.language), self.y_unit)
     }
 
     fn build_chart_2d<DB: DrawingBackend>(&self, mut builder: ChartBuilder<DB>) {
@@ -681,7 +681,7 @@ impl SensorChart {
         text_y += TOOLTIP_LINE_HEIGHT as i32;
 
         area.draw(&Text::new(
-            tooltip_value(self.language, &content.value_text()),
+            tooltip_value(self.language, &content.value_text(self.language)),
             (text_x, text_y),
             text_style.clone(),
         ))

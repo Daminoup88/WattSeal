@@ -21,7 +21,10 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    translations::{all_time, current_power_consumption, electricity_bill, emissions, zero_carbon_intensity_warning},
+    translations::{
+        all_time, current_power_consumption, electricity_bill, emissions, format_emissions, format_energy,
+        format_number, zero_carbon_intensity_warning,
+    },
     types::{AppLanguage, CarbonIntensity, ElectricityCost},
 };
 
@@ -71,15 +74,13 @@ impl DashboardPage {
         carbon_intensity: CarbonIntensity,
         electricity_cost: ElectricityCost,
     ) -> Element<'a, Message, AppTheme> {
-        let power_value = format!(
-            "{:.1}",
-            sensors
-                .get(TotalData::table_name_static())
-                .and_then(|c| c.get_latest_reading())
-                .and_then(|data| data.total_energy())
-                .map(|energy| energy.as_watts_for_seconds(1.0))
-                .unwrap_or(0.0)
-        );
+        let raw_power = sensors
+            .get(TotalData::table_name_static())
+            .and_then(|c| c.get_latest_reading())
+            .and_then(|data| data.total_energy())
+            .map(|energy| energy.as_watts_for_seconds(1.0))
+            .unwrap_or(0.0);
+        let power_value = format_number(raw_power, 1, language);
 
         let main = Column::new()
             .width(Length::FillPortion(1))
@@ -114,6 +115,10 @@ impl DashboardPage {
         let carbon_grams = wh_to_co2_grams(total_energy_wh, carbon_intensity.g_per_kwh);
         let bill = (total_energy_wh / 1000.0) * electricity_cost.price_per_kwh;
 
+        let (energy_val, energy_unit) = format_energy(total_energy_wh, language);
+        let (emissions_val, emissions_unit) = format_emissions(carbon_grams, language);
+        let bill_val = format_number(bill.max(0.0), 2, language);
+
         let help_button = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
             .on_press(Message::OpenInfoModal("carbon_emissions".to_string()))
@@ -126,8 +131,8 @@ impl DashboardPage {
                 Row::new()
                     .push(metric_tile(
                         all_time(language),
-                        format_wh(total_energy_wh),
-                        "Wh",
+                        energy_val,
+                        energy_unit,
                         TextStyle::Secondary,
                     ))
                     // space for help button alignment
@@ -137,8 +142,8 @@ impl DashboardPage {
                 Row::new()
                     .push(metric_tile(
                         emissions(language),
-                        format_grams(carbon_grams),
-                        "g CO₂",
+                        emissions_val,
+                        emissions_unit,
                         TextStyle::Tertiary,
                     ))
                     .align_y(Alignment::Center)
@@ -159,7 +164,7 @@ impl DashboardPage {
             .align_x(Alignment::Center)
             .push(metric_tile(
                 electricity_bill(language),
-                format!("{:.2}", bill.max(0.0)),
+                bill_val,
                 electricity_cost.currency_symbol,
                 TextStyle::Primary,
             ));
@@ -314,12 +319,4 @@ fn metric_tile<'a>(
 
 fn wh_to_co2_grams(energy_wh: f64, intensity_g_per_kwh: f64) -> f64 {
     (energy_wh / 1000.0) * intensity_g_per_kwh
-}
-
-fn format_wh(energy_wh: f64) -> String {
-    format!("{:.1}", energy_wh.max(0.0))
-}
-
-fn format_grams(co2_grams: f64) -> String {
-    format!("{:.1}", co2_grams.max(0.0))
 }

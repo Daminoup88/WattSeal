@@ -29,11 +29,11 @@ use crate::{
     translations::{
         TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description,
         close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid, custom_carbon_placeholder,
-        custom_kwh_cost_placeholder, database_migrating_description, database_migrating_title,
-        info_modal_all_time_power, info_modal_all_time_top_consumer, info_modal_current_power,
-        info_modal_current_top_consumer, info_modal_description, info_modal_title, info_modal_top_process,
-        kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity, setup_choose_language,
-        setup_confirm, setup_welcome_title,
+        custom_kwh_cost_placeholder, database_migrating_description, database_migrating_title, format_emissions,
+        format_energy, format_number, info_modal_all_time_power, info_modal_all_time_top_consumer,
+        info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
+        info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
+        setup_choose_language, setup_confirm, setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, SensorRecord, TimeRange},
 };
@@ -562,7 +562,7 @@ impl App {
                 .map(|energy| energy.as_watts_for_seconds(1.0));
 
             let power_text = power
-                .map(|p| format!("{:.1} W", p))
+                .map(|p| format!("{} W", format_number(p, 1, language)))
                 .unwrap_or_else(|| na(language).to_string());
 
             let power_row = Row::new()
@@ -586,7 +586,8 @@ impl App {
         }
 
         if let Some(&energy) = self.all_time_data.components.get(target) {
-            let energy_text = format!("{:.1} Wh", energy.as_watt_hours().max(0.0));
+            let (val, unit) = crate::translations::format_energy(energy.as_watt_hours(), language);
+            let energy_text = format!("{} {}", val, unit);
             let all_time_row = Row::new()
                 .spacing(SPACING_MEDIUM)
                 .align_y(Alignment::Center)
@@ -615,7 +616,7 @@ impl App {
                             .class(TextStyle::Muted),
                     )
                     .push(
-                        Text::new(format!("{} ({:.1} W)", name, power))
+                        Text::new(format!("{} ({} W)", name, format_number(power, 1, language)))
                             .size(FONT_SIZE_SUBTITLE)
                             .font(FONT_BOLD)
                             .class(TextStyle::Primary),
@@ -633,10 +634,13 @@ impl App {
                             .class(TextStyle::Muted),
                     )
                     .push(
-                        Text::new(format!("{} ({:.1} Wh)", name, energy))
-                            .size(FONT_SIZE_SUBTITLE)
-                            .font(FONT_BOLD)
-                            .class(TextStyle::Secondary),
+                        Text::new({
+                            let (val, unit) = format_energy(energy, language);
+                            format!("{} ({} {})", name, val, unit)
+                        })
+                        .size(FONT_SIZE_SUBTITLE)
+                        .font(FONT_BOLD)
+                        .class(TextStyle::Secondary),
                     );
                 content = content.push(consumer_row);
             }
@@ -668,9 +672,9 @@ impl App {
 
                     proc_row = proc_row.push(
                         Text::new(format!(
-                            "{} ({:.1} {})",
+                            "{} ({} {})",
                             top_proc.measured.app_name,
-                            value,
+                            format_number(value, 1, language),
                             range.power_unit()
                         ))
                         .size(FONT_SIZE_SUBTITLE)
@@ -703,7 +707,10 @@ impl App {
 
             let measured_row = make_co2_row(
                 carbon_info_measured(language),
-                format!("{:.1} g CO₂", measured_g.max(0.0)),
+                {
+                    let (val, unit) = format_emissions(measured_g, language);
+                    format!("{} {}", val, unit)
+                },
                 TextStyle::Tertiary,
             );
 
