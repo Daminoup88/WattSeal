@@ -837,10 +837,9 @@ impl SensorState {
         let mut table = Column::new().spacing(SPACING_SMALL).push(header_row);
         let table_font_size = FONT_SIZE_BODY;
         for p in &state.top_processes {
-            let gpu = p
-                .measured
-                .process_gpu_usage
-                .map_or(na(self.language).to_string(), |v| format!("{:.1}%", v));
+            let gpu = p.measured.process_gpu_usage.map_or(na(self.language).to_string(), |v| {
+                format!("{}%", format_number(v as f64, 1, self.language))
+            });
             table = table.push(
                 Row::new()
                     .spacing(SPACING_MEDIUM)
@@ -869,7 +868,10 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!("{:.1}%", p.measured.process_cpu_usage),
+                        format!(
+                            "{}%",
+                            format_number(p.measured.process_cpu_usage as f64, 1, self.language)
+                        ),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_CPU_WIDTH),
@@ -883,7 +885,10 @@ impl SensorState {
                         false,
                     ))
                     .push(text_widget(
-                        format!("{:.1}%", p.measured.process_mem_usage),
+                        format!(
+                            "{}%",
+                            format_number(p.measured.process_mem_usage as f64, 1, self.language)
+                        ),
                         table_font_size,
                         TextStyle::Secondary,
                         Length::Fixed(PROCESS_RAM_WIDTH),

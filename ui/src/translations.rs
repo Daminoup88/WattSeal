@@ -1267,7 +1267,12 @@ impl std::fmt::Display for TranslatedCarbonIntensity {
         if self.intensity.is_custom() {
             write!(f, "{}", country)
         } else {
-            write!(f, "{} ({:.0} g/kWh)", country, self.intensity.g_per_kwh)
+            write!(
+                f,
+                "{} ({} g/kWh)",
+                country,
+                format_number(self.intensity.g_per_kwh, 0, self.language)
+            )
         }
     }
 }
@@ -1299,8 +1304,10 @@ impl std::fmt::Display for TranslatedElectricityCost {
         } else {
             write!(
                 f,
-                "{} ({:.2} {}/kWh)",
-                country, self.cost.price_per_kwh, self.cost.currency_symbol
+                "{} ({} {}/kWh)",
+                country,
+                format_number(self.cost.price_per_kwh, 2, self.language),
+                self.cost.currency_symbol
             )
         }
     }
