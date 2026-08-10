@@ -9,7 +9,7 @@ use crate::{
 
 pub fn app_name(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "WattSeal",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "WattSeal",
     }
 }
 
@@ -19,12 +19,13 @@ pub fn page_dashboard(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Dashboard",
         AppLanguage::French => "Tableau de bord",
+        AppLanguage::Romanian => "Tablou de bord",
     }
 }
 
 pub fn page_info(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Info",
+        AppLanguage::English | AppLanguage::Romanian => "Info",
         AppLanguage::French => "Infos",
     }
 }
@@ -35,12 +36,13 @@ pub fn settings_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Settings",
         AppLanguage::French => "Paramètres",
+        AppLanguage::Romanian => "Setări",
     }
 }
 
 pub fn settings_general(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "General",
+        AppLanguage::English | AppLanguage::Romanian => "General",
         AppLanguage::French => "Général",
     }
 }
@@ -49,6 +51,7 @@ pub fn settings_theme(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Theme",
         AppLanguage::French => "Thème",
+        AppLanguage::Romanian => "Temă",
     }
 }
 
@@ -56,6 +59,7 @@ pub fn settings_language(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Language",
         AppLanguage::French => "Langue",
+        AppLanguage::Romanian => "Limbă",
     }
 }
 
@@ -63,6 +67,7 @@ pub fn modal_close(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close",
         AppLanguage::French => "Fermer",
+        AppLanguage::Romanian => "Închide",
     }
 }
 
@@ -72,6 +77,7 @@ pub fn current_power_consumption(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Current power consumption",
         AppLanguage::French => "Consommation actuelle",
+        AppLanguage::Romanian => "Consum curent",
     }
 }
 
@@ -79,6 +85,7 @@ pub fn database_migrating_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Preparing database",
         AppLanguage::French => "Préparation de la base de données",
+        AppLanguage::Romanian => "Bază de date în pregătire",
     }
 }
 
@@ -90,6 +97,9 @@ pub fn database_migrating_description(language: AppLanguage) -> &'static str {
         AppLanguage::French => {
             "WattSeal attend que le collecteur termine la migration de la base de données. Nouvel essai chaque seconde…"
         }
+        AppLanguage::Romanian => {
+            "WattSeal așteaptă colectorul să termine de migrat baza de date. Reîncercare în fiecare secundă..."
+        }
     }
 }
 
@@ -97,12 +107,13 @@ pub fn all_time(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "All Time",
         AppLanguage::French => "Depuis le début",
+        AppLanguage::Romanian => "De la început",
     }
 }
 
 pub fn total(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "Total",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Total",
     }
 }
 
@@ -110,6 +121,7 @@ pub fn emissions(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Emissions",
         AppLanguage::French => "Émissions",
+        AppLanguage::Romanian => "Emisii",
     }
 }
 
@@ -117,6 +129,7 @@ pub fn zero_carbon_intensity_warning(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "\u{26a0} Choose a real carbon intensity in the settings! \u{26a0}",
         AppLanguage::French => "\u{26a0} Choisissez une intensité carbone réelle dans les paramètres ! \u{26a0}",
+        AppLanguage::Romanian => "\u{26a0} Alegeți o intensitate de carbon reală în setări! \u{26a0}",
     }
 }
 
@@ -124,7 +137,7 @@ pub fn zero_carbon_intensity_warning(language: AppLanguage) -> &'static str {
 
 pub fn cpu(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "CPU",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "CPU",
     }
 }
 
@@ -132,12 +145,13 @@ pub fn processor_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Processor Information",
         AppLanguage::French => "Informations processeur",
+        AppLanguage::Romanian => "Informații procesor",
     }
 }
 
 pub fn model(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Model",
+        AppLanguage::English | AppLanguage::Romanian => "Model",
         AppLanguage::French => "Modèle",
     }
 }
@@ -146,6 +160,7 @@ pub fn cores(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Cores",
         AppLanguage::French => "Cœurs",
+        AppLanguage::Romanian => "Nuclee",
     }
 }
 
@@ -153,12 +168,13 @@ pub fn cores_and_threads(language: AppLanguage, physical: u16, logical: u16) -> 
     match language {
         AppLanguage::English => format!("{} cores / {} threads", physical, logical),
         AppLanguage::French => format!("{} cœurs / {} threads", physical, logical),
+        AppLanguage::Romanian => format!("{} nuclee / {} thread-uri", physical, logical),
     }
 }
 
 pub fn gpu(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "GPU",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "GPU",
     }
 }
 
@@ -166,6 +182,7 @@ pub fn graphics_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Graphics Information",
         AppLanguage::French => "Informations graphiques",
+        AppLanguage::Romanian => "Informații grafice",
     }
 }
 
@@ -173,6 +190,7 @@ pub fn graphics_processor_n(language: AppLanguage, n: usize) -> String {
     match language {
         AppLanguage::English => format!("Graphics Processor {}", n),
         AppLanguage::French => format!("Processeur graphique {}", n),
+        AppLanguage::Romanian => format!("Procesor grafic {}", n),
     }
 }
 
@@ -180,6 +198,7 @@ pub fn memory(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Memory",
         AppLanguage::French => "Mémoire",
+        AppLanguage::Romanian => "Memorie",
     }
 }
 
@@ -187,6 +206,7 @@ pub fn ram_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "RAM Information",
         AppLanguage::French => "Informations RAM",
+        AppLanguage::Romanian => "Informații RAM",
     }
 }
 
@@ -194,12 +214,14 @@ pub fn total_memory(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Total Memory",
         AppLanguage::French => "Mémoire totale",
+        AppLanguage::Romanian => "Memorie Totală",
     }
 }
 
 pub fn swap(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English | AppLanguage::French => "Swap",
+        AppLanguage::Romanian => "Swap",
     }
 }
 
@@ -207,6 +229,7 @@ pub fn system(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "System",
         AppLanguage::French => "Système",
+        AppLanguage::Romanian => "Sistem",
     }
 }
 
@@ -214,6 +237,7 @@ pub fn os_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "OS Information",
         AppLanguage::French => "Informations OS",
+        AppLanguage::Romanian => "Informații Sistem de Operare",
     }
 }
 
@@ -221,6 +245,7 @@ pub fn operating_system(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Operating System",
         AppLanguage::French => "Système d'exploitation",
+        AppLanguage::Romanian => "Sistem de operare",
     }
 }
 
@@ -228,6 +253,7 @@ pub fn hostname(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Hostname",
         AppLanguage::French => "Nom d'hôte",
+        AppLanguage::Romanian => "Nume de gazdă",
     }
 }
 
@@ -235,6 +261,7 @@ pub fn storage(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Storage",
         AppLanguage::French => "Stockage",
+        AppLanguage::Romanian => "Stocare",
     }
 }
 
@@ -242,6 +269,7 @@ pub fn disk_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Disk Information",
         AppLanguage::French => "Informations disque",
+        AppLanguage::Romanian => "Informații disc",
     }
 }
 
@@ -249,12 +277,13 @@ pub fn disk(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Disk",
         AppLanguage::French => "Disque",
+        AppLanguage::Romanian => "Disc",
     }
 }
 
 pub fn disk_n(language: AppLanguage, n: usize) -> String {
     match language {
-        AppLanguage::English | AppLanguage::French => format!("{} {}", disk(language), n),
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => format!("{} {}", disk(language), n),
     }
 }
 
@@ -262,6 +291,7 @@ pub fn space(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Space",
         AppLanguage::French => "Espace",
+        AppLanguage::Romanian => "Spațiu",
     }
 }
 
@@ -269,6 +299,7 @@ pub fn network(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Network",
         AppLanguage::French => "Réseau",
+        AppLanguage::Romanian => "Rețea",
     }
 }
 
@@ -276,6 +307,7 @@ pub fn battery(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Battery",
         AppLanguage::French => "Batterie",
+        AppLanguage::Romanian => "Baterie",
     }
 }
 
@@ -283,6 +315,7 @@ pub fn battery_status(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Battery Status",
         AppLanguage::French => "État de la batterie",
+        AppLanguage::Romanian => "Stare Baterie",
     }
 }
 
@@ -290,6 +323,7 @@ pub fn process(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Processes",
         AppLanguage::French => "Processus",
+        AppLanguage::Romanian => "Procese",
     }
 }
 
@@ -297,6 +331,7 @@ pub fn name(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Name",
         AppLanguage::French => "Nom",
+        AppLanguage::Romanian => "Nume",
     }
 }
 
@@ -304,6 +339,7 @@ pub fn capacity(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Capacity",
         AppLanguage::French => "Capacité",
+        AppLanguage::Romanian => "Capacitate",
     }
 }
 
@@ -312,13 +348,14 @@ pub fn capacity_wh_cycles(language: AppLanguage, cap_wh: f32, cycles: u32) -> St
     match language {
         AppLanguage::English => format!("{} Wh ({} cycles)", val, cycles),
         AppLanguage::French => format!("{} Wh ({} cycles)", val, cycles),
+        AppLanguage::Romanian => format!("{} Wh ({} cicluri)", val, cycles),
     }
 }
 
 pub fn capacity_wh_only(language: AppLanguage, cap_wh: f32) -> String {
     let val = format_number(cap_wh as f64, 1, language);
     match language {
-        AppLanguage::English | AppLanguage::French => format!("{} Wh", val),
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => format!("{} Wh", val),
     }
 }
 
@@ -326,6 +363,7 @@ pub fn na_with_cycles(language: AppLanguage, cycles: u32) -> String {
     match language {
         AppLanguage::English => format!("N/A ({} cycles)", cycles),
         AppLanguage::French => format!("N/A ({} cycles)", cycles),
+        AppLanguage::Romanian => format!("N/A ({} cicluri)", cycles),
     }
 }
 
@@ -333,6 +371,7 @@ pub fn display(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Display",
         AppLanguage::French => "Écran",
+        AppLanguage::Romanian => "Ecran",
     }
 }
 
@@ -340,6 +379,7 @@ pub fn screen_information(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Screen Information",
         AppLanguage::French => "Informations écran",
+        AppLanguage::Romanian => "Informații ecran",
     }
 }
 
@@ -347,6 +387,7 @@ pub fn mode(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Mode",
         AppLanguage::French => "Mode",
+        AppLanguage::Romanian => "Mod",
     }
 }
 
@@ -354,6 +395,7 @@ pub fn primary_display(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Primary Display",
         AppLanguage::French => "Écran principal",
+        AppLanguage::Romanian => "Ecran principal",
     }
 }
 
@@ -361,6 +403,7 @@ pub fn secondary_display(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Secondary Display",
         AppLanguage::French => "Écran secondaire",
+        AppLanguage::Romanian => "Ecran secundar",
     }
 }
 
@@ -368,7 +411,7 @@ pub fn secondary_display(language: AppLanguage) -> &'static str {
 
 pub fn na(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "N/A",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "N/A",
     }
 }
 
@@ -376,6 +419,7 @@ pub fn no_data_available(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "No data available",
         AppLanguage::French => "Aucune donnée disponible",
+        AppLanguage::Romanian => "Nu există date disponibile",
     }
 }
 
@@ -385,6 +429,7 @@ pub fn power_label(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Power:",
         AppLanguage::French => "Puissance :",
+        AppLanguage::Romanian => "Putere:",
     }
 }
 
@@ -405,6 +450,7 @@ pub fn tooltip_value(language: AppLanguage, value_text: &str) -> String {
     match language {
         AppLanguage::English => format!("Value: {}", value_text),
         AppLanguage::French => format!("Valeur : {}", value_text),
+        AppLanguage::Romanian => format!("Valoare: {}", value_text),
     }
 }
 
@@ -412,6 +458,7 @@ pub fn tooltip_time(language: AppLanguage, time_text: &str) -> String {
     match language {
         AppLanguage::English => format!("Time: {}", time_text),
         AppLanguage::French => format!("Heure : {}", time_text),
+        AppLanguage::Romanian => format!("Timp: {}", time_text),
     }
 }
 
@@ -420,6 +467,7 @@ pub fn tooltip_time(language: AppLanguage, time_text: &str) -> String {
 pub fn application(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English | AppLanguage::French => "Application",
+        AppLanguage::Romanian => "Aplicație",
     }
 }
 
@@ -427,6 +475,7 @@ pub fn power(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Power",
         AppLanguage::French => "Puissance",
+        AppLanguage::Romanian => "Putere",
     }
 }
 
@@ -434,6 +483,7 @@ pub fn energy(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Energy",
         AppLanguage::French => "Énergie",
+        AppLanguage::Romanian => "Energie",
     }
 }
 
@@ -453,8 +503,7 @@ pub fn power_or_energy_with_unit(language: AppLanguage, energy_mode: bool) -> St
 
 pub fn ram(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "RAM",
-        AppLanguage::French => "RAM",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "RAM",
     }
 }
 
@@ -462,6 +511,7 @@ pub fn disk_read(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Disk read",
         AppLanguage::French => "Lecture disque",
+        AppLanguage::Romanian => "Citire disc",
     }
 }
 
@@ -469,6 +519,7 @@ pub fn disk_write(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Disk write",
         AppLanguage::French => "Écriture disque",
+        AppLanguage::Romanian => "Scriere disc",
     }
 }
 
@@ -478,6 +529,7 @@ pub fn last_minute(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last Minute",
         AppLanguage::French => "Dernière minute",
+        AppLanguage::Romanian => "Ultimul minut",
     }
 }
 
@@ -485,6 +537,7 @@ pub fn last_hour(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last Hour",
         AppLanguage::French => "Dernière heure",
+        AppLanguage::Romanian => "Ultima oră",
     }
 }
 
@@ -492,6 +545,7 @@ pub fn last_24_hours(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last 24 Hours",
         AppLanguage::French => "Dernières 24 heures",
+        AppLanguage::Romanian => "Ultimele 24 ore",
     }
 }
 
@@ -499,6 +553,7 @@ pub fn last_week(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last Week",
         AppLanguage::French => "Dernière semaine",
+        AppLanguage::Romanian => "Ultima săptămână",
     }
 }
 
@@ -506,6 +561,7 @@ pub fn last_month(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last Month",
         AppLanguage::French => "Dernier mois",
+        AppLanguage::Romanian => "Ultima lună",
     }
 }
 
@@ -513,6 +569,7 @@ pub fn last_year(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last Year",
         AppLanguage::French => "Dernière année",
+        AppLanguage::Romanian => "Ultimul an",
     }
 }
 
@@ -533,6 +590,7 @@ pub fn metric_power(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Power",
         AppLanguage::French => "Puissance",
+        AppLanguage::Romanian => "Putere",
     }
 }
 
@@ -544,6 +602,7 @@ pub fn metric_usage(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Usage",
         AppLanguage::French => "Utilisation",
+        AppLanguage::Romanian => "Utilizare",
     }
 }
 
@@ -551,6 +610,7 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Speed",
         AppLanguage::French => "Vitesse",
+        AppLanguage::Romanian => "Viteză",
     }
 }
 
@@ -566,7 +626,7 @@ pub fn metric_type_name(language: AppLanguage, metric: MetricKind) -> &'static s
 
 pub fn label_usage(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => metric_usage(language),
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => metric_usage(language),
     }
 }
 
@@ -574,6 +634,7 @@ pub fn label_read(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Read",
         AppLanguage::French => "Lecture",
+        AppLanguage::Romanian => "Citire",
     }
 }
 
@@ -581,6 +642,7 @@ pub fn label_write(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Write",
         AppLanguage::French => "Écriture",
+        AppLanguage::Romanian => "Scriere",
     }
 }
 
@@ -588,6 +650,7 @@ pub fn label_download(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Download",
         AppLanguage::French => "Téléchargement",
+        AppLanguage::Romanian => "Descărcare",
     }
 }
 
@@ -595,6 +658,7 @@ pub fn label_upload(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Upload",
         AppLanguage::French => "Envoi",
+        AppLanguage::Romanian => "Încărcare",
     }
 }
 
@@ -610,6 +674,7 @@ pub fn translate_label(language: AppLanguage, english_label: &str) -> &'static s
         _ => match language {
             AppLanguage::English => "Unknown",
             AppLanguage::French => "Inconnu",
+            AppLanguage::Romanian => "Necunoscut",
         },
     }
 }
@@ -622,6 +687,9 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
         (AppLanguage::French, "Disk") => "Disque",
         (AppLanguage::French, "Network") => "Réseau",
         (AppLanguage::French, "Processes") => "Processus",
+        (AppLanguage::Romanian, "Disk") => "Disc",
+        (AppLanguage::Romanian, "Network") => "Rețea",
+        (AppLanguage::Romanian, "Processes") => "Procese",
         _ => english_name,
     }
 }
@@ -637,6 +705,7 @@ pub fn settings_electricity_cost(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Electricity Cost",
         AppLanguage::French => "Coût de l'électricité",
+        AppLanguage::Romanian => "Cost electricitate",
     }
 }
 
@@ -644,6 +713,7 @@ pub fn kwh_cost_placeholder(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "e.g. 0.20",
         AppLanguage::French => "ex. 0.20",
+        AppLanguage::Romanian => "ex: 0.20",
     }
 }
 
@@ -651,6 +721,7 @@ pub fn kwh_cost_invalid(language: AppLanguage, currency_symbol: &str) -> String 
     let text = match language {
         AppLanguage::English => "Enter a positive number",
         AppLanguage::French => "Entrez un nombre positif",
+        AppLanguage::Romanian => "Introduceți un număr pozitiv",
     };
     return format!("{} ({}/kWh)", text, currency_symbol);
 }
@@ -659,6 +730,7 @@ pub fn setup_choose_electricity(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Select your electricity price",
         AppLanguage::French => "Sélectionnez votre tarif d'électricité",
+        AppLanguage::Romanian => "Selectați tariful dvs. de electricitate",
     }
 }
 
@@ -666,6 +738,7 @@ pub fn custom_kwh_cost_placeholder(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "e.g. 0.25",
         AppLanguage::French => "ex. 0.25",
+        AppLanguage::Romanian => "ex: 0.25",
     }
 }
 
@@ -673,6 +746,7 @@ pub fn electricity_bill(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated Bill",
         AppLanguage::French => "Facture estimée",
+        AppLanguage::Romanian => "Factură estimată",
     }
 }
 
@@ -680,6 +754,7 @@ pub fn settings_carbon_intensity(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Carbon Intensity",
         AppLanguage::French => "Intensité carbone",
+        AppLanguage::Romanian => "Intensitate Carbon",
     }
 }
 
@@ -687,6 +762,7 @@ pub fn setup_welcome_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Welcome to WattSeal",
         AppLanguage::French => "Bienvenue sur WattSeal",
+        AppLanguage::Romanian => "Bine ați venit la WattSeal",
     }
 }
 
@@ -694,6 +770,7 @@ pub fn setup_choose_language(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Choose your language",
         AppLanguage::French => "Choisissez votre langue",
+        AppLanguage::Romanian => "Alegeți limba",
     }
 }
 
@@ -701,6 +778,7 @@ pub fn setup_choose_carbon(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Select the carbon intensity of your electricity grid",
         AppLanguage::French => "Sélectionnez l'intensité carbone de votre réseau électrique",
+        AppLanguage::Romanian => "Selectați intensitatea de carbon a rețelei electrice",
     }
 }
 
@@ -708,6 +786,7 @@ pub fn setup_confirm(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Confirm",
         AppLanguage::French => "Confirmer",
+        AppLanguage::Romanian => "Confirmați",
     }
 }
 
@@ -715,6 +794,7 @@ pub fn custom_carbon_placeholder(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "e.g. 300",
         AppLanguage::French => "ex. 300",
+        AppLanguage::Romanian => "ex: 300",
     }
 }
 
@@ -722,6 +802,7 @@ pub fn custom_carbon_invalid(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Enter a positive number (g CO₂/kWh)",
         AppLanguage::French => "Entrez un nombre positif (g CO₂/kWh)",
+        AppLanguage::Romanian => "Introduceți un număr pozitiv (g CO₂/kWh)",
     }
 }
 
@@ -731,6 +812,7 @@ pub fn info_modal_current_power(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Current power",
         AppLanguage::French => "Puissance actuelle",
+        AppLanguage::Romanian => "Putere actuală",
     }
 }
 
@@ -738,6 +820,7 @@ pub fn info_modal_all_time_power(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "All-time energy",
         AppLanguage::French => "Énergie totale",
+        AppLanguage::Romanian => "Energie totală",
     }
 }
 
@@ -745,6 +828,7 @@ pub fn info_modal_current_top_consumer(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Current highest consumer",
         AppLanguage::French => "Plus gros consommateur actuel",
+        AppLanguage::Romanian => "Cel mai mare consumator actual",
     }
 }
 
@@ -752,6 +836,7 @@ pub fn info_modal_all_time_top_consumer(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "All-time top consumer",
         AppLanguage::French => "Plus gros consommateur total",
+        AppLanguage::Romanian => "Cel mai mare consumator total",
     }
 }
 
@@ -759,6 +844,7 @@ pub fn info_modal_top_process(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Top process",
         AppLanguage::French => "Processus le plus gourmand",
+        AppLanguage::Romanian => "Cel mai intensiv proces",
     }
 }
 
@@ -766,6 +852,7 @@ pub fn info_modal_coming_soon(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Coming soon",
         AppLanguage::French => "Bientôt disponible",
+        AppLanguage::Romanian => "În curând",
     }
 }
 
@@ -792,10 +879,12 @@ pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
             "carbon_emissions" => match language {
                 AppLanguage::English => "Carbon Emissions".to_string(),
                 AppLanguage::French => "Émissions carbone".to_string(),
+                AppLanguage::Romanian => "Emisii de carbon".to_string(),
             },
             _ => match language {
                 AppLanguage::English => "Info".to_string(),
                 AppLanguage::French => "Info".to_string(),
+                AppLanguage::Romanian => "Info".to_string(),
             },
         };
     }
@@ -822,6 +911,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Les tâches intensives (compilation, encodage) augmentent la charge\n\
                  \u{2022} Des tensions plus élevées (overclocking) augmentent la consommation"
             }
+            AppLanguage::Romanian => {
+                "Unitatea centrală de procesare (CPU) este creierul calculatorului dumneavoastră. \
+                 El execută toate instrucțiunile și calculele.\n\n\
+                 Principalii factori de consum:\n\
+                 \u{2022} Frecvențele mai mari cresc consumul\n\
+                 \u{2022} Mai multe nuclee active = consum mai ridicat\n\
+                 \u{2022} Sarcinile intensive (compilare, encodare) cresc consumul\n\
+                 \u{2022} Tensiuni ridicate (overclocking) cresc consumul"
+            }
         };
     } else if key == GPUData::table_name_static() {
         return match language {
@@ -842,6 +940,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Encodage / décodage vidéo\n\
                  \u{2022} Charges IA et machine learning\n\
                  \u{2022} Utilisation élevée de la VRAM"
+            }
+            AppLanguage::Romanian => {
+                "Unitatea de Procesare Grafică (GPU) se ocupă de randarea grafică și calcule \
+                 paralele.\n\n\
+                 Principalii consumatori:\n\
+                 \u{2022} Randarea 3D și jocurile\n\
+                 \u{2022} Encodare/decodare video\n\
+                 \u{2022} Sarcini IA și învățare automată\n\
+                 \u{2022} Utilizare intensă a VRAM-ului și lățime de bandă a memoriei"
             }
         };
     } else if key == RamData::table_name_static() {
@@ -864,6 +971,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Opérations de lecture/écriture fréquentes\n\n\
                  Globalement, la RAM consomme de l'énergie tant que le système est allumé, même au repos."
             }
+            AppLanguage::Romanian => {
+                "Memoria RAM (Random Access Memory) oferă stocare temporară rapidă pentru\
+                 programele în execuție și datele active.\n\n\
+                 Consumatori principali:\n\
+                 \u{2022} Frecvențe înalte de memorie (MHz)\n\
+                 \u{2022} Mai multe module de memorie\n\
+                 \u{2022} Citiri/Scrieri frecvente\n\n\
+                 Pe scurt, memoria RAM consumă curent constant, cât timp sistemul este pornit,\
+                 chiar și în stand-by."
+            }
         };
     } else if key == DiskData::table_name_static() {
         return match language {
@@ -884,6 +1001,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Plateaux en rotation (HDD)\n\
                  \u{2022} Opérations d'écriture NAND (SSD)\n\
                  \u{2022} Recherche et indexation sur le disque"
+            }
+            AppLanguage::Romanian => {
+                "Discurile de stocare (SSD / HDD) oferă spațiu de stocare permanent pentru fișiere \
+                 și sistem.\n\n\
+                 Principalii consumatori:\n\
+                 \u{2022} Operații de citire/scriere frecvente\n\
+                 \u{2022} Rotirea discurilor (HDD)\n\
+                 \u{2022} Operații de scriere NAND (SSD)\n\
+                 \u{2022} Căutari și indexări pe disc"
             }
         };
     } else if key == NetworkData::table_name_static() {
@@ -910,6 +1036,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Bluetooth et périphériques sans fil\n\n\
                  Note : L'utilisation d'internet engendre des émissions indirectes dues aux infrastructures réseau et aux serveurs distants (28 à 63 g CO₂/Go), qui ne sont pas incluses dans les mesures de WattSeal pour votre PC."
             }
+            AppLanguage::Romanian => {
+                "Interfețele de rețea se ocupă de transmiterea datelor între calculatorul dvs. și \
+                 alte dispozitive sau internet.\n\n\
+                 Principalii consumatori:\n\
+                 \u{2022} Debit ridicat de date\n\
+                 \u{2022} Transmisii Wi-Fi\n\
+                 \u{2022} Conexiuni de rețea active\n\
+                 \u{2022} Periferice Bluetooth sau wireless\n\n\
+                Notă: Utilizarea internetului generează emisii indirecte prin infrastructura de rețea și servere remote (28\u{2013}63 g CO₂/GB), care nu sunt incluse în măsurătorile WattSeal pentru calculatorul dumneavoastră."
+            }
         };
     } else if key == ProcessData::table_name_static() {
         return match language {
@@ -927,6 +1063,12 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Les processus en arrière-plan et les services \
                  contribuent aussi à la consommation totale."
             }
+            AppLanguage::Romanian => {
+                "Arată care sunt aplicațiile cu cel mai mare consum de curent din sistem.\n\n\
+                 Consumul este estimat pe baza utilizării de CPU și GPU (cel mai mare consum \
+                 variabil) al fiecărui proces.\n\
+                 Procesele și serviciile ascunse contribuie de asemenea la consumul total."
+            }
         };
     } else if key == TotalData::table_name_static() {
         return match language {
@@ -941,6 +1083,12 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  C'est la somme de tous les composants (CPU, GPU, RAM, Disque, \
                  Réseau). Comprendre quel composant consomme le plus aide à \
                  optimiser la consommation d'énergie."
+            }
+            AppLanguage::Romanian => {
+                "Arată consumul total de curent al sistemului.\n\n\
+                 Aceasta este suma totală a tuturor componentelor hardware (CPU, GPU, RAM, Disc, \
+                 Rețea). Înțelegerea componentei care consumă cel mai mult ajută la optimizarea \
+                 consumului de energie."
             }
         };
     } else if key == "carbon_emissions" {
@@ -967,6 +1115,14 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Émissions liées à la fin de vie du matériel (varie largement, écoulement de matériaux toxiques dans les décharges)\n\n\
                  Note: Le numérique consomme aussi énormément d'eau pour le refroidissement des datacenters (environ 1,9L/kWh) et l'extraction des minerais, notamment dans des régions en stress hydrique."
             }
+            AppLanguage::Romanian => {
+                "Aceste emisii reflectă doar CO₂ generat de energia electrică consumată de PC în timpul funcționării.\n\n\
+                 Pentru a estima amprenta de carbon completă, ar trebui să adăugați și:\n\
+                 \u{2022} Emisiile din fabricație și transport (~250\u{2013}500 kg CO₂e, o singură dată), mai mult pentru PC-urile de gaming, monitoare suplimentare și periferice\n\
+                 \u{2022} Emisiile din infrastructura rețelei (28\u{2013}63 g CO₂/GB), care cresc odată cu avansul IA\n\
+                 \u{2022} Emisiile legate de eliminarea hardware-ului și deșeurilor electronice (variază mult, scurgeri de materiale toxice în depozite)\n\n\
+                 Notă: Tehnologia digitală consumă și multă apă pentru răcirea centrelor de date (aprox. 1,9 L/kWh) și pentru extracția mineralelor, în special în regiuni cu stres hidric."
+            }
         };
     } else {
         return match key {
@@ -991,6 +1147,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                     Vous pouvez optimiser cela en désactivant les programmes de démarrage \
                     inutiles, les processus d'arrière-plan dans la barre des tâches (météo, actualités...), et en utilisant les modes d'économie d'énergie."
                 }
+                AppLanguage::Romanian => {
+                    "Sistemul de operare gestionează toate resursele hardware și software-ul care rulează.\n\n\
+                     Impact asupra consumului de energie:\n\
+                     \u{2022} Servicii de fundal și sarcini programate\n\
+                     \u{2022} Indexarea și actualizările sistemului\n\
+                     \u{2022} Setările planului de energie afectează toate componentele\n\n\
+                     Puteți optimiza acest consum prin dezactivarea programelor de pornire inutile, \
+                     proceselor de fundal care rulează în bara de activități (vreme, știri...), \
+                     și prin utilizarea modurilor de economisire a energiei."
+                }
             },
             "battery" => match language {
                 AppLanguage::English => {
@@ -1013,6 +1179,14 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      d'économie\n\
                      \u{2022} La charge rapide génère plus de chaleur et consomme plus"
                 }
+                AppLanguage::Romanian => {
+                    "Bateria stochează energie pentru utilizare portabilă și influențează modul în care este gestionat consumul.\n\n\
+                     Aspecte cheie:\n\
+                     \u{2022} Numărul de cicluri reflectă sănătatea și îmbătrânirea bateriei\n\
+                     \u{2022} Capacitatea proiectată scade în timp\n\
+                     \u{2022} Utilizarea pe baterie declanșează adesea moduri de economisire a energiei\n\
+                     \u{2022} Încărcarea rapidă generează mai multă căldură și consumă mai multă energie"
+                }
             },
             "display" => match language {
                 AppLanguage::English => {
@@ -1031,6 +1205,14 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Taux de rafraîchissement élevés (Hz)\n\
                      \u{2022} Résolutions plus élevées\n\
                      \u{2022} HDR et gamme de couleurs étendue"
+                }
+                AppLanguage::Romanian => {
+                    "Display-urile sunt un mare consumator de energie, în special la luminozitate ridicată.\n\n\
+                     Principalii consumatori:\n\
+                     \u{2022} Luminozitatea ecranului (factorul principal)\n\
+                     \u{2022} Rate de reîmprospătare mai mari (Hz)\n\
+                     \u{2022} Rezoluții mai înalte\n\
+                     \u{2022} HDR și gamă largă de culori"
                 }
             },
             "storage" => match language {
@@ -1052,10 +1234,19 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Opérations d'écriture NAND (SSD)\n\
                      \u{2022} Recherche et indexation sur le disque"
                 }
+                AppLanguage::Romanian => {
+                    "Discurile de stocare (SSD / HDD) oferă stocare permanentă pentru fișierele și sistemul dvs.\n\n\
+                     Principalii consumatori:\n\
+                     \u{2022} Operații de citire/scriere susținute\n\
+                     \u{2022} Rotirea platanelor (HDD)\n\
+                     \u{2022} Operații de scriere NAND (SSD)\n\
+                     \u{2022} Căutări și indexări pe disc"
+                }
             },
             _ => match language {
                 AppLanguage::English => "No additional information available for this component.",
                 AppLanguage::French => "Aucune information supplémentaire disponible pour ce composant.",
+                AppLanguage::Romanian => "Nu sunt disponibile informații suplimentare pentru această componentă.",
             },
         };
     }
@@ -1066,6 +1257,7 @@ pub fn carbon_info_measured(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Measured by WattSeal",
         AppLanguage::French => "Mesuré par WattSeal",
+        AppLanguage::Romanian => "Măsurat de WattSeal",
     }
 }
 
@@ -1074,6 +1266,7 @@ pub fn carbon_info_base(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated base (manufacturing + transport)",
         AppLanguage::French => "Base estimée (fabrication + transport)",
+        AppLanguage::Romanian => "Estimare de bază (fabricare + transport)",
     }
 }
 
@@ -1082,6 +1275,7 @@ pub fn carbon_info_annual(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated annual (network usage)",
         AppLanguage::French => "Annuel estimé (utilisation réseau)",
+        AppLanguage::Romanian => "Estimare anuală (utilizare rețea)",
     }
 }
 
@@ -1090,6 +1284,7 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated all-time total",
         AppLanguage::French => "Total estimé (toutes sources)",
+        AppLanguage::Romanian => "Total estimat (toate sursele)",
     }
 }
 
@@ -1155,6 +1350,7 @@ pub fn close_dialog_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close WattSeal",
         AppLanguage::French => "Fermer WattSeal",
+        AppLanguage::Romanian => "Închide WattSeal",
     }
 }
 
@@ -1162,6 +1358,7 @@ pub fn close_dialog_description(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Do you want to close only the window, or also stop the background collector?",
         AppLanguage::French => "Voulez-vous fermer uniquement l'interface, ou aussi arrêter le collecteur ?",
+        AppLanguage::Romanian => "Doriți să închideți doar fereastra sau și să opriți colectorul de fundal?",
     }
 }
 
@@ -1169,6 +1366,7 @@ pub fn close_ui_only(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close window only",
         AppLanguage::French => "Fermer l'interface",
+        AppLanguage::Romanian => "Închide doar fereastra",
     }
 }
 
@@ -1176,6 +1374,7 @@ pub fn close_everything(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close everything",
         AppLanguage::French => "Tout fermer",
+        AppLanguage::Romanian => "Închide tot",
     }
 }
 
@@ -1192,6 +1391,7 @@ pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
             AppTheme::GeothermalCore => "Bronzette",
             AppTheme::SolarUmbra => "Détente",
         },
+        AppLanguage::Romanian => theme.name(),
     }
 }
 
@@ -1215,6 +1415,25 @@ pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str
             "Poland" => "Pologne",
             "World average" => "Moyenne mondiale",
             "Custom" => "Personnalisé",
+            other => other,
+        },
+        AppLanguage::Romanian => match label {
+            "France" => "Franța",
+            "Germany" => "Germania",
+            "Spain" => "Spania",
+            "Italy" => "Italia",
+            "Netherlands" => "Olanda",
+            "Switzerland" => "Elveția",
+            "UK" => "Regatul Unit",
+            "USA (average)" => "SUA (medie)",
+            "China" => "China",
+            "India" => "India",
+            "Indonesia" => "Indonezia",
+            "Philippines" => "Filipine",
+            "Sweden" => "Suedia",
+            "Poland" => "Polonia",
+            "World average" => "Media mondială",
+            "Custom" => "Personalizat",
             other => other,
         },
     }
@@ -1323,6 +1542,7 @@ pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
     let unit = match language {
         AppLanguage::English => "GB",
         AppLanguage::French => "Go",
+        AppLanguage::Romanian => "GB",
     };
     format!("{} {}", format_number(gb, 2, language), unit)
 }
@@ -1331,6 +1551,7 @@ pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
     let unit = match language {
         AppLanguage::English => "MB/s",
         AppLanguage::French => "Mo/s",
+        AppLanguage::Romanian => "MB/s",
     };
     format!("{} {}", format_number(mb, 1, language), unit)
 }
@@ -1342,6 +1563,7 @@ pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
         MetricKind::Speed => match language {
             AppLanguage::English => "MB/s",
             AppLanguage::French => "Mo/s",
+            AppLanguage::Romanian => "MB/s",
         },
     }
 }
@@ -1365,6 +1587,7 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
                 match language {
                     AppLanguage::English => ".",
                     AppLanguage::French => ",",
+                    AppLanguage::Romanian => ",",
                 },
                 "0".repeat(decimals)
             )
@@ -1376,10 +1599,12 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
     let thousands_sep = match language {
         AppLanguage::English => ",",
         AppLanguage::French => " ",
+        AppLanguage::Romanian => " ",
     };
     let decimal_sep = match language {
         AppLanguage::English => ".",
         AppLanguage::French => ",",
+        AppLanguage::Romanian => ",",
     };
 
     let is_negative = val < 0.0;

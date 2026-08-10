@@ -139,12 +139,13 @@ pub enum AppLanguage {
     #[default]
     English,
     French,
+    Romanian,
 }
 
 impl AppLanguage {
     /// Returns all available languages.
     pub const fn all() -> &'static [AppLanguage] {
-        &[AppLanguage::English, AppLanguage::French]
+        &[AppLanguage::English, AppLanguage::French, AppLanguage::Romanian]
     }
 
     /// Returns the ISO language code.
@@ -152,6 +153,7 @@ impl AppLanguage {
         match self {
             AppLanguage::English => "EN",
             AppLanguage::French => "FR",
+            AppLanguage::Romanian => "RO",
         }
     }
 
@@ -160,6 +162,7 @@ impl AppLanguage {
         match code {
             "EN" => AppLanguage::English,
             "FR" => AppLanguage::French,
+            "RO" => AppLanguage::Romanian,
             _ => AppLanguage::English,
         }
     }
@@ -170,6 +173,7 @@ impl Display for AppLanguage {
         match self {
             AppLanguage::English => write!(f, "English"),
             AppLanguage::French => write!(f, "Français"),
+            AppLanguage::Romanian => write!(f, "Română"),
         }
     }
 }
