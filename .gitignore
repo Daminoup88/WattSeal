@@ -2,3 +2,5 @@
 *.db*
 *.log
 *.exe
+
+.idea
