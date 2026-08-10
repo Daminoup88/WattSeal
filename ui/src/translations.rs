@@ -220,8 +220,7 @@ pub fn total_memory(language: AppLanguage) -> &'static str {
 
 pub fn swap(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French => "Swap",
-        AppLanguage::Romanian => "Swap",
+        AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Swap",
     }
 }
 
@@ -882,9 +881,7 @@ pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
                 AppLanguage::Romanian => "Emisii de carbon".to_string(),
             },
             _ => match language {
-                AppLanguage::English => "Info".to_string(),
-                AppLanguage::French => "Info".to_string(),
-                AppLanguage::Romanian => "Info".to_string(),
+                AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Info".to_string(),
             },
         };
     }
@@ -1381,61 +1378,113 @@ pub fn close_everything(language: AppLanguage) -> &'static str {
 // Localized Theme & Country Presets
 
 pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
-    match language {
-        AppLanguage::English => theme.name(),
-        AppLanguage::French => match theme {
-            AppTheme::DeepOcean => "Chasse",
-            AppTheme::OceanLight => "Baignade",
-            AppTheme::EcoEnergy => "Dodo",
-            AppTheme::EcoEnergyLight => "Bataille d'eau",
-            AppTheme::GeothermalCore => "Bronzette",
-            AppTheme::SolarUmbra => "Détente",
+    match theme {
+        AppTheme::DeepOcean => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Hunting",
+            AppLanguage::French => "Chasse",
         },
-        AppLanguage::Romanian => theme.name(),
+        AppTheme::OceanLight => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Swimming",
+            AppLanguage::French => "Baignade",
+        },
+        AppTheme::EcoEnergy => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Sleeping",
+            AppLanguage::French => "Dodo",
+        },
+        AppTheme::EcoEnergyLight => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Splashing",
+            AppLanguage::French => "Bataille d'eau",
+        },
+        AppTheme::GeothermalCore => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Sunbathing",
+            AppLanguage::French => "Bronzette",
+        },
+        AppTheme::SolarUmbra => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Lounging",
+            AppLanguage::French => "Détente",
+        },
     }
 }
 
 pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str {
-    match language {
-        AppLanguage::English => label,
-        AppLanguage::French => match label {
-            "France" => "France",
-            "Germany" => "Allemagne",
-            "Spain" => "Espagne",
-            "Italy" => "Italie",
-            "Netherlands" => "Pays-Bas",
-            "Switzerland" => "Suisse",
-            "UK" => "Royaume-Uni",
-            "USA (average)" => "États-Unis (moyenne)",
-            "China" => "Chine",
-            "India" => "Inde",
-            "Indonesia" => "Indonésie",
-            "Philippines" => "Philippines",
-            "Sweden" => "Suède",
-            "Poland" => "Pologne",
-            "World average" => "Moyenne mondiale",
-            "Custom" => "Personnalisé",
-            other => other,
+    match label {
+        "France" => match language {
+            AppLanguage::English | AppLanguage::French => label,
+            AppLanguage::Romanian => "Franța",
         },
-        AppLanguage::Romanian => match label {
-            "France" => "Franța",
-            "Germany" => "Germania",
-            "Spain" => "Spania",
-            "Italy" => "Italia",
-            "Netherlands" => "Olanda",
-            "Switzerland" => "Elveția",
-            "UK" => "Regatul Unit",
-            "USA (average)" => "SUA (medie)",
-            "China" => "China",
-            "India" => "India",
-            "Indonesia" => "Indonezia",
-            "Philippines" => "Filipine",
-            "Sweden" => "Suedia",
-            "Poland" => "Polonia",
-            "World average" => "Media mondială",
-            "Custom" => "Personalizat",
-            other => other,
+        "Germany" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Allemagne",
+            AppLanguage::Romanian => "Germania",
         },
+        "Spain" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Espagne",
+            AppLanguage::Romanian => "Spania",
+        },
+        "Italy" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Italie",
+            AppLanguage::Romanian => "Italia",
+        },
+        "Netherlands" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Pays-Bas",
+            AppLanguage::Romanian => "Olanda",
+        },
+        "Switzerland" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Suisse",
+            AppLanguage::Romanian => "Elveția",
+        },
+        "UK" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Royaume-Uni",
+            AppLanguage::Romanian => "Regatul Unit",
+        },
+        "USA (average)" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "États-Unis (moyenne)",
+            AppLanguage::Romanian => "SUA (medie)",
+        },
+        "China" => match language {
+            AppLanguage::English | AppLanguage::Romanian => label,
+            AppLanguage::French => "Chine",
+        },
+        "India" => match language {
+            AppLanguage::English | AppLanguage::Romanian => label,
+            AppLanguage::French => "Inde",
+        },
+        "Indonesia" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Indonésie",
+            AppLanguage::Romanian => "Indonezia",
+        },
+        "Philippines" => match language {
+            AppLanguage::English | AppLanguage::French => label,
+            AppLanguage::Romanian => "Filipine",
+        },
+        "Sweden" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Suède",
+            AppLanguage::Romanian => "Suedia",
+        },
+        "Poland" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Pologne",
+            AppLanguage::Romanian => "Polonia",
+        },
+        "World average" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Moyenne mondiale",
+            AppLanguage::Romanian => "Media mondială",
+        },
+        "Custom" => match language {
+            AppLanguage::English => label,
+            AppLanguage::French => "Personnalisé",
+            AppLanguage::Romanian => "Personalizat",
+        },
+        _ => label,
     }
 }
 
@@ -1540,18 +1589,16 @@ pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
     }
     let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
     let unit = match language {
-        AppLanguage::English => "GB",
+        AppLanguage::English | AppLanguage::Romanian => "GB",
         AppLanguage::French => "Go",
-        AppLanguage::Romanian => "GB",
     };
     format!("{} {}", format_number(gb, 2, language), unit)
 }
 
 pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
     let unit = match language {
-        AppLanguage::English => "MB/s",
+        AppLanguage::English | AppLanguage::Romanian => "MB/s",
         AppLanguage::French => "Mo/s",
-        AppLanguage::Romanian => "MB/s",
     };
     format!("{} {}", format_number(mb, 1, language), unit)
 }
@@ -1561,9 +1608,8 @@ pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
         MetricKind::Power => "W",
         MetricKind::Usage => "%",
         MetricKind::Speed => match language {
-            AppLanguage::English => "MB/s",
+            AppLanguage::English | AppLanguage::Romanian => "MB/s",
             AppLanguage::French => "Mo/s",
-            AppLanguage::Romanian => "MB/s",
         },
     }
 }
@@ -1586,8 +1632,7 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
                 "0{}{}",
                 match language {
                     AppLanguage::English => ".",
-                    AppLanguage::French => ",",
-                    AppLanguage::Romanian => ",",
+                    AppLanguage::French | AppLanguage::Romanian => ",",
                 },
                 "0".repeat(decimals)
             )
@@ -1598,13 +1643,11 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
 
     let thousands_sep = match language {
         AppLanguage::English => ",",
-        AppLanguage::French => " ",
-        AppLanguage::Romanian => " ",
+        AppLanguage::French | AppLanguage::Romanian => " ",
     };
     let decimal_sep = match language {
         AppLanguage::English => ".",
-        AppLanguage::French => ",",
-        AppLanguage::Romanian => ",",
+        AppLanguage::French | AppLanguage::Romanian => ",",
     };
 
     let is_negative = val < 0.0;

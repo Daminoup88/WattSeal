@@ -33,7 +33,7 @@ use crate::{
         format_energy, format_number, info_modal_all_time_power, info_modal_all_time_top_consumer,
         info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
         info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
-        setup_choose_language, setup_confirm, setup_welcome_title,
+        setup_choose_language, setup_confirm, setup_welcome_title, theme_name,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, SensorRecord, TimeRange},
 };
@@ -807,7 +807,7 @@ impl App {
             language: self.language.code().to_string(),
             carbon_intensity: carbon_str,
             kwh_cost: kwh_str,
-            theme: self.theme.name().to_string(),
+            theme: theme_name(AppLanguage::English, self.theme).to_string(),
             currency: self.electricity_cost.currency_code.to_string(),
         };
         let _ = self.database.save_ui_settings(&settings);
