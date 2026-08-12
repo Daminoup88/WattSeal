@@ -93,6 +93,7 @@ pub fn database_migrating_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Preparing database",
         AppLanguage::French => "Préparation de la base de données",
+        AppLanguage::Chinese => "准备数据库",
         AppLanguage::Romanian => "Bază de date în pregătire",
     }
 }
@@ -105,6 +106,7 @@ pub fn database_migrating_description(language: AppLanguage) -> &'static str {
         AppLanguage::French => {
             "WattSeal attend que le collecteur termine la migration de la base de données. Nouvel essai chaque seconde…"
         }
+        AppLanguage::Chinese => "WattSeal 正在等待采集器完成数据库迁移，每秒重试一次…",
         AppLanguage::Romanian => {
             "WattSeal așteaptă colectorul să termine de migrat baza de date. Reîncercare în fiecare secundă..."
         }
@@ -1147,8 +1149,9 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Note : L'utilisation d'internet engendre des émissions indirectes dues aux infrastructures réseau et aux serveurs distants (28 à 63 g CO₂/Go), qui ne sont pas incluses dans les mesures de WattSeal pour votre PC."
             }
             AppLanguage::Chinese => {
-                "网络接口负责数据传输。\n\n\
-                 主要耗电\u{ff1a}高吞吐、Wi-Fi 发射、活跃连接、蓝牙等。"
+                "网络接口负责计算机与其他设备或互联网之间的数据传输。\n\n\
+                 主要耗电因素\u{ff1a}高数据吞吐量、Wi-Fi 无线传输、活跃的网络连接、蓝牙和无线外设。\n\n\
+                 注意：使用互联网会通过网络基础设施和远程服务器产生间接排放 (28\u{2013}63 g CO₂/GB)\u{ff0c}这部分未包含在 WattSeal 对您电脑的测量中。"
             }
             AppLanguage::Romanian => {
                 "Interfețele de rețea se ocupă de transmiterea datelor între calculatorul dvs. și \
@@ -1238,8 +1241,12 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Note: Le numérique consomme aussi énormément d'eau pour le refroidissement des datacenters (environ 1,9L/kWh) et l'extraction des minerais, notamment dans des régions en stress hydrique."
             }
             AppLanguage::Chinese => {
-                "此处仅反映电脑用电产生的 CO₂。\n\n\
-                 完整足迹还需考虑制造运输、网络与硬件报废等。"
+                "此处仅反映电脑运行时消耗电力所产生的 CO₂。\n\n\
+                 完整碳足迹还需考虑：\n\
+                 \u{2022} 制造与运输排放 (约 250\u{2013}500 kg CO₂eq\u{ff0c}一次性)\u{ff0c}游戏电脑、额外显示器及外设更高\n\
+                 \u{2022} 网络基础设施排放 (28\u{2013}63 g CO₂/GB) \u{ff0c}随 AI 兴起而持续增长\n\
+                 \u{2022} 硬件废弃与电子垃圾排放 (差异较大，涉及填埋场有毒物质渗漏) \n\n\
+                 注：数字技术也消耗大量水资源用于数据中心冷却 (约 1.9L/kWh) 及矿物开采，在水资源紧张地区尤为严重。"
             }
             AppLanguage::Romanian => {
                 "Aceste emisii reflectă doar CO₂ generat de energia electrică consumată de PC în timpul funcționării.\n\n\
@@ -1274,8 +1281,9 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                     inutiles, les processus d'arrière-plan dans la barre des tâches (météo, actualités...), et en utilisant les modes d'économie d'énergie."
                 }
                 AppLanguage::Chinese => {
-                    "操作系统管理硬件与软件。\n\n\
-                     可禁用多余启动项与后台程序，并使用省电模式。"
+                    "操作系统管理所有硬件资源及运行中的软件。\n\n\
+                     对功耗的影响：后台服务与计划任务、系统索引与更新、电源方案设置影响所有组件。\n\n\
+                     可禁用不必要的自启程序、任务栏后台进程（天气、新闻等），并使用省电模式来优化。"
                 }
                 AppLanguage::Romanian => {
                     "Sistemul de operare gestionează toate resursele hardware și software-ul care rulează.\n\n\
@@ -1310,8 +1318,8 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} La charge rapide génère plus de chaleur et consomme plus"
                 }
                 AppLanguage::Chinese => {
-                    "电池储存便携用电能量。\n\n\
-                     循环次数反映健康；用电池时常自动省电；快充更发热。"
+                    "电池为便携使用储存能量，并影响电源管理行为。\n\n\
+                     要点：循环次数反映电池健康与老化程度、设计容量随时间衰减、使用电池时常触发省电模式、快充发热更大且耗能更多。"
                 }
                 AppLanguage::Romanian => {
                     "Bateria stochează energie pentru utilizare portabilă și influențează modul în care este gestionat consumul.\n\n\
@@ -1340,7 +1348,10 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Résolutions plus élevées\n\
                      \u{2022} HDR et gamme de couleurs étendue"
                 }
-                AppLanguage::Chinese => "显示器是耗电大户，亮度影响最大，其次刷新率与分辨率。",
+                AppLanguage::Chinese => {
+                    "显示器是耗电大户，尤其在高亮度下。\n\n\
+                     主要耗电因素：屏幕亮度 (影响最大) 、更高的刷新率、更高的分辨率、HDR 与广色域。"
+                }
                 AppLanguage::Romanian => {
                     "Display-urile sunt un mare consumator de energie, în special la luminozitate ridicată.\n\n\
                      Principalii consumatori:\n\
@@ -1369,7 +1380,10 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Opérations d'écriture NAND (SSD)\n\
                      \u{2022} Recherche et indexation sur le disque"
                 }
-                AppLanguage::Chinese => "存储设备用于永久保存数据，持续读写时耗电明显。",
+                AppLanguage::Chinese => {
+                    "存储设备 (SSD / HDD) 为文件与系统提供永久存储。\n\n\
+                     主要耗电因素：持续读写操作、机械盘片旋转 (HDD)、NAND 写入操作 (SSD)、磁盘寻道与索引。"
+                }
                 AppLanguage::Romanian => {
                     "Discurile de stocare (SSD / HDD) oferă stocare permanentă pentru fișierele și sistemul dvs.\n\n\
                      Principalii consumatori:\n\
@@ -1404,7 +1418,7 @@ pub fn carbon_info_base(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated base (manufacturing + transport)",
         AppLanguage::French => "Base estimée (fabrication + transport)",
-        AppLanguage::Chinese => "预估基础（制造与运输）",
+        AppLanguage::Chinese => "预估基础 (制造与运输)",
         AppLanguage::Romanian => "Estimare de bază (fabricare + transport)",
     }
 }
@@ -1414,7 +1428,7 @@ pub fn carbon_info_annual(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Estimated annual (network usage)",
         AppLanguage::French => "Annuel estimé (utilisation réseau)",
-        AppLanguage::Chinese => "预估年度（网络使用）",
+        AppLanguage::Chinese => "预估年度 (网络使用)",
         AppLanguage::Romanian => "Estimare anuală (utilizare rețea)",
     }
 }
@@ -1530,26 +1544,32 @@ pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
         AppTheme::DeepOcean => match language {
             AppLanguage::English | AppLanguage::Romanian => "Hunting",
             AppLanguage::French => "Chasse",
+            AppLanguage::Chinese => "捕猎",
         },
         AppTheme::OceanLight => match language {
             AppLanguage::English | AppLanguage::Romanian => "Swimming",
             AppLanguage::French => "Baignade",
+            AppLanguage::Chinese => "畅游",
         },
         AppTheme::EcoEnergy => match language {
             AppLanguage::English | AppLanguage::Romanian => "Sleeping",
             AppLanguage::French => "Dodo",
+            AppLanguage::Chinese => "酣睡",
         },
         AppTheme::EcoEnergyLight => match language {
             AppLanguage::English | AppLanguage::Romanian => "Splashing",
             AppLanguage::French => "Bataille d'eau",
+            AppLanguage::Chinese => "戏水",
         },
         AppTheme::GeothermalCore => match language {
             AppLanguage::English | AppLanguage::Romanian => "Sunbathing",
             AppLanguage::French => "Bronzette",
+            AppLanguage::Chinese => "晒日",
         },
         AppTheme::SolarUmbra => match language {
             AppLanguage::English | AppLanguage::Romanian => "Lounging",
             AppLanguage::French => "Détente",
+            AppLanguage::Chinese => "小憩",
         },
     }
 }
@@ -1559,78 +1579,94 @@ pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str
         "France" => match language {
             AppLanguage::English | AppLanguage::French => label,
             AppLanguage::Romanian => "Franța",
+            AppLanguage::Chinese => "法国",
         },
         "Germany" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Allemagne",
             AppLanguage::Romanian => "Germania",
+            AppLanguage::Chinese => "德国",
         },
         "Spain" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Espagne",
             AppLanguage::Romanian => "Spania",
+            AppLanguage::Chinese => "西班牙",
         },
         "Italy" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Italie",
             AppLanguage::Romanian => "Italia",
+            AppLanguage::Chinese => "意大利",
         },
         "Netherlands" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Pays-Bas",
             AppLanguage::Romanian => "Olanda",
+            AppLanguage::Chinese => "荷兰",
         },
         "Switzerland" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Suisse",
             AppLanguage::Romanian => "Elveția",
+            AppLanguage::Chinese => "瑞士",
         },
         "UK" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Royaume-Uni",
             AppLanguage::Romanian => "Regatul Unit",
+            AppLanguage::Chinese => "英国",
         },
         "USA (average)" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "États-Unis (moyenne)",
             AppLanguage::Romanian => "SUA (medie)",
+            AppLanguage::Chinese => "美国（平均）",
         },
         "China" => match language {
             AppLanguage::English | AppLanguage::Romanian => label,
             AppLanguage::French => "Chine",
+            AppLanguage::Chinese => "中国",
         },
         "India" => match language {
             AppLanguage::English | AppLanguage::Romanian => label,
             AppLanguage::French => "Inde",
+            AppLanguage::Chinese => "印度",
         },
         "Indonesia" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Indonésie",
             AppLanguage::Romanian => "Indonezia",
+            AppLanguage::Chinese => "印度尼西亚",
         },
         "Philippines" => match language {
             AppLanguage::English | AppLanguage::French => label,
             AppLanguage::Romanian => "Filipine",
+            AppLanguage::Chinese => "菲律宾",
         },
         "Sweden" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Suède",
             AppLanguage::Romanian => "Suedia",
+            AppLanguage::Chinese => "瑞典",
         },
         "Poland" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Pologne",
             AppLanguage::Romanian => "Polonia",
+            AppLanguage::Chinese => "波兰",
         },
         "World average" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Moyenne mondiale",
             AppLanguage::Romanian => "Media mondială",
+            AppLanguage::Chinese => "全球平均",
         },
         "Custom" => match language {
             AppLanguage::English => label,
             AppLanguage::French => "Personnalisé",
             AppLanguage::Romanian => "Personalizat",
+            AppLanguage::Chinese => "自定义",
         },
         _ => label,
     }
@@ -1737,18 +1773,18 @@ pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
     }
     let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
     let unit = match language {
-        AppLanguage::English | AppLanguage::Romanian => "GB",
+        AppLanguage::English | AppLanguage::Chinese | AppLanguage::Romanian => "GB",
         AppLanguage::French => "Go",
     };
     format!("{} {}", format_number(gb, 2, language), unit)
 }
 
 pub fn format_mb_per_sec(mb: f64, language: AppLanguage) -> String {
-    let unit = match language {
-        AppLanguage::English | AppLanguage::Romanian => "MB/s",
-        AppLanguage::French => "Mo/s",
-    };
-    format!("{} {}", format_number(mb, 1, language), unit)
+    format!(
+        "{} {}",
+        format_number(mb, 1, language),
+        metric_unit(language, MetricKind::Speed)
+    )
 }
 
 pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
@@ -1756,7 +1792,7 @@ pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
         MetricKind::Power => "W",
         MetricKind::Usage => "%",
         MetricKind::Speed => match language {
-            AppLanguage::English | AppLanguage::Romanian => "MB/s",
+            AppLanguage::English | AppLanguage::Chinese | AppLanguage::Romanian => "MB/s",
             AppLanguage::French => "Mo/s",
         },
     }
@@ -1779,7 +1815,7 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
             format!(
                 "0{}{}",
                 match language {
-                    AppLanguage::English => ".",
+                    AppLanguage::English | AppLanguage::Chinese => ".",
                     AppLanguage::French | AppLanguage::Romanian => ",",
                 },
                 "0".repeat(decimals)
@@ -1792,9 +1828,10 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
     let thousands_sep = match language {
         AppLanguage::English => ",",
         AppLanguage::French | AppLanguage::Romanian => " ",
+        AppLanguage::Chinese => "",
     };
     let decimal_sep = match language {
-        AppLanguage::English => ".",
+        AppLanguage::English | AppLanguage::Chinese => ".",
         AppLanguage::French | AppLanguage::Romanian => ",",
     };
 
