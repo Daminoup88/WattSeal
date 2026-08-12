@@ -586,7 +586,14 @@ impl SensorChart {
             };
 
             if let Some(anno) = annotation.ok() {
-                anno.label(format!("{}   ", series.display_label))
+                let cjk_count = series
+                    .display_label
+                    .chars()
+                    .filter(|c| ('\u{4e00}'..='\u{9fff}').contains(c) || ('\u{3400}'..='\u{4dbf}').contains(c))
+                    .count();
+                let padding_spaces = 3 + cjk_count * 3;
+                let padding = " ".repeat(padding_spaces);
+                anno.label(format!("{}{}", series.display_label, padding))
                     .legend(move |(x, y)| PathElement::new(vec![(x, y), (x + 20, y)], color.stroke_width(2)));
             }
         }

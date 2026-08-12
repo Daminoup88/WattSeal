@@ -198,7 +198,7 @@ impl ComponentState {
         match metric_type {
             MetricKind::Power => {
                 let key = metric_type.legend(display_name);
-                let display = metric_type_name(language, metric_type);
+                let display = power_or_energy(language, energy_mode);
                 self.power_graph.chart.add_series(
                     &key,
                     display,
@@ -622,7 +622,17 @@ impl SensorState {
                 );
             }
             SensorCategory::Total(state) => {
+                let energy_mode = self.time_range.is_energy_mode();
                 state.power_graph.chart.update_language(language);
+                state.power_graph.chart.set_y_axis_unit(metric_effective_unit(
+                    language,
+                    MetricKind::Power,
+                    energy_mode,
+                ));
+                state
+                    .power_graph
+                    .chart
+                    .set_all_display_labels(power_or_energy(language, energy_mode));
             }
             SensorCategory::Processes(_) => {}
         }
