@@ -21,7 +21,7 @@ resolver = "3"
 members = ["collector", "ui", "common", "mqtt"]
 
 [workspace.package]
-version = "1.0.2"
+version = "1.0.3"
 authors = ["Damien PHILIPPE <damien.philippe@edu.esiee.fr>", "Paul MALLARD <paul.mallard@edu.esiee.fr>"]
 readme = "README.md"
 license = "GPL-3.0"
