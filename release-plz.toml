@@ -1,0 +1,24 @@
+[workspace]
+publish = false
+git_release_enable = false
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+pr_name = "chore: release v{{ version }}"
+changelog_update = true
+semver_check = false
+
+[[package]]
+name = "collector"
+release = false
+
+[[package]]
+name = "ui"
+release = false
+
+[[package]]
+name = "common"
+release = false
+
+[[package]]
+name = "mqtt"
+release = false
