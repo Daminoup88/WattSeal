@@ -1,0 +1,28 @@
+[workspace]
+publish = false
+git_release_enable = false
+git_tag_enable = true
+git_tag_name = "v{{ version }}"
+pr_name = "chore: release v{{ version }}"
+changelog_update = true
+semver_check = false
+
+[[package]]
+name = "wattseal"
+version_group = "app"
+
+[[package]]
+name = "ui"
+version_group = "app"
+
+[[package]]
+name = "collector"
+version_group = "app"
+
+[[package]]
+name = "common"
+version_group = "app"
+
+[[package]]
+name = "mqtt"
+version_group = "app"

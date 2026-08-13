@@ -8,62 +8,10 @@ permissions:
   contents: write
 
 jobs:
-  sync-version:
-    name: Sync Cargo version to tag
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
-    outputs:
-      sha: ${{ steps.bump.outputs.sha }}
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - uses: dtolnay/rust-toolchain@stable
-
-      - name: Update Cargo.toml version if needed
-        id: bump
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          # Normalize tag to full semver (e.g. "0.4" -> "0.4.0")
-          case "$TAG" in
-            *.*.*) ;;
-            *.*  ) TAG="${TAG}.0" ;;
-            *    ) TAG="${TAG}.0.0" ;;
-          esac
-
-          CARGO_VERSION=$(grep '^version[[:space:]]*=[[:space:]]*"' Cargo.toml \
-            | head -1 \
-            | sed 's/^version[[:space:]]*=[[:space:]]*"\([^"]*\)"/\1/')
-
-          echo "Tag version:   $TAG"
-          echo "Cargo version: $CARGO_VERSION"
-
-          if [ "$TAG" != "$CARGO_VERSION" ]; then
-            sed -i "s/^version[[:space:]]*=[[:space:]]*\"[^\"]*\"/version = \"$TAG\"/" Cargo.toml
-            cargo update --offline
-            git config user.name  "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
-            git add Cargo.toml Cargo.lock
-            git commit -m "chore: bump version to $TAG [skip ci]"
-            git fetch origin main
-            git rebase origin/main
-            git push origin HEAD:main --force-with-lease
-            git tag -f "v$TAG"
-            git push origin "v$TAG" --force
-          fi
-
-          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-
   build:
     name: Build
-    needs: sync-version
     uses: ./.github/workflows/build.yml
     with:
-      ref: ${{ needs.sync-version.outputs.sha }}
       upload-artifacts: true
 
   release:
