@@ -1,0 +1,234 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+## [1.0.2](https://github.com/Daminoup88/WattSeal/releases/tag/v1.0.2) - 2026-08-13
+
+### Added
+
+- *(ui)* app translations Romanian
+- *(collector)* Improved runtime logging
+- Log downloads
+- Better logs
+- Banner, purge, architecture
+- Markdown files and better loading of UI settings from DB
+- Icons and correct carbon intensities and electricity costs
+- *(ui)* Finalized translations, some UI improvements
+- *(ui)* Footer and icons font
+- implement close dialog for UI and background collector, integrated gpu estimation
+- Cross-platform with any sysinfo-supported system
+- Cross-platform on linux, estimation if not admin
+- *(ui)* Hardware info page
+- *(database)* Hardware info added
+- *(collector)* new data all_time and general_hardware_infos
+- *(common)* Icon fetched from the exe path
+- *(main)* UI as child process, can be closed and opened
+- *(database)* averaging data
+- Tray icon with green square
+- *(common)* Select last N events from all sensor tables
+- *(ui)* Print last DB event in terminal
+- Dependabot config file
+- *(common)* Table list in memory and select last cpu events
+- *(common)* Select last N entries function and flexible table names
+- Series in a HashMap in the chart + mock UI/DB conn
+- Database access created in UI (unwrap)
+- READMEs + architecture diagram
+- Static database path
+- Multi-threaded collector + UI
+
+### Fixed
+
+- Linux `.desktop` file
+- *(collector)* Info is uncountable
+- *(ci)* Add explicit permissions
+- Minor changes
+- *(ui)* Usage translation used the wrong function
+- Linux tray icon or fall back to only collector / UI
+- *(readme)* some url
+- *(database)* merge issue
+- Keep tray icon in context to display it
+- Collector initialized before UI
+- READMEs fix
+
+### Other
+
+- release-plz config
+- *(deps)* bump bpaf from 0.9.26 to 0.9.27 ([#113](https://github.com/Daminoup88/WattSeal/pull/113))
+- *(collector)* Go back to Winring0
+- *(deps)* bump tray-icon from 0.24.1 to 0.24.2 ([#107](https://github.com/Daminoup88/WattSeal/pull/107))
+- *(deps)* bump serde_json from 1.0.150 to 1.0.151 ([#105](https://github.com/Daminoup88/WattSeal/pull/105))
+- *(deps)* bump serde from 1.0.228 to 1.0.229 ([#104](https://github.com/Daminoup88/WattSeal/pull/104))
+- *(deps)* bump sysinfo from 0.39.5 to 0.39.6 ([#103](https://github.com/Daminoup88/WattSeal/pull/103)) [skip_ci]
+- *(deps)* bump open from 5.3.6 to 5.4.0 ([#102](https://github.com/Daminoup88/WattSeal/pull/102))
+- Beta version with increased patch number
+- *(deps)* bump open from 5.3.5 to 5.3.6 ([#95](https://github.com/Daminoup88/WattSeal/pull/95))
+- *(deps)* bump mockall from 0.14.0 to 0.15.0 ([#94](https://github.com/Daminoup88/WattSeal/pull/94))
+- Split sensors and computed sensors ([#91](https://github.com/Daminoup88/WattSeal/pull/91))
+- Build steps name clarity
+- Artifact name change
+- *(deps)* bump sysinfo from 0.39.3 to 0.39.5 ([#90](https://github.com/Daminoup88/WattSeal/pull/90))
+- *(deps)* bump actions/checkout from 6 to 7 ([#89](https://github.com/Daminoup88/WattSeal/pull/89))
+- Reusable workflow
+- Fix release Linux build & beta version
+- *(deps)* bump tray-icon from 0.24.0 to 0.24.1 ([#86](https://github.com/Daminoup88/WattSeal/pull/86))
+- Fix Linux beta output directory
+- Faster, less optimized beta build
+- Cross compile Linux for glibc >= 2.17
+- Upload to artifact registry on push
+- *(deps)* bump chrono from 0.4.44 to 0.4.45 ([#82](https://github.com/Daminoup88/WattSeal/pull/82))
+- *(deps)* bump rusqlite from 0.39.0 to 0.40.1 ([#81](https://github.com/Daminoup88/WattSeal/pull/81))
+- *(deps)* bump sysinfo from 0.39.2 to 0.39.3 ([#79](https://github.com/Daminoup88/WattSeal/pull/79))
+- *(deps)* bump file_icon_provider from 1.0.0 to 1.0.1 ([#78](https://github.com/Daminoup88/WattSeal/pull/78))
+- *(deps)* bump serde_json from 1.0.149 to 1.0.150 ([#76](https://github.com/Daminoup88/WattSeal/pull/76))
+- Replace power metrics by energy metrics ([#73](https://github.com/Daminoup88/WattSeal/pull/73))
+- Add Zed editor settings to format on save
+- Better logging ([#72](https://github.com/Daminoup88/WattSeal/pull/72))
+- *(deps)* bump sysinfo from 0.39.1 to 0.39.2 ([#71](https://github.com/Daminoup88/WattSeal/pull/71))
+- Update roadmap [skip ci]
+- Add sensor sources documentation ([#70](https://github.com/Daminoup88/WattSeal/pull/70))
+- Replace Winring0 with Scaphandre driver ([#69](https://github.com/Daminoup88/WattSeal/pull/69))
+- *(deps)* bump tray-icon from 0.23.1 to 0.24.0 ([#65](https://github.com/Daminoup88/WattSeal/pull/65))
+- *(deps)* bump bpaf from 0.9.25 to 0.9.26 ([#67](https://github.com/Daminoup88/WattSeal/pull/67))
+- *(deps)* bump sysinfo from 0.39.0 to 0.39.1 ([#66](https://github.com/Daminoup88/WattSeal/pull/66))
+- *(deps)* bump open from 5.3.4 to 5.3.5 ([#64](https://github.com/Daminoup88/WattSeal/pull/64))
+- *(deps)* bump sysinfo from 0.38.4 to 0.39.0 ([#62](https://github.com/Daminoup88/WattSeal/pull/62))
+- *(deps)* bump tray-icon from 0.23.0 to 0.23.1 ([#61](https://github.com/Daminoup88/WattSeal/pull/61))
+- Mode to send metrics via mqtt ([#56](https://github.com/Daminoup88/WattSeal/pull/56))
+- *(deps)* bump tray-icon from 0.22.0 to 0.23.0 ([#57](https://github.com/Daminoup88/WattSeal/pull/57))
+- *(main)* Replace flag with switch for boolean cli options
+- Add new mode headless ([#53](https://github.com/Daminoup88/WattSeal/pull/53))
+- Improve flags management ([#51](https://github.com/Daminoup88/WattSeal/pull/51))
+- Add decision flow diagram for Hécaton contribution
+- Add components architectural diagram for Hécaton contribution
+- Add possible architectural after MQTT implementation
+- Add headless mode to the roadmap
+- Add Hecaton contribution to the roadmap
+- *(deps)* bump image from 0.25.8 to 0.25.10 ([#45](https://github.com/Daminoup88/WattSeal/pull/45))
+- *(deps)* bump open from 5.3.3 to 5.3.4 ([#44](https://github.com/Daminoup88/WattSeal/pull/44))
+- *(deps)* bump rand from 0.8.5 to 0.8.6 ([#43](https://github.com/Daminoup88/WattSeal/pull/43))
+- CLA
+- *(deps)* bump softprops/action-gh-release from 2 to 3 ([#40](https://github.com/Daminoup88/WattSeal/pull/40))
+- Fix links to bug and feature request templates [skip ci]
+- *(deps)* bump windows from 0.57 to 0.62.2
+- Update Cargo.lock on new release
+- *(deps)* Cargo update
+- Change ubuntu build version for glibc compatibility >= 2.31
+- *(deps)* bump rand from 0.9.2 to 0.9.4 ([#38](https://github.com/Daminoup88/WattSeal/pull/38))
+- Fix downloads log [skip ci]
+- Move python code to page branch
+- *(deps)* bump tray-icon from 0.21.3 to 0.22.0 ([#37](https://github.com/Daminoup88/WattSeal/pull/37))
+- bump version to 1.0.2 [skip ci]
+- Lowercase package name, uppercase binary
+- *(deps)* bump bytes from 1.11.0 to 1.11.1 ([#35](https://github.com/Daminoup88/WattSeal/pull/35))
+- *(deps)* bump nvml-wrapper from 0.12.0 to 0.12.1 ([#33](https://github.com/Daminoup88/WattSeal/pull/33))
+- *(deps)* bump display-info from 0.5.8 to 0.5.9 ([#31](https://github.com/Daminoup88/WattSeal/pull/31))
+- *(deps)* bump rusqlite from 0.38.0 to 0.39.0 ([#29](https://github.com/Daminoup88/WattSeal/pull/29))
+- bump version to 1.0.1 [skip ci]
+- *(deps)* bump sysinfo from 0.38.0 to 0.38.4 ([#28](https://github.com/Daminoup88/WattSeal/pull/28))
+- *(deps)* bump image from 0.25.9 to 0.25.10 ([#27](https://github.com/Daminoup88/WattSeal/pull/27))
+- *(deps)* bump winit from 0.30.12 to 0.30.13 ([#26](https://github.com/Daminoup88/WattSeal/pull/26))
+- Add dashboard
+- Overall architecture diagram
+- bump version to 1.0.0 [skip ci]
+- README, roadmap, security
+- Revise feature request template [skip ci]
+- Revise bug report template [skip ci]
+- Revise bug template [skip ci]
+- *(deps)* bump sysinfo from 0.37.2 to 0.38.0 ([#16](https://github.com/Daminoup88/WattSeal/pull/16))
+- *(deps)* bump nvml-wrapper from 0.11.0 to 0.12.0 ([#15](https://github.com/Daminoup88/WattSeal/pull/15))
+- *(deps)* bump display-info from 0.5.7 to 0.5.8 ([#14](https://github.com/Daminoup88/WattSeal/pull/14))
+- *(deps)* bump chrono from 0.4.43 to 0.4.44 ([#13](https://github.com/Daminoup88/WattSeal/pull/13))
+- Enable cargo dependabot
+- bump version to 0.5.0 [skip ci]
+- Remove deps on linux
+- Issue templates
+- Roadmap
+- File lock on db to prevent multiple instances
+- Update link to developer documentation in CONTRIBUTING.md
+- Extended release logs & unify cargo tomls
+- *(deps)* bump actions/download-artifact from 4 to 8 ([#11](https://github.com/Daminoup88/WattSeal/pull/11))
+- *(deps)* bump actions/upload-artifact from 4 to 7 ([#10](https://github.com/Daminoup88/WattSeal/pull/10))
+- Windows defender warning
+- bump version to 0.4.0 [skip ci]
+- Keep cargo version to the tag version
+- Readme
+- Simpler executable names
+- Fix linux dependencies
+- Mermaid chart fix
+- Release on tag `v*`
+- Name, documentation, README
+- Clean warnings, release profile, optimize database, remove logs, init logs in release mode
+- Cross platform build
+- BREAKING CHANGE: Simplify hardware info
+- Removed many crash possibilities except when the database cannot be created
+- *(ui)* Change iced features
+- *(deps)* Remove unused dependencies
+- BREAKING CHANGE: Timestamp stored as i64 in database
+- Use more recent rust toolchain setup action
+- 30 minutes workflow time limit
+- Merge with main v1
+- *(ui)* Update to iced 0.14 and plotters_iced2
+- Update iced requirement from 0.13.1 to 0.14.0
+- Update rusqlite requirement from 0.37.0 to 0.38.0 ([#6](https://github.com/Daminoup88/WattSeal/pull/6))
+- Bump actions/checkout from 4 to 6 ([#3](https://github.com/Daminoup88/WattSeal/pull/3))
+- SensorChart number of series no longer generic
+- Common types only accessed in `database` module
+- Database utilities moved to the new `common` crate
+- Collector logic moved to lib inside CollectorApp struct
+- Delete unused `differs` function
+- Database tables and insertion
+- Clean the Sensor trait
+- One event for several measures at a time
+- initializing database and pushing the data
+- few changes database
+- database sql functions
+- ALL values of cpu and gpu consumption and as Options
+- accurate CPU usage in percents calcultated
+- cpu value ok
+- gpu and cpu collected in main
+- formatted
+- CPU and GPU detection, data structs
+- UI merge
+- Y description and labels overlap fix
+- Chart hover tooltip
+- Formatting
+- UI refactoring - The kitchen is burning 🔥
+- Theme support for chart, custom app themes
+- Small changes
+- Dynamic Y range, more precise hover and debug points
+- Better hover button distribution
+- Hover detection on graph
+- Move the build chart utility inside the SensorChart impl
+- 5 line types support
+- Chart supports N timeseries with a specific color and grid style
+- Multiple empty pages with navigation
+- VSCode auto formatting settings and CI/CD format check pipeline
+- Rust automatic formatting (needs to be run with cargo +nightly fmt)
+- UI package architecture
+- cargo issue
+- Merge branch 'main' of https://github.com/Daminoup88/ProjetE5
+- gpu amd power
+- test cpu sensor
+- cpu_vendor_id
+- Nvidia GPU sensor support, will fail on AMD
+- bad power values handled
+- SQLite database for CPU data
+- WinRing0 driver more robust management
+- Finished splitting main.rs into multiple files:
+- check permissions
+- Merge branch 'main' of https://github.com/Daminoup88/ProjetE5
+- Windows CPU sensor & driver handler
+- Sensor architecture
+- Intel energy fix
+- Intel energy MSR + 1s power calculation
+- uninstall fonc
+- return
+- Read MSR check errors
+- Notification test
+- Webhook test
+- MSR tests
