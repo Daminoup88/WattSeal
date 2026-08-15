@@ -775,7 +775,7 @@ dependencies = [
 
 [[package]]
 name = "collector"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "adlx",
  "battery",
@@ -809,7 +809,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "chrono",
  "file_icon_provider",
@@ -3088,7 +3088,7 @@ dependencies = [
 
 [[package]]
 name = "mqtt"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "common",
  "mockall",
@@ -5622,7 +5622,7 @@ dependencies = [
 
 [[package]]
 name = "ui"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "chrono",
  "common",
@@ -5871,7 +5871,7 @@ dependencies = [
 
 [[package]]
 name = "wattseal"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "bpaf",
  "chrono",
