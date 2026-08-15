@@ -30,9 +30,9 @@ jobs:
           TAG="${GITHUB_REF#refs/tags/v}"
           # Normalize tag to full semver (e.g. "0.4" -> "0.4.0")
           case "$TAG" in
-            *.*.*) ;;
-            *.*  ) TAG="${TAG}.0" ;;
-            *    ) TAG="${TAG}.0.0" ;;
+            *.*.* ) ;;
+            *.* )   TAG="${TAG}.0" ;;
+            * )     TAG="${TAG}.0.0" ;;
           esac
 
           CARGO_VERSION=$(grep '^version[[:space:]]*=[[:space:]]*"' Cargo.toml \
@@ -43,10 +43,13 @@ jobs:
           echo "Cargo version: $CARGO_VERSION"
 
           if [ "$TAG" != "$CARGO_VERSION" ]; then
+            echo "Updating Cargo.toml from $CARGO_VERSION to $TAG"
             sed -i "s/^version[[:space:]]*=[[:space:]]*\"[^\"]*\"/version = \"$TAG\"/" Cargo.toml
-            cargo update --offline
-            git config user.name  "github-actions[bot]"
-            git config user.email "github-actions[bot]@users.noreply.github.com"
+
+            cargo update --workspace --package wattseal
+
+            git config user.name  "Daminoup88"
+            git config user.email "102148427+Daminoup88@users.noreply.github.com"
             git add Cargo.toml Cargo.lock
             git commit -m "chore: bump version to $TAG [skip ci]"
             git fetch origin main
