@@ -1,0 +1,26 @@
+name: Release Please
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@v4
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLZ_TOKEN }}
+      - name: Delete auto-created GitHub release (keep tag)
+        if: steps.release.outputs.release_created
+        run: |
+            gh release delete ${{ steps.release.outputs.tag_name }} --yes || true
+        env:
+            GH_TOKEN: ${{ secrets.RELEASE_PLZ_TOKEN }}
