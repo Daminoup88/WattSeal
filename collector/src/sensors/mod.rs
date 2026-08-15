@@ -149,7 +149,7 @@ pub fn create_event_from_sensors(
     if let Some(dram) = dram_energy {
         if let Some(idx) = ram_indice {
             if let Some(SensorData::Ram(ram)) = data.get_mut(idx) {
-                *ram.total_energy.get_or_insert(EnergyUj::from_u64(0)) += dram;
+                ram.total_energy.replace(dram);
             }
         }
     }
