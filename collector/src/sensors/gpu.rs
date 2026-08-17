@@ -21,7 +21,7 @@ impl GPUVendor {
         let vendor_lower = vendor_str.to_lowercase();
         if vendor_lower.contains("nvidia") {
             GPUVendor::Nvidia
-        } else if vendor_lower.contains("amd") {
+        } else if vendor_lower.contains("amd") || vendor_lower.contains("radeon") {
             GPUVendor::Amd
         } else if vendor_lower.contains("intel") {
             GPUVendor::Intel
