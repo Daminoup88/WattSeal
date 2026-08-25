@@ -1,6 +1,6 @@
 use iced::{
     Alignment, Element, Length,
-    widget::{Button, Column, Container, Row, Text, button, pick_list, text_input},
+    widget::{Button, Column, Container, Row, Text, button, pick_list, text_input, toggler},
 };
 
 use crate::{
@@ -13,13 +13,14 @@ use crate::{
             SPACING_LARGE,
         },
         text::TextStyle,
+        toggler::TogglerStyle,
     },
     themes::AppTheme,
     translations::{
         TranslatedCarbonIntensity, TranslatedElectricityCost, TranslatedTheme, custom_carbon_invalid,
         custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
-        settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language, settings_theme,
-        settings_title,
+        settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language,
+        settings_launch_on_startup, settings_theme, settings_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
@@ -40,6 +41,7 @@ impl SettingsPage {
         custom_carbon_input: &'a str,
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
+        launch_on_startup: bool,
     ) -> Element<'a, Message, AppTheme> {
         let title = Text::new(settings_title(language))
             .size(FONT_SIZE_HEADER)
@@ -83,15 +85,19 @@ impl SettingsPage {
             .push(title)
             .push(close_button);
 
-        let content = Column::new()
+        let mut content = Column::new()
             .spacing(SPACING_LARGE)
             .align_x(Alignment::Start)
             .push(top_row)
             .push(subtitle)
             .push(theme_row)
-            .push(language_row)
-            .push(carbon_row)
-            .push(kwh_row);
+            .push(language_row);
+
+        if common::autostart::is_supported() {
+            content = content.push(launch_on_startup_row(language, launch_on_startup));
+        }
+
+        let content = content.push(carbon_row).push(kwh_row);
 
         Container::new(content)
             .width(Length::Fixed(520.0))
@@ -109,6 +115,16 @@ fn settings_row<'a>(label: &'a str, control: Element<'a, Message, AppTheme>) -> 
         .push(Text::new(label).size(FONT_SIZE_BODY).width(Length::FillPortion(2)))
         .push(control)
         .into()
+}
+
+fn launch_on_startup_row<'a>(language: AppLanguage, launch_on_startup: bool) -> Element<'a, Message, AppTheme> {
+    settings_row(
+        settings_launch_on_startup(language),
+        toggler(launch_on_startup)
+            .on_toggle(Message::ToggleLaunchOnStartup)
+            .class(TogglerStyle::Standard)
+            .into(),
+    )
 }
 
 fn carbon_intensity_row<'a>(

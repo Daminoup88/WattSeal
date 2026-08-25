@@ -55,6 +55,7 @@ pub struct App {
     custom_carbon_input: String,
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
+    launch_on_startup: bool,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -141,6 +142,7 @@ impl App {
                 custom_carbon_input,
                 electricity_cost,
                 custom_kwh_cost_input,
+                launch_on_startup: common::autostart::is_enabled(),
                 show_setup,
                 theme,
                 database,
@@ -175,6 +177,7 @@ impl App {
                 custom_carbon_input: String::new(),
                 electricity_cost: ElectricityCost::PRESETS[8],
                 custom_kwh_cost_input: String::new(),
+                launch_on_startup: common::autostart::is_enabled(),
                 show_setup: false,
                 theme,
                 database,
@@ -347,6 +350,13 @@ impl App {
                 self.persist_ui_settings();
                 Task::none()
             }
+            Message::ToggleLaunchOnStartup(enabled) => {
+                match common::autostart::set_enabled(enabled) {
+                    Ok(()) => self.launch_on_startup = enabled,
+                    Err(e) => common::clog!("✗ Failed to update launch-on-startup setting: {e}"),
+                }
+                Task::none()
+            }
             Message::ChangeChartMetricType(table_name, metric_type) => {
                 if let Some(sensor) = self.sensors.get_mut(&table_name) {
                     sensor.set_metric_type(metric_type);
@@ -489,6 +499,7 @@ impl App {
                     &self.custom_carbon_input,
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
+                    self.launch_on_startup,
                 ),
                 Message::CloseSettings,
             )

@@ -14,3 +14,4 @@ image = { version = "0.25", default-features = false, features = ["png", "ico"] 
 
 [target."cfg(windows)".dependencies]
 pelite = "0.10.0"
+winreg = "0.56.0"
