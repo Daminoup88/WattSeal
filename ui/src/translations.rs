@@ -69,6 +69,15 @@ pub fn settings_language(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Launch on startup",
+        AppLanguage::French => "Lancer au démarrage",
+        AppLanguage::Chinese => "开机自启动",
+        AppLanguage::Romanian => "Pornește la conectare",
+    }
+}
+
 pub fn modal_close(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close",

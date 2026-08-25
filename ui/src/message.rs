@@ -18,6 +18,7 @@ pub enum Message {
     ChangeElectricityCost(ElectricityCost),
     CustomKwhCostInput(String),
     ChangeCustomCurrency(Currency),
+    ToggleLaunchOnStartup(bool),
     OpenSettings,
     CloseSettings,
     ChangeChartMetricType(String, MetricKind),
