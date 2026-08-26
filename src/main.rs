@@ -32,7 +32,11 @@ struct Options {
     mqtt_id: Option<String>,
     mqtt_addr: Option<SocketAddr>,
     mqtt_unit: Option<ConsumptionUnit>,
-    mqtt_raw: bool,
+    home_assistant: bool,
+    mqtt_processes: Option<String>,
+    mqtt_user: Option<String>,
+    mqtt_pass: Option<String>,
+    mqtt_tls: bool,
     db_mode: bool,
     #[cfg(target_os = "windows")]
     install_cpu_driver: bool,
@@ -83,9 +87,26 @@ fn options() -> OptionParser<Options> {
         })
         .optional();
 
-    let mqtt_raw = long("mqtt-raw")
-        .help("Publish directly raw (non-computed) sensor data.")
+    let home_assistant = long("home-assistant")
+        .help("Simple mode for Home Assistant integration: disables process metrics, enables MQTT discovery and publishes Wh data.")
         .switch();
+
+    let mqtt_processes = long("mqtt-processes")
+        .help("Process publishing mode: off, capped:N. Defaults to capped:10 (or off if --home-assistant).")
+        .argument::<String>("MODE")
+        .optional();
+
+    let mqtt_user = long("mqtt-user")
+        .help("Username for MQTT broker authentication.")
+        .argument::<String>("USER")
+        .optional();
+
+    let mqtt_pass = long("mqtt-pass")
+        .help("Password for MQTT broker authentication.")
+        .argument::<String>("PASS")
+        .optional();
+
+    let mqtt_tls = long("mqtt-tls").help("Enable TLS for MQTT broker connection.").switch();
 
     let db_mode = long("no-db")
         .help("Do not save sensors metrics in local database.")
@@ -110,7 +131,11 @@ fn options() -> OptionParser<Options> {
             mqtt_id,
             mqtt_addr,
             mqtt_unit,
-            mqtt_raw,
+            home_assistant,
+            mqtt_processes,
+            mqtt_user,
+            mqtt_pass,
+            mqtt_tls,
             db_mode,
             install_cpu_driver,
             uninstall_cpu_driver,
@@ -128,7 +153,11 @@ fn options() -> OptionParser<Options> {
             mqtt_id,
             mqtt_addr,
             mqtt_unit,
-            mqtt_raw,
+            home_assistant,
+            mqtt_processes,
+            mqtt_user,
+            mqtt_pass,
+            mqtt_tls,
             db_mode,
         })
         .to_options()
@@ -329,9 +358,28 @@ fn main() {
     };
 
     let mqtt_info = if let Some(mqtt_addr) = options.mqtt_addr {
-        let id = options.mqtt_id.unwrap_or("wattseal_collector".to_string());
-        let unit = options.mqtt_unit;
-        Some(MQTTInfo::new(&id, &mqtt_addr, unit, options.mqtt_raw))
+        let id = options.mqtt_id.unwrap_or_else(|| "wattseal_collector".to_string());
+        let mut config = collector::MqttConfig::new(id, mqtt_addr);
+        config.unit = options.mqtt_unit;
+
+        config.home_assistant = options.home_assistant;
+        config.user = options.mqtt_user;
+        config.pass = options.mqtt_pass;
+        config.tls = options.mqtt_tls;
+
+        config.process_mode = match options.home_assistant {
+            true => collector::ProcessPublishMode::Disabled,
+            false => match options.mqtt_processes.as_deref() {
+                Some("off") => collector::ProcessPublishMode::Disabled,
+                Some(s) if s.starts_with("capped:") => {
+                    let n = s.trim_start_matches("capped:").parse::<usize>().unwrap_or(10);
+                    collector::ProcessPublishMode::Capped(n)
+                }
+                _ => collector::ProcessPublishMode::Capped(10),
+            },
+        };
+
+        Some(MQTTInfo::from_config(config, None))
     } else {
         None
     };

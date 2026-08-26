@@ -40,7 +40,16 @@ impl<T> Event<T> {
     }
 }
 
+/// Possible units to choose as output
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ConsumptionUnit {
+    WattHour,
+    #[default]
+    UJoul,
+}
+
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+
 pub struct EnergyUj(u64);
 
 impl std::fmt::Display for EnergyUj {
@@ -60,6 +69,10 @@ impl EnergyUj {
 
     pub fn as_f64(&self) -> f64 {
         self.0 as f64
+    }
+
+    pub fn as_u64(&self) -> u64 {
+        self.0
     }
 
     pub fn as_joules(&self) -> f64 {
@@ -341,7 +354,7 @@ pub struct GeneralData {
 }
 
 /// Complete hardware inventory of the system.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HardwareInfo {
     pub system: SystemInfo,
     pub cpu: CpuInfo,
@@ -400,7 +413,7 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
 }
 
 /// Operating system and host information.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct SystemInfo {
     pub os: String,
     pub hostname: String,
@@ -408,7 +421,7 @@ pub struct SystemInfo {
 }
 
 /// CPU model, vendor, and core count.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct CpuInfo {
     pub name: String,
     pub vendor: String,
@@ -419,14 +432,14 @@ pub struct CpuInfo {
 }
 
 /// Total physical and swap memory sizes.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct MemoryInfo {
     pub total_ram_bytes: u64,
     pub total_swap_bytes: u64,
 }
 
 /// Disk name, mount point, and capacity.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct DiskInfo {
     pub name: String,
     pub mount_point: String,
@@ -437,7 +450,7 @@ pub struct DiskInfo {
 }
 
 /// Display model, resolution, and refresh rate.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ScreenInfo {
     pub model: String,
     pub resolution: String,
@@ -446,7 +459,7 @@ pub struct ScreenInfo {
 }
 
 /// Battery presence, capacity, and cycle count.
-#[derive(Debug, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BatteryInfo {
     pub present: bool,
     pub name: Option<String>,

@@ -13,6 +13,8 @@ description.workspace = true
 [dependencies]
 common = { path = "../common" }
 mockall = "0.15.0"
-rumqttc = "0.25.1"
+rumqttc = { version = "0.25.1", features = ["use-rustls"] }
 serde = "1.0.228"
 serde_json = "1.0.150"
+thiserror = "2.0"
+
