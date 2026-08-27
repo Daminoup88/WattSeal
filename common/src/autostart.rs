@@ -29,11 +29,19 @@ mod platform {
         if enabled {
             let exe = std::env::current_exe().map_err(|e| e.to_string())?;
             let command = format!("\"{}\" --background", exe.display());
-            key.set_value(VALUE_NAME, &command).map_err(|e| e.to_string())
+            key.set_value(VALUE_NAME, &command).map_err(|e| e.to_string())?;
+            crate::clog!("\u{2713} Registered launch-on-startup entry {RUN_KEY_PATH}\\{VALUE_NAME} = {command}");
+            Ok(())
         } else {
             match key.delete_value(VALUE_NAME) {
-                Ok(()) => Ok(()),
-                Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+                Ok(()) => {
+                    crate::clog!("\u{2713} Removed launch-on-startup entry {RUN_KEY_PATH}\\{VALUE_NAME}");
+                    Ok(())
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
+                    crate::clog!("\u{2713} Launch-on-startup entry {RUN_KEY_PATH}\\{VALUE_NAME} already absent");
+                    Ok(())
+                }
                 Err(e) => Err(e.to_string()),
             }
         }
