@@ -352,7 +352,10 @@ impl App {
             }
             Message::ToggleLaunchOnStartup(enabled) => {
                 match common::autostart::set_enabled(enabled) {
-                    Ok(()) => self.launch_on_startup = enabled,
+                    Ok(()) => {
+                        self.launch_on_startup = enabled;
+                        common::clog!("✓ Launch-on-startup {}", if enabled { "enabled" } else { "disabled" });
+                    }
                     Err(e) => common::clog!("✗ Failed to update launch-on-startup setting: {e}"),
                 }
                 Task::none()
