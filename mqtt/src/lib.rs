@@ -23,10 +23,10 @@ pub enum MQTTError {
 }
 
 #[derive(Debug, Serialize)]
-pub struct Envelope<'a, T: Serialize> {
+pub struct Envelope<'a, T: Serialize, E: Serialize = u64> {
     pub timestamp_ms: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub total_energy_uj: Option<u64>,
+    pub total_energy: Option<E>,
     #[serde(flatten)]
     pub data: &'a T,
 }
@@ -46,12 +46,18 @@ impl MQTTClient for Client {
 
 pub struct MQTTPublisher<T: MQTTClient> {
     client: T,
+    hardware_info: std::sync::Arc<std::sync::RwLock<Option<HardwareInfo>>>,
+    config: MqttConfig,
 }
 
 impl<T: MQTTClient> MQTTPublisher<T> {
     /// Create a new MQTT publisher from a client implementation
     pub fn new(client: T) -> Self {
-        Self { client }
+        Self {
+            client,
+            hardware_info: std::sync::Arc::new(std::sync::RwLock::new(None)),
+            config: MqttConfig::new("wattseal_collector".to_string(), "127.0.0.1:1883".parse().unwrap()),
+        }
     }
 
     /// Non-blocking publish of `data` to `topic`
@@ -67,19 +73,45 @@ impl<T: MQTTClient> MQTTPublisher<T> {
     }
 
     /// Publish `data` wrapped in a generic timestamped `Envelope`
-    pub fn publish_envelope<TData: Serialize>(
+    pub fn publish_envelope<TData: Serialize, E: Serialize>(
         &self,
         topic: &str,
         data: &TData,
         timestamp_ms: i64,
-        total_energy_uj: Option<u64>,
+        total_energy: Option<E>,
     ) -> Result<(), MQTTError> {
         let envelope = Envelope {
             timestamp_ms,
-            total_energy_uj,
+            total_energy,
             data,
         };
         self.publish(topic, &envelope)
+    }
+
+    /// Update hardware info and publish Home Assistant discovery configs if enabled
+    pub fn set_hardware_info(&self, info: &HardwareInfo) {
+        if let Ok(mut lock) = self.hardware_info.write() {
+            *lock = Some(info.clone());
+        }
+        if self.config.home_assistant {
+            self.publish_ha_discovery(info);
+        }
+    }
+
+    /// Publish Home Assistant discovery configs
+    pub fn publish_ha_discovery(&self, hw_info: &HardwareInfo) {
+        let device = discovery::HaDevice::new(
+            &self.config.id,
+            Some(hw_info.system.hostname.as_str()),
+            Some(hw_info.system.os.as_str()),
+            Some(hw_info.cpu.name.as_str()),
+        );
+        let ha_configs = discovery::build_ha_discovery_configs(&self.config.id, &device, &hw_info.gpus);
+        for (top, cfg) in ha_configs {
+            if let Ok(payload) = serde_json::to_vec(&cfg) {
+                let _ = self.client.try_publish_bytes(&top, QoS::AtLeastOnce, true, payload);
+            }
+        }
     }
 
     /// Signal graceful offline status
@@ -129,7 +161,8 @@ impl MQTTPublisher<Client> {
         let is_ha = config.home_assistant;
         let client_clone = client.clone();
         let status_top_clone = status_top.clone();
-        let hw_info = hardware_info.cloned();
+        let hw_info_arc = std::sync::Arc::new(std::sync::RwLock::new(hardware_info.cloned()));
+        let hw_info_clone = hw_info_arc.clone();
 
         std::thread::spawn(move || {
             let mut is_connected = false;
@@ -143,13 +176,16 @@ impl MQTTPublisher<Client> {
 
                             // Publish Home Assistant discovery configs if enabled
                             if is_ha {
+                                let hw_info_guard = hw_info_clone.read().ok();
+                                let hw_info = hw_info_guard.as_ref().and_then(|g| g.as_ref());
                                 let device = discovery::HaDevice::new(
                                     &node_id,
-                                    hw_info.as_ref().map(|h| h.system.hostname.as_str()),
-                                    hw_info.as_ref().map(|h| h.system.os.as_str()),
-                                    hw_info.as_ref().map(|h| h.cpu.name.as_str()),
+                                    hw_info.map(|h| h.system.hostname.as_str()),
+                                    hw_info.map(|h| h.system.os.as_str()),
+                                    hw_info.map(|h| h.cpu.name.as_str()),
                                 );
-                                let ha_configs = discovery::build_ha_discovery_configs(&node_id, &device);
+                                let gpus: Vec<String> = hw_info.map(|h| h.gpus.clone()).unwrap_or_default();
+                                let ha_configs = discovery::build_ha_discovery_configs(&node_id, &device, &gpus);
                                 for (top, cfg) in ha_configs {
                                     if let Ok(payload) = serde_json::to_vec(&cfg) {
                                         let _ = client_clone.try_publish(&top, QoS::AtLeastOnce, true, payload);
@@ -168,7 +204,11 @@ impl MQTTPublisher<Client> {
             }
         });
 
-        Self { client }
+        Self {
+            client,
+            hardware_info: hw_info_arc,
+            config: config.clone(),
+        }
     }
 }
 
@@ -206,7 +246,7 @@ mod tests {
                 let text = String::from_utf8_lossy(payload);
                 topic == test_topic
                     && text.contains("\"timestamp_ms\":1700000000000")
-                    && text.contains("\"total_energy_uj\":500000")
+                    && text.contains("\"total_energy\":500000")
                     && text.contains("\"usage_percent\":45.5")
             })
             .times(1)
@@ -223,13 +263,20 @@ mod tests {
     #[test]
     fn test_ha_discovery_building() {
         let device = HaDevice::new("test_node", Some("my-host"), Some("Windows 11"), Some("Core i7"));
+        let gpus = vec!["NVIDIA GeForce RTX 3070".to_string()];
 
-        let configs = build_ha_discovery_configs("test_node", &device);
+        let configs = build_ha_discovery_configs("test_node", &device, &gpus);
         assert!(!configs.is_empty());
 
         let (cpu_topic, cpu_cfg) = configs.iter().find(|(t, _)| t.contains("cpu_usage")).unwrap();
         assert_eq!(cpu_topic, "homeassistant/sensor/test_node/cpu_usage/config");
         assert_eq!(cpu_cfg.state_topic, "test_node/sensor_data/cpu");
         assert_eq!(cpu_cfg.device.name, "my-host");
+
+        let (gpu_energy_topic, gpu_energy_cfg) = configs.iter().find(|(t, _)| t.contains("gpu_nvidia_geforce_rtx_3070_energy")).unwrap();
+        assert_eq!(gpu_energy_topic, "homeassistant/sensor/test_node/gpu_nvidia_geforce_rtx_3070_energy/config");
+        assert_eq!(gpu_energy_cfg.state_topic, "test_node/sensor_data/gpu_nvidia_geforce_rtx_3070");
+        assert_eq!(gpu_energy_cfg.unit_of_measurement.as_deref(), Some("Wh"));
+        assert_eq!(gpu_energy_cfg.state_class.as_deref(), Some("total"));
     }
 }

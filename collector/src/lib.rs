@@ -15,7 +15,7 @@ use common::logging::start_log_session;
 use common::{
     DatabaseEntry, ProcessData, TotalData,
     database::purge::averaging_and_purging_data,
-    types::{HardwareInfo, PublishableSensor},
+    types::{EnergyUj, HardwareInfo, PublishableSensor},
 };
 pub use common::{clog, types::ConsumptionUnit};
 use database::Database;
@@ -195,11 +195,14 @@ impl CollectorApp {
                 Err(e) => crate::clog!("✗ Failed to save hardware info: {e}"),
             }
         }
-        if let Some(mqtt_info) = &self.mqtt_info {
-            let topic = hardware_info_topic(&mqtt_info.config.id);
-            match mqtt_info.publisher.publish(&topic, &info.hardware_info) {
-                Ok(_) => crate::clog!("✓ Hardware info published on broker"),
-                Err(e) => crate::clog!("✗ Failed to publish hardware info: {e}"),
+        if let Some(mqtt_info) = &mut self.mqtt_info {
+            mqtt_info.publisher.set_hardware_info(&info.hardware_info);
+            if !mqtt_info.config.home_assistant {
+                let topic = hardware_info_topic(&mqtt_info.config.id);
+                match mqtt_info.publisher.publish(&topic, &info.hardware_info) {
+                    Ok(_) => crate::clog!("✓ Hardware info published on broker"),
+                    Err(e) => crate::clog!("✗ Failed to publish hardware info: {e}"),
+                }
             }
         }
         crate::clog!("Initialization complete");
@@ -266,13 +269,13 @@ impl CollectorApp {
 
             if let Some(mqtt_info) = &mut self.mqtt_info {
                 for sensor_data in computed_event.data() {
-                    let stype = sensor_data.sensor_type().to_lowercase();
+                    let key = sensor_data.sensor_key();
                     if let Some(e) = sensor_data.total_energy() {
-                        let entry = mqtt_info.cumulative_energy.entry(stype.clone()).or_insert(0);
+                        let entry = mqtt_info.cumulative_energy.entry(key.clone()).or_insert(0);
                         *entry = entry.saturating_add(e.as_u64());
                     }
-                    let total_cum = mqtt_info.cumulative_energy.get(&stype).copied();
-                    publish_sensor_envelope(mqtt_info, sensor_data, timestamp_ms, total_cum);
+                    let total_cum_uj = mqtt_info.cumulative_energy.get(&key).copied();
+                    publish_sensor_envelope(mqtt_info, sensor_data, &key, timestamp_ms, total_cum_uj);
                 }
             }
 
@@ -307,15 +310,17 @@ impl CollectorApp {
 fn publish_sensor_envelope<T: PublishableSensor>(
     mqtt_info: &MQTTInfo,
     sensor_data: &T,
+    sensor_key: &str,
     timestamp_ms: i64,
     total_energy_uj: Option<u64>,
 ) {
-    let topic = sensor_type_to_topic(&mqtt_info.config.id, sensor_data.sensor_type());
+    let topic = sensor_type_to_topic(&mqtt_info.config.id, sensor_key);
     let _result = match mqtt_info.config.unit {
         Some(ConsumptionUnit::WattHour) => {
+            let total_energy_wh = total_energy_uj.map(|uj| EnergyUj::from_u64(uj).as_watt_hours());
             mqtt_info
                 .publisher
-                .publish_envelope(&topic, &sensor_data.to_wh(), timestamp_ms, total_energy_uj)
+                .publish_envelope(&topic, &sensor_data.to_wh(), timestamp_ms, total_energy_wh)
         }
         _ => mqtt_info
             .publisher

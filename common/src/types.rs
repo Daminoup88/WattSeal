@@ -581,6 +581,29 @@ impl SensorData {
         }
     }
 
+    /// Returns a unique topic key for this sensor, accounting for individual device names/indices.
+    pub fn sensor_key(&self) -> String {
+        match self {
+            SensorData::GPU(gpu) => {
+                if let Some(name) = &gpu.name {
+                    let sanitized = name
+                        .chars()
+                        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+                        .collect::<String>();
+                    let clean = sanitized.trim_matches('_');
+                    if clean.is_empty() {
+                        "gpu".to_string()
+                    } else {
+                        format!("gpu_{}", clean)
+                    }
+                } else {
+                    "gpu".to_string()
+                }
+            }
+            other => other.sensor_type().to_lowercase(),
+        }
+    }
+
     /// Returns the total energy in µJ, if available.
     pub fn total_energy(&self) -> Option<EnergyUj> {
         match self {
@@ -680,6 +703,29 @@ impl ComputedSensorData {
             ComputedSensorData::Network(_) => "Network",
             ComputedSensorData::Total(_) => "Total",
             ComputedSensorData::Process(_) => "Processes",
+        }
+    }
+
+    /// Returns a unique topic key for this sensor, accounting for individual device names/indices.
+    pub fn sensor_key(&self) -> String {
+        match self {
+            ComputedSensorData::GPU(gpu) => {
+                if let Some(name) = &gpu.name {
+                    let sanitized = name
+                        .chars()
+                        .map(|c| if c.is_alphanumeric() { c.to_ascii_lowercase() } else { '_' })
+                        .collect::<String>();
+                    let clean = sanitized.trim_matches('_');
+                    if clean.is_empty() {
+                        "gpu".to_string()
+                    } else {
+                        format!("gpu_{}", clean)
+                    }
+                } else {
+                    "gpu".to_string()
+                }
+            }
+            other => other.sensor_type().to_lowercase(),
         }
     }
 
@@ -834,6 +880,7 @@ impl Display for ComputedSensorData {
 pub trait PublishableSensor: Serialize {
     type Wh: Serialize;
     fn sensor_type(&self) -> &'static str;
+    fn sensor_key(&self) -> String;
     fn to_wh(&self) -> Self::Wh;
 }
 
@@ -841,6 +888,9 @@ impl PublishableSensor for SensorData {
     type Wh = SensorData<EnergyWh>;
     fn sensor_type(&self) -> &'static str {
         SensorData::sensor_type(self)
+    }
+    fn sensor_key(&self) -> String {
+        SensorData::sensor_key(self)
     }
     fn to_wh(&self) -> Self::Wh {
         SensorData::to_wh(self)
@@ -851,6 +901,9 @@ impl PublishableSensor for ComputedSensorData {
     type Wh = ComputedSensorData<EnergyWh>;
     fn sensor_type(&self) -> &'static str {
         ComputedSensorData::sensor_type(self)
+    }
+    fn sensor_key(&self) -> String {
+        ComputedSensorData::sensor_key(self)
     }
     fn to_wh(&self) -> Self::Wh {
         ComputedSensorData::to_wh(self)

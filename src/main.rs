@@ -360,24 +360,25 @@ fn main() {
     let mqtt_info = if let Some(mqtt_addr) = options.mqtt_addr {
         let id = options.mqtt_id.unwrap_or_else(|| "wattseal_collector".to_string());
         let mut config = collector::MqttConfig::new(id, mqtt_addr);
-        config.unit = options.mqtt_unit;
-
         config.home_assistant = options.home_assistant;
         config.user = options.mqtt_user;
         config.pass = options.mqtt_pass;
         config.tls = options.mqtt_tls;
 
-        config.process_mode = match options.home_assistant {
-            true => collector::ProcessPublishMode::Disabled,
-            false => match options.mqtt_processes.as_deref() {
+        if options.home_assistant {
+            config.unit = Some(ConsumptionUnit::WattHour);
+            config.process_mode = collector::ProcessPublishMode::Disabled;
+        } else {
+            config.unit = options.mqtt_unit;
+            config.process_mode = match options.mqtt_processes.as_deref() {
                 Some("off") => collector::ProcessPublishMode::Disabled,
                 Some(s) if s.starts_with("capped:") => {
                     let n = s.trim_start_matches("capped:").parse::<usize>().unwrap_or(10);
                     collector::ProcessPublishMode::Capped(n)
                 }
                 _ => collector::ProcessPublishMode::Capped(10),
-            },
-        };
+            };
+        }
 
         Some(MQTTInfo::from_config(config, None))
     } else {
