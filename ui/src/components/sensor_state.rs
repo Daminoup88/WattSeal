@@ -30,8 +30,8 @@ use crate::{
         picklist::PickListStyle,
         scrollable::ScrollableStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL,
-            SPACING_XLARGE,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE,
+            SPACING_MEDIUM, SPACING_SMALL, SPACING_XLARGE,
         },
         text::TextStyle,
     },
@@ -388,6 +388,7 @@ enum SensorCategory {
 pub struct SensorState {
     table_name: String,
     display_name: String,
+    hardware_model: Option<String>,
     sensor_category: SensorCategory,
     latest_reading: Option<SensorRecord>,
     time_range: TimeRange,
@@ -396,7 +397,13 @@ pub struct SensorState {
 
 impl SensorState {
     /// Creates a sensor state for the given table and display name.
-    pub fn new(table_name: String, display_name: String, theme: AppTheme, language: AppLanguage) -> Self {
+    pub fn new(
+        table_name: String,
+        display_name: String,
+        hardware_model: Option<String>,
+        theme: AppTheme,
+        language: AppLanguage,
+    ) -> Self {
         let sensor_category = if table_name == TotalData::table_name_static() {
             SensorCategory::Total(TotalState::new(theme, &display_name, language))
         } else if table_name == ProcessData::table_name_static() {
@@ -408,6 +415,7 @@ impl SensorState {
         let mut state = Self {
             table_name,
             display_name,
+            hardware_model,
             sensor_category,
             latest_reading: None,
             time_range: TimeRange::default(),
@@ -679,10 +687,14 @@ impl SensorState {
         extra_control: Option<Element<'b, Message, AppTheme>>,
     ) -> Row<'b, Message, AppTheme> {
         let default_name = sensor_name(self.language, &self.display_name);
-        let title_widget = Text::new(title.unwrap_or(default_name))
-            .size(FONT_SIZE_SUBTITLE)
-            .font(FONT_BOLD)
-            .width(Length::Fill);
+        let mut title_widget = Column::new().spacing(2).width(Length::Fill).push(
+            Text::new(title.unwrap_or(default_name))
+                .size(FONT_SIZE_SUBTITLE)
+                .font(FONT_BOLD),
+        );
+        if let Some(model) = self.hardware_model.as_deref() {
+            title_widget = title_widget.push(Text::new(model).size(FONT_SIZE_SMALL).class(TextStyle::Muted));
+        }
 
         let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)

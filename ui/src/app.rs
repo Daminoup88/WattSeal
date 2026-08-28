@@ -2,8 +2,8 @@ use std::{collections::HashMap, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
-    AllTimeData, ComputedSensorData, Database, DatabaseEntry, DatabaseError, HardwareInfo, ProcessData, TotalData,
-    UiSettings, generic_name_for_table,
+    AllTimeData, CPUData, ComputedSensorData, Database, DatabaseEntry, DatabaseError, GPUData, HardwareInfo,
+    ProcessData, TotalData, UiSettings, generic_name_for_table,
 };
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
@@ -39,6 +39,10 @@ use crate::{
 };
 
 const FPS: u64 = 1;
+
+fn non_empty_string(value: &str) -> Option<String> {
+    (!value.trim().is_empty()).then(|| value.to_string())
+}
 
 /// Main application state managing pages, sensors, and database.
 pub struct App {
@@ -107,6 +111,7 @@ impl App {
             String::new()
         };
 
+        let hardware_info = database.get_hardware_info().unwrap_or_default();
         let sensors = database
             .get_tables()
             .into_iter()
@@ -114,13 +119,19 @@ impl App {
                 let display_name = generic_name_for_table(table_name.as_str())
                     .map(|s| s.to_string())
                     .unwrap_or(table_name.clone());
+                let hardware_model = if table_name == CPUData::table_name_static() {
+                    non_empty_string(&hardware_info.cpu.name)
+                } else if table_name == GPUData::table_name_static() {
+                    non_empty_string(&hardware_info.gpus.join(", "))
+                } else {
+                    None
+                };
                 (
                     table_name.clone(),
-                    SensorState::new(table_name, display_name, theme, language),
+                    SensorState::new(table_name, display_name, hardware_model, theme, language),
                 )
             })
             .collect();
-        let hardware_info = database.get_hardware_info().unwrap_or_default();
         let dashboard_page = DashboardPage;
         let all_time_data = database.get_all_time_data().unwrap_or_default();
         let task = Task::done(Message::FetchAllChartsData(TimeRange::default()));
