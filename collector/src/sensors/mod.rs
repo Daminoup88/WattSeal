@@ -13,11 +13,11 @@ use std::{
 };
 
 use battery::Manager;
-use common::types::EnergyUj;
 pub use common::{
     AllTimeData, ComputedSensorData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
     types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
+use common::{MAX_TRACKED_PROCESSES, types::EnergyUj};
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
@@ -272,11 +272,11 @@ pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
         gpu_usage,
         total_energy,
     );
-    let top10_processes: Vec<ProcessData> = sort_processes_by_energy(computed_process_data)
+    let tracked_processes: Vec<ProcessData> = sort_processes_by_energy(computed_process_data)
         .into_iter()
-        .take(10)
+        .take(MAX_TRACKED_PROCESSES)
         .collect();
-    data.push(ComputedSensorData::Process(top10_processes));
+    data.push(ComputedSensorData::Process(tracked_processes));
 
     Event::new(sensors_event.time(), data)
 }

@@ -2,7 +2,7 @@ use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData,
 
 use crate::{
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, ProcessLimit, TimeRange},
 };
 
 // Window title
@@ -1453,6 +1453,48 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
 }
 
 // Pick lists
+
+pub fn process_limit_name(language: AppLanguage, limit: ProcessLimit) -> &'static str {
+    match (language, limit) {
+        (AppLanguage::English, ProcessLimit::Five) => "Top 5",
+        (AppLanguage::English, ProcessLimit::Ten) => "Top 10",
+        (AppLanguage::English, ProcessLimit::Custom) => "Custom",
+        (AppLanguage::French, ProcessLimit::Five) => "5 premiers",
+        (AppLanguage::French, ProcessLimit::Ten) => "10 premiers",
+        (AppLanguage::French, ProcessLimit::Custom) => "Personnalisé",
+        (AppLanguage::Chinese, ProcessLimit::Five) => "前 5",
+        (AppLanguage::Chinese, ProcessLimit::Ten) => "前 10",
+        (AppLanguage::Chinese, ProcessLimit::Custom) => "自定义",
+        (AppLanguage::Romanian, ProcessLimit::Five) => "Top 5",
+        (AppLanguage::Romanian, ProcessLimit::Ten) => "Top 10",
+        (AppLanguage::Romanian, ProcessLimit::Custom) => "Personalizat",
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranslatedProcessLimit {
+    pub limit: ProcessLimit,
+    language: AppLanguage,
+}
+
+impl TranslatedProcessLimit {
+    pub fn new(limit: ProcessLimit, language: AppLanguage) -> Self {
+        Self { limit, language }
+    }
+
+    pub fn options(language: AppLanguage) -> Vec<Self> {
+        ProcessLimit::all()
+            .iter()
+            .map(|&limit| Self::new(limit, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedProcessLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", process_limit_name(self.language, self.limit))
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslatedTimeRange {
