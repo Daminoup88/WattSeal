@@ -66,22 +66,6 @@ impl MsrDriverReader {
     }
 }
 
-impl Drop for MsrDriverReader {
-    /// Security specific for WinRing0: close and uninstall the driver when the reader is dropped.
-    fn drop(&mut self) {
-        crate::clog!("Closing WinRing0 driver...");
-        match self.driver.close() {
-            Ok(_) => crate::clog!("WinRing0 driver closed successfully."),
-            Err(e) => crate::clog!("Error closing WinRing0 driver: {}", e),
-        }
-        crate::clog!("Uninstalling WinRing0 driver...");
-        match Self::uninstall() {
-            Ok(_) => crate::clog!("WinRing0 driver uninstalled successfully."),
-            Err(e) => crate::clog!("Error uninstalling WinRing0 driver: {}", e),
-        }
-    }
-}
-
 fn extract_windows_error_code(message: &str) -> Option<u32> {
     let code_prefix = "(code ";
     if let Some(start) = message.find(code_prefix) {
