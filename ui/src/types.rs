@@ -138,6 +138,7 @@ impl Display for TimeRange {
 pub enum AppLanguage {
     #[default]
     English,
+    German,
     French,
     Chinese,
     Romanian,
@@ -148,6 +149,7 @@ impl AppLanguage {
     pub const fn all() -> &'static [AppLanguage] {
         &[
             AppLanguage::English,
+            AppLanguage::German,
             AppLanguage::French,
             AppLanguage::Chinese,
             AppLanguage::Romanian,
@@ -158,6 +160,7 @@ impl AppLanguage {
     pub fn code(self) -> &'static str {
         match self {
             AppLanguage::English => "EN",
+            AppLanguage::German => "DE",
             AppLanguage::French => "FR",
             AppLanguage::Chinese => "ZH",
             AppLanguage::Romanian => "RO",
@@ -168,6 +171,7 @@ impl AppLanguage {
     pub fn from_code(code: &str) -> Self {
         match code {
             "EN" => AppLanguage::English,
+            "DE" => AppLanguage::German,
             "FR" => AppLanguage::French,
             "ZH" => AppLanguage::Chinese,
             "RO" => AppLanguage::Romanian,
@@ -180,6 +184,7 @@ impl Display for AppLanguage {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AppLanguage::English => write!(f, "English"),
+            AppLanguage::German => write!(f, "Deutsch"),
             AppLanguage::French => write!(f, "Français"),
             AppLanguage::Chinese => write!(f, "简体中文"),
             AppLanguage::Romanian => write!(f, "Română"),
