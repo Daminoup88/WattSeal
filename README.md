@@ -4,8 +4,6 @@
 
 WattSeal shows you a live breakdown of power consumption of your PC, by component and by app. Monitor which hardware is drawing the most energy, which apps are the biggest energy hogs, and how your usage changes over time.
 
-Available in English and French.
-
 [![Windows](https://img.shields.io/badge/Windows-x86__64-0078D4?style=flat-square&logo=windows)](https://github.com/daminoup88/wattseal/releases)
 [![Linux](https://img.shields.io/badge/Linux-x86__64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/daminoup88/wattseal/releases)
 [![macOS](https://img.shields.io/badge/macOS-aarch64-000000?style=flat-square&logo=apple)](https://github.com/daminoup88/wattseal/releases)
@@ -112,33 +110,44 @@ Run the app normally, WattSeal will work without admin privileges.
 
 With admin privileges, WattSeal provides the most comprehensive power monitoring experience possible on each platform:
 
-|  | Windows | Linux | macOS |
-|---|:---:|:---:|:---:|
-| Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | ✅ | ✅ | Estimated |
-| NVIDIA GPU | ✅ | ✅ | ❌ |
-| AMD GPU | ✅ | ❌ | ❌ |
-| Intel GPU | ✅ | ❌ | ❌ |
-| Other sensors (usage, I/O) | ✅ | ✅ | ✅ |
-| Auto admin elevation | ✅ UAC | Manual (`sudo`) | Manual |
+|                                                      | Windows |      Linux      |   macOS   |
+|------------------------------------------------------|:-------:|:---------------:|:---------:|
+| Full application                                     |    ✅    |        ✅        |     ✅     |
+| CPU energy counters                                  |    ✅    |        ✅        | Estimated |
+| NVIDIA GPU                                           |    ✅    |        ✅        |     ❌     |
+| AMD GPU                                              |    ✅    |        ❌        |     ❌     |
+| Intel GPU                                            |    ✅    |        ❌        |     ❌     |
+| Other sensors (usage, I/O)                           |    ✅    |        ✅        |     ✅     |
+| Auto admin elevation                                 |  ✅ UAC  | Manual (`sudo`) |  Manual   |
+| Auto start on login (requires admin on first launch) |    ✅    |        ❌        |     ❌     |
 
 <details>
 <summary><strong>Support without admin privileges</strong></summary>
 
-|  | Windows | Linux | macOS |
-|---|:---:|:---:|:---:|
-| Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | Estimated | Estimated | Estimated |
-| NVIDIA GPU | ✅ | ✅ | ❌ |
-| AMD GPU | ✅ | ❌ | ❌ |
-| Intel GPU | ✅ | ❌ | ❌ |
-| Other sensors (usage, I/O) | ✅ | ✅ | ✅ |
+|                            |  Windows  |   Linux   |   macOS   |
+|----------------------------|:---------:|:---------:|:---------:|
+| Full application           |     ✅     |     ✅     |     ✅     |
+| CPU energy counters        | Estimated | Estimated | Estimated |
+| NVIDIA GPU                 |     ✅     |     ✅     |     ❌     |
+| AMD GPU                    |     ✅     |     ❌     |     ❌     |
+| Intel GPU                  |     ✅     |     ❌     |     ❌     |
+| Other sensors (usage, I/O) |     ✅     |     ✅     |     ✅     |
 
 </details>
 
 ---
 
-<br>
+## Language Support
+
+The following languages are supported by WattSeal:
+
+| Language             | Status            | Contributor                                       |
+|----------------------|-------------------|---------------------------------------------------|
+| Chinese (Simplified) | ✅ Fully supported | [metahubaifeel](https://github.com/metahubaifeel) |
+| English              | ✅ Fully supported | [Daminoup88](https://github.com/Daminoup88)       |
+| French               | ✅ Fully supported | [Daminoup88](https://github.com/Daminoup88)       |
+| Romanian             | ✅ Fully supported | [CodrinSocol](https://github.com/CodrinSocol)     |
+
 
 ## Troubleshooting
 
@@ -216,12 +225,12 @@ cargo build --release
 
 ## Project Layout
 
-| Path | What it does |
-|---|---|
-| `src/main.rs` | Entry point: admin elevation, tray icon, collector thread, UI subprocess |
-| `collector/` | All sensor implementations (CPU, GPU, RAM, disk, network, per-process) |
-| `common/` | Shared types (`Event`, `SensorData`, …), SQLite database layer, utilities |
-| `ui/` | Iced application: pages, components, charts, themes, translations |
+| Path          | What it does                                                              |
+|---------------|---------------------------------------------------------------------------|
+| `src/main.rs` | Entry point: admin elevation, tray icon, collector thread, UI subprocess  |
+| `collector/`  | All sensor implementations (CPU, GPU, RAM, disk, network, per-process)    |
+| `common/`     | Shared types (`Event`, `SensorData`, …), SQLite database layer, utilities |
+| `ui/`         | Iced application: pages, components, charts, themes, translations         |
 
 ---
 
