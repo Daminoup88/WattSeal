@@ -10,7 +10,6 @@ use crate::DatabaseEntry;
 
 pub const MICROJOULES_PER_JOULE: f64 = 1_000_000.0;
 pub const SECONDS_PER_HOUR: f64 = 3600.0;
-pub const MAX_TRACKED_PROCESSES: usize = 50;
 
 /// Timestamped collection of sensor readings.
 #[derive(Debug, Clone)]

@@ -20,8 +20,8 @@ pub use database::{DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSett
 pub use singleton::SingletonGuard;
 pub use types::{
     AllTimeData, CPUData, ComputedSensorData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, IconData,
-    LabeledValue, MAX_TRACKED_PROCESSES, MICROJOULES_PER_JOULE, MetricKind, NetworkData, ProcessData, RamData,
-    SECONDS_PER_HOUR, SecondaryValues, SensorData, TotalData,
+    LabeledValue, MICROJOULES_PER_JOULE, MetricKind, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR,
+    SecondaryValues, SensorData, TotalData,
 };
 pub use utils::set_current_dir_to_exe_dir;
 

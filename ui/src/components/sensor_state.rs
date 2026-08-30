@@ -7,8 +7,8 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, IconData, MAX_TRACKED_PROCESSES, MetricKind, NetworkData,
-    ProcessData, RamData, SecondaryValues, TotalData, utils::load_icon_and_name,
+    ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData,
+    SecondaryValues, TotalData, utils::load_icon_and_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
@@ -356,7 +356,7 @@ impl ProcessesState {
         let Ok(limit) = input.parse::<usize>() else {
             return false;
         };
-        let limit = limit.clamp(1, MAX_TRACKED_PROCESSES);
+        let limit = limit.max(1);
         self.custom_limit_input = limit.to_string();
         self.top_processes.truncate(limit);
         true
@@ -788,7 +788,7 @@ impl SensorState {
             .push(selector);
         if state.limit_choice == ProcessLimit::Custom {
             controls = controls.push(
-                text_input("1-50", &state.custom_limit_input)
+                text_input("1+", &state.custom_limit_input)
                     .on_input(Message::ChangeCustomProcessLimit)
                     .width(Length::Fixed(58.0))
                     .padding(6),
@@ -1137,7 +1137,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn process_limit_supports_presets_and_bounded_custom_values() {
+    fn process_limit_supports_presets_and_positive_custom_values() {
         let mut state = ProcessesState::new();
         assert_eq!(state.limit(), 10);
 
@@ -1152,7 +1152,15 @@ mod tests {
         assert!(!state.set_custom_limit_input("invalid".to_string()));
         assert_eq!(state.limit(), 25);
 
-        assert!(state.set_custom_limit_input("100".to_string()));
-        assert_eq!(state.limit(), MAX_TRACKED_PROCESSES);
+        assert!(!state.set_custom_limit_input("-1".to_string()));
+        assert_eq!(state.limit(), 25);
+
+        assert!(state.set_custom_limit_input("50000".to_string()));
+        assert_eq!(state.limit(), 50000);
+        state.update_from_snapshot(&[]);
+        assert!(state.top_processes.is_empty());
+
+        assert!(state.set_custom_limit_input("0".to_string()));
+        assert_eq!(state.limit(), 1);
     }
 }

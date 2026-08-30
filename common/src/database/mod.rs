@@ -924,10 +924,11 @@ impl Database {
                 ORDER BY process_energy_uj DESC \
                 LIMIT ?3";
 
+        let top_n = i64::try_from(top_n).unwrap_or(i64::MAX);
         let rows = self.execute_sensor_query(
             ProcessData::table_name_static(),
             query,
-            rusqlite::params![start, now_ms, top_n as i64],
+            rusqlite::params![start, now_ms, top_n],
         )?;
 
         let mut processes = Vec::new();

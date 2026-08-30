@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use chrono::{DateTime, Duration, Local};
-use common::{ComputedSensorData, MAX_TRACKED_PROCESSES, SECONDS_PER_HOUR};
+use common::{ComputedSensorData, SECONDS_PER_HOUR};
 
 const DEFAULT_CUSTOM_PROCESS_LIMIT: usize = 15;
 
@@ -23,9 +23,7 @@ impl ProcessLimit {
         match self {
             ProcessLimit::Five => 5,
             ProcessLimit::Ten => 10,
-            ProcessLimit::Custom => custom
-                .unwrap_or(DEFAULT_CUSTOM_PROCESS_LIMIT)
-                .clamp(1, MAX_TRACKED_PROCESSES),
+            ProcessLimit::Custom => custom.unwrap_or(DEFAULT_CUSTOM_PROCESS_LIMIT).max(1),
         }
     }
 }
