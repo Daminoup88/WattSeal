@@ -5622,6 +5622,7 @@ dependencies = [
  "plotters",
  "plotters-backend",
  "plotters-iced2",
+ "sys-locale",
 ]
 
 [[package]]
