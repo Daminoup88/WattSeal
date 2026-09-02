@@ -90,7 +90,7 @@ impl App {
                 (lang, ci, theme, ec, false)
             }
             _ => (
-                AppLanguage::default(),
+                AppLanguage::from_os(),
                 CarbonIntensity::PRESETS[8],
                 AppTheme::default(),
                 ElectricityCost::PRESETS[8],
@@ -158,7 +158,7 @@ impl App {
 
     fn waiting_for_migration(database: Database) -> (Self, Task<Message>) {
         let current_page = Page::Dashboard;
-        let language = AppLanguage::default();
+        let language = AppLanguage::from_os();
         let theme = AppTheme::default();
 
         (
