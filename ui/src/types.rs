@@ -3,6 +3,31 @@ use std::fmt::Display;
 use chrono::{DateTime, Duration, Local};
 use common::{ComputedSensorData, SECONDS_PER_HOUR};
 
+const DEFAULT_CUSTOM_PROCESS_LIMIT: usize = 15;
+
+/// Preset shown in the process-count selector.
+#[derive(Default, Clone, Copy, PartialEq, Eq, Debug)]
+pub enum ProcessLimit {
+    Five,
+    #[default]
+    Ten,
+    Custom,
+}
+
+impl ProcessLimit {
+    pub const fn all() -> &'static [ProcessLimit] {
+        &[ProcessLimit::Five, ProcessLimit::Ten, ProcessLimit::Custom]
+    }
+
+    pub fn resolve(self, custom: Option<usize>) -> usize {
+        match self {
+            ProcessLimit::Five => 5,
+            ProcessLimit::Ten => 10,
+            ProcessLimit::Custom => custom.unwrap_or(DEFAULT_CUSTOM_PROCESS_LIMIT).max(1),
+        }
+    }
+}
+
 /// A sensor data point with the sampling duration.
 #[derive(Debug, Clone)]
 pub struct SensorRecord {
