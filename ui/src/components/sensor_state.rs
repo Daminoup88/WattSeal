@@ -39,7 +39,7 @@ use crate::{
     themes::AppTheme,
     translations::{
         TranslatedMetricType, TranslatedProcessLimit, TranslatedTimeRange, application, cpu, disk_read, disk_write,
-        format_mb_per_sec, format_number, gpu, metric_effective_unit, metric_type_name, metric_unit, na,
+        format_energy, format_mb_per_sec, format_number, gpu, metric_effective_unit, metric_type_name, metric_unit, na,
         power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
     },
     types::{AppLanguage, ProcessLimit, SensorRecord, TimeRange},
@@ -944,15 +944,15 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!(
-                            "{}{}",
-                            format_number(
-                                process_power_or_energy(p.process_energy, &self.time_range),
-                                1,
-                                self.language
-                            ),
-                            unit_str
-                        ),
+                        {
+                            let raw = process_power_or_energy(p.process_energy, &self.time_range);
+                            if energy_mode {
+                                let (val, unit) = format_energy(raw, self.language);
+                                format!("{} {}", val, unit)
+                            } else {
+                                format!("{}{}", format_number(raw, 1, self.language), unit_str)
+                            }
+                        },
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_POWER_WIDTH),

@@ -26,7 +26,7 @@ use plotters_iced2::{Chart, ChartWidget, DrawingArea, Renderer, plotters_backend
 use crate::{
     message::Message,
     themes::AppTheme,
-    translations::{format_number, tooltip_time, tooltip_value},
+    translations::{format_energy, format_number, tooltip_time, tooltip_value},
     types::AppLanguage,
 };
 
@@ -141,8 +141,13 @@ impl TooltipContent {
     }
 
     fn value_text(&self, language: AppLanguage) -> String {
-        let decimals = if self.value < 1.0 { 2 } else { 1 };
-        format!("{}{}", format_number(self.value as f64, decimals, language), self.unit)
+        if self.unit == "Wh" {
+            let (val, unit) = format_energy(self.value as f64, language);
+            format!("{} {}", val, unit)
+        } else {
+            let decimals = if self.value < 1.0 { 2 } else { 1 };
+            format!("{}{}", format_number(self.value as f64, decimals, language), self.unit)
+        }
     }
 
     fn timestamp_text(&self) -> String {
