@@ -1455,19 +1455,16 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
 // Pick lists
 
 pub fn process_limit_name(language: AppLanguage, limit: ProcessLimit) -> &'static str {
-    match (language, limit) {
-        (AppLanguage::English, ProcessLimit::Five) => "Top 5",
-        (AppLanguage::English, ProcessLimit::Ten) => "Top 10",
-        (AppLanguage::English, ProcessLimit::Custom) => "Custom",
-        (AppLanguage::French, ProcessLimit::Five) => "5 premiers",
-        (AppLanguage::French, ProcessLimit::Ten) => "10 premiers",
-        (AppLanguage::French, ProcessLimit::Custom) => "Personnalisé",
-        (AppLanguage::Chinese, ProcessLimit::Five) => "前 5",
-        (AppLanguage::Chinese, ProcessLimit::Ten) => "前 10",
-        (AppLanguage::Chinese, ProcessLimit::Custom) => "自定义",
-        (AppLanguage::Romanian, ProcessLimit::Five) => "Top 5",
-        (AppLanguage::Romanian, ProcessLimit::Ten) => "Top 10",
-        (AppLanguage::Romanian, ProcessLimit::Custom) => "Personalizat",
+    match limit {
+        ProcessLimit::Five => match language {
+            AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Top 5",
+            AppLanguage::Chinese => "前 5",
+        },
+        ProcessLimit::Ten => match language {
+            AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Top 10",
+            AppLanguage::Chinese => "前 10",
+        },
+        ProcessLimit::Custom => custom_preset_name(language),
     }
 }
 
@@ -1713,13 +1710,17 @@ pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str
             AppLanguage::Romanian => "Media mondială",
             AppLanguage::Chinese => "全球平均",
         },
-        "Custom" => match language {
-            AppLanguage::English => label,
-            AppLanguage::French => "Personnalisé",
-            AppLanguage::Romanian => "Personalizat",
-            AppLanguage::Chinese => "自定义",
-        },
+        "Custom" => custom_preset_name(language),
         _ => label,
+    }
+}
+
+pub fn custom_preset_name(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Custom",
+        AppLanguage::French => "Personnalisé",
+        AppLanguage::Chinese => "自定义",
+        AppLanguage::Romanian => "Personalizat",
     }
 }
 
