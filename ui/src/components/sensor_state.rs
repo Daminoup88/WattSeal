@@ -737,7 +737,8 @@ impl SensorState {
         let default_name = sensor_name(self.language, &self.display_name);
         let title_widget = Text::new(title.unwrap_or(default_name))
             .size(FONT_SIZE_SUBTITLE)
-            .font(FONT_BOLD);
+            .font(FONT_BOLD)
+            .width(Length::Fill);
 
         let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
@@ -771,8 +772,6 @@ impl SensorState {
             .align_y(Alignment::Center)
             .push(title_widget)
             .push(controls.wrap().vertical_spacing(SPACING_MEDIUM))
-            .wrap()
-            .vertical_spacing(SPACING_MEDIUM)
             .into()
     }
 
