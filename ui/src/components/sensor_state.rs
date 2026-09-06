@@ -15,7 +15,7 @@ use iced::{
     widget::{
         Button, Column, Container, Row, Scrollable, Space, Text, button, image, pick_list,
         scrollable::{Direction, Scrollbar},
-        text_input,
+        text_input, tooltip,
     },
 };
 
@@ -31,8 +31,8 @@ use crate::{
         picklist::PickListStyle,
         scrollable::ScrollableStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL,
-            SPACING_XLARGE,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE,
+            SPACING_MEDIUM, SPACING_SMALL, SPACING_XLARGE,
         },
         text::TextStyle,
     },
@@ -419,6 +419,7 @@ enum SensorCategory {
 pub struct SensorState {
     table_name: String,
     display_name: String,
+    hardware_model: Option<String>,
     sensor_category: SensorCategory,
     latest_reading: Option<SensorRecord>,
     time_range: TimeRange,
@@ -427,7 +428,13 @@ pub struct SensorState {
 
 impl SensorState {
     /// Creates a sensor state for the given table and display name.
-    pub fn new(table_name: String, display_name: String, theme: AppTheme, language: AppLanguage) -> Self {
+    pub fn new(
+        table_name: String,
+        display_name: String,
+        hardware_model: Option<String>,
+        theme: AppTheme,
+        language: AppLanguage,
+    ) -> Self {
         let sensor_category = if table_name == TotalData::table_name_static() {
             SensorCategory::Total(TotalState::new(theme, &display_name, language))
         } else if table_name == ProcessData::table_name_static() {
@@ -439,6 +446,7 @@ impl SensorState {
         let mut state = Self {
             table_name,
             display_name,
+            hardware_model,
             sensor_category,
             latest_reading: None,
             time_range: TimeRange::default(),
@@ -737,8 +745,21 @@ impl SensorState {
         let default_name = sensor_name(self.language, &self.display_name);
         let title_widget = Text::new(title.unwrap_or(default_name))
             .size(FONT_SIZE_SUBTITLE)
-            .font(FONT_BOLD)
-            .width(Length::Fill);
+            .font(FONT_BOLD);
+        let title_widget: Element<'b, Message, AppTheme> = match self.hardware_model.as_deref() {
+            Some(model) => tooltip(
+                title_widget,
+                Container::new(Text::new(model).size(FONT_SIZE_SMALL)).max_width(320),
+                tooltip::Position::Bottom,
+            )
+            .class(ContainerStyle::Card)
+            .padding(SPACING_SMALL)
+            .gap(SPACING_SMALL)
+            .delay(std::time::Duration::from_millis(350))
+            .into(),
+            None => title_widget.into(),
+        };
+        let title_widget = Container::new(title_widget).width(Length::Fill);
 
         let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
