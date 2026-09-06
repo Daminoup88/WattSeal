@@ -15,7 +15,7 @@ use iced::{
     widget::{
         Button, Column, Container, Row, Scrollable, Space, Text, button, image, pick_list,
         scrollable::{Direction, Scrollbar},
-        tooltip,
+        text_input, tooltip,
     },
 };
 
@@ -38,11 +38,11 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedMetricType, TranslatedTimeRange, application, cpu, disk_read, disk_write, format_mb_per_sec,
-        format_number, gpu, metric_effective_unit, metric_type_name, metric_unit, na, power_or_energy,
-        power_or_energy_label, ram, sensor_name, translate_label,
+        TranslatedMetricType, TranslatedProcessLimit, TranslatedTimeRange, application, cpu, disk_read, disk_write,
+        format_energy, format_mb_per_sec, format_number, gpu, metric_effective_unit, metric_type_name, metric_unit, na,
+        power_or_energy, power_or_energy_label, ram, sensor_name, translate_label,
     },
-    types::{AppLanguage, SensorRecord, TimeRange},
+    types::{AppLanguage, ProcessLimit, SensorRecord, TimeRange},
 };
 
 const SNAPSHOT_AREA_HEIGHT: f32 = 34.0;
@@ -321,6 +321,8 @@ struct ProcessesState {
     top_processes: Vec<ProcessData>,
     icon_handles: HashMap<String, image::Handle>,
     icon_cache: HashMap<String, (Option<IconData>, Option<String>)>,
+    limit_choice: ProcessLimit,
+    custom_limit_input: String,
 }
 
 impl ProcessesState {
@@ -329,11 +331,39 @@ impl ProcessesState {
             top_processes: Vec::new(),
             icon_handles: HashMap::new(),
             icon_cache: HashMap::new(),
+            limit_choice: ProcessLimit::default(),
+            custom_limit_input: "15".to_string(),
         }
     }
 
+    fn limit(&self) -> usize {
+        self.limit_choice.resolve(self.custom_limit_input.parse().ok())
+    }
+
+    fn set_limit_choice(&mut self, limit: ProcessLimit) {
+        self.limit_choice = limit;
+        self.top_processes.truncate(self.limit());
+    }
+
+    fn set_custom_limit_input(&mut self, input: String) -> bool {
+        if input.is_empty() {
+            self.custom_limit_input.clear();
+            return false;
+        }
+        if !input.chars().all(|character| character.is_ascii_digit()) {
+            return false;
+        }
+        let Ok(limit) = input.parse::<usize>() else {
+            return false;
+        };
+        let limit = limit.max(1);
+        self.custom_limit_input = limit.to_string();
+        self.top_processes.truncate(limit);
+        true
+    }
+
     fn update_from_snapshot(&mut self, processes: &[ProcessData]) {
-        let mut next_top = processes.to_vec();
+        let mut next_top: Vec<ProcessData> = processes.iter().take(self.limit()).cloned().collect();
 
         for process in &mut next_top {
             if let Some(exe_path) = &process.measured.process_exe_path {
@@ -447,6 +477,31 @@ impl SensorState {
             state.top_processes.first()
         } else {
             None
+        }
+    }
+
+    /// Returns the selected number of process rows.
+    pub fn process_limit(&self) -> usize {
+        if let SensorCategory::Processes(state) = &self.sensor_category {
+            state.limit()
+        } else {
+            ProcessLimit::default().resolve(None)
+        }
+    }
+
+    /// Changes the process-count preset.
+    pub fn set_process_limit(&mut self, limit: ProcessLimit) {
+        if let SensorCategory::Processes(state) = &mut self.sensor_category {
+            state.set_limit_choice(limit);
+        }
+    }
+
+    /// Updates the custom process-count value and reports whether it is valid.
+    pub fn set_custom_process_limit(&mut self, input: String) -> bool {
+        if let SensorCategory::Processes(state) = &mut self.sensor_category {
+            state.set_custom_limit_input(input)
+        } else {
+            false
         }
     }
 
@@ -739,6 +794,30 @@ impl SensorState {
             .push(controls)
     }
 
+    fn process_limit_control<'b>(&'b self, state: &'b ProcessesState) -> Element<'b, Message, AppTheme> {
+        let selector = pick_list(
+            TranslatedProcessLimit::options(self.language),
+            Some(TranslatedProcessLimit::new(state.limit_choice, self.language)),
+            |selection: TranslatedProcessLimit| Message::ChangeProcessLimit(selection.limit),
+        )
+        .class(PickListStyle::TimeRange)
+        .menu_class(PickListStyle::TimeRange);
+
+        let mut controls = Row::new()
+            .spacing(SPACING_SMALL)
+            .align_y(Alignment::Center)
+            .push(selector);
+        if state.limit_choice == ProcessLimit::Custom {
+            controls = controls.push(
+                text_input("1+", &state.custom_limit_input)
+                    .on_input(Message::ChangeCustomProcessLimit)
+                    .width(Length::Fixed(58.0))
+                    .padding(6),
+            );
+        }
+        controls.into()
+    }
+
     fn sensor_chart_card<'b>(
         &'b self,
         chart: &'b PowerChartState,
@@ -807,7 +886,8 @@ impl SensorState {
     }
 
     fn process_card<'b>(&'b self, state: &'b ProcessesState, title: Option<&'b str>) -> Element<'b, Message, AppTheme> {
-        let header = self.chart_card_header(title, None);
+        let limit_control = self.process_limit_control(state);
+        let header = self.chart_card_header(title, Some(limit_control));
         let energy_mode = self.time_range.is_energy_mode();
         let unit_str = self.time_range.power_unit();
 
@@ -885,15 +965,15 @@ impl SensorState {
                         true,
                     ))
                     .push(text_widget(
-                        format!(
-                            "{}{}",
-                            format_number(
-                                process_power_or_energy(p.process_energy, &self.time_range),
-                                1,
-                                self.language
-                            ),
-                            unit_str
-                        ),
+                        {
+                            let raw = process_power_or_energy(p.process_energy, &self.time_range);
+                            if energy_mode {
+                                let (val, unit) = format_energy(raw, self.language);
+                                format!("{} {}", val, unit)
+                            } else {
+                                format!("{}{}", format_number(raw, 1, self.language), unit_str)
+                            }
+                        },
                         table_font_size,
                         TextStyle::Primary,
                         Length::Fixed(PROCESS_POWER_WIDTH),
@@ -1070,5 +1150,38 @@ fn initial_metric_for_table(table_name: &str) -> Option<MetricKind> {
         Some(MetricKind::Speed)
     } else {
         None
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn process_limit_supports_presets_and_positive_custom_values() {
+        let mut state = ProcessesState::new();
+        assert_eq!(state.limit(), 10);
+
+        state.set_limit_choice(ProcessLimit::Five);
+        assert_eq!(state.limit(), 5);
+
+        state.set_limit_choice(ProcessLimit::Custom);
+        assert_eq!(state.limit(), 15);
+        assert!(state.set_custom_limit_input("25".to_string()));
+        assert_eq!(state.limit(), 25);
+
+        assert!(!state.set_custom_limit_input("invalid".to_string()));
+        assert_eq!(state.limit(), 25);
+
+        assert!(!state.set_custom_limit_input("-1".to_string()));
+        assert_eq!(state.limit(), 25);
+
+        assert!(state.set_custom_limit_input("50000".to_string()));
+        assert_eq!(state.limit(), 50000);
+        state.update_from_snapshot(&[]);
+        assert!(state.top_processes.is_empty());
+
+        assert!(state.set_custom_limit_input("0".to_string()));
+        assert_eq!(state.limit(), 1);
     }
 }

@@ -2,7 +2,7 @@ use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData,
 
 use crate::{
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, ElectricityCost, TimeRange},
+    types::{AppLanguage, CarbonIntensity, ElectricityCost, ProcessLimit, TimeRange},
 };
 
 // Window title
@@ -66,6 +66,15 @@ pub fn settings_language(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Langue",
         AppLanguage::Chinese => "语言",
         AppLanguage::Romanian => "Limbă",
+    }
+}
+
+pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Launch on startup",
+        AppLanguage::French => "Lancer au démarrage",
+        AppLanguage::Chinese => "开机自启动",
+        AppLanguage::Romanian => "Pornește la conectare",
     }
 }
 
@@ -1445,6 +1454,45 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
 
 // Pick lists
 
+pub fn process_limit_name(language: AppLanguage, limit: ProcessLimit) -> &'static str {
+    match limit {
+        ProcessLimit::Five => match language {
+            AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Top 5",
+            AppLanguage::Chinese => "前 5",
+        },
+        ProcessLimit::Ten => match language {
+            AppLanguage::English | AppLanguage::French | AppLanguage::Romanian => "Top 10",
+            AppLanguage::Chinese => "前 10",
+        },
+        ProcessLimit::Custom => custom_preset_name(language),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TranslatedProcessLimit {
+    pub limit: ProcessLimit,
+    language: AppLanguage,
+}
+
+impl TranslatedProcessLimit {
+    pub fn new(limit: ProcessLimit, language: AppLanguage) -> Self {
+        Self { limit, language }
+    }
+
+    pub fn options(language: AppLanguage) -> Vec<Self> {
+        ProcessLimit::all()
+            .iter()
+            .map(|&limit| Self::new(limit, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedProcessLimit {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", process_limit_name(self.language, self.limit))
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct TranslatedTimeRange {
     pub range: TimeRange,
@@ -1662,13 +1710,17 @@ pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str
             AppLanguage::Romanian => "Media mondială",
             AppLanguage::Chinese => "全球平均",
         },
-        "Custom" => match language {
-            AppLanguage::English => label,
-            AppLanguage::French => "Personnalisé",
-            AppLanguage::Romanian => "Personalizat",
-            AppLanguage::Chinese => "自定义",
-        },
+        "Custom" => custom_preset_name(language),
         _ => label,
+    }
+}
+
+pub fn custom_preset_name(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Custom",
+        AppLanguage::French => "Personnalisé",
+        AppLanguage::Chinese => "自定义",
+        AppLanguage::Romanian => "Personalizat",
     }
 }
 

@@ -35,7 +35,7 @@ use crate::{
         info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
         setup_choose_language, setup_confirm, setup_welcome_title, theme_name,
     },
-    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, SensorRecord, TimeRange},
+    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -60,6 +60,7 @@ pub struct App {
     custom_carbon_input: String,
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
+    launch_on_startup: bool,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -160,6 +161,7 @@ impl App {
                 custom_carbon_input,
                 electricity_cost,
                 custom_kwh_cost_input,
+                launch_on_startup: common::autostart::is_enabled(),
                 show_setup,
                 theme,
                 database,
@@ -194,6 +196,7 @@ impl App {
                 custom_carbon_input: String::new(),
                 electricity_cost: ElectricityCost::PRESETS[8],
                 custom_kwh_cost_input: String::new(),
+                launch_on_startup: common::autostart::is_enabled(),
                 show_setup: false,
                 theme,
                 database,
@@ -224,16 +227,7 @@ impl App {
                 self.refresh_all_time_data();
                 self.tick_count += 1;
                 if self.tick_count == 1 || self.tick_count % 10 == 0 {
-                    let table_name = ProcessData::table_name_static();
-                    let time_range = self
-                        .sensors
-                        .get(table_name)
-                        .map(|s| s.current_time_range().clone())
-                        .unwrap_or_default();
-                    let process_data = self.load_process_data(time_range);
-                    if let Some(sensor) = self.sensors.get_mut(table_name) {
-                        sensor.load_history_batch(&process_data);
-                    }
+                    self.refresh_process_data();
                 }
                 Task::none()
             }
@@ -366,9 +360,36 @@ impl App {
                 self.persist_ui_settings();
                 Task::none()
             }
+            Message::ToggleLaunchOnStartup(enabled) => {
+                match common::autostart::set_enabled(enabled) {
+                    Ok(()) => {
+                        self.launch_on_startup = enabled;
+                        common::clog!("✓ Launch-on-startup {}", if enabled { "enabled" } else { "disabled" });
+                    }
+                    Err(e) => common::clog!("✗ Failed to update launch-on-startup setting: {e}"),
+                }
+                Task::none()
+            }
             Message::ChangeChartMetricType(table_name, metric_type) => {
                 if let Some(sensor) = self.sensors.get_mut(&table_name) {
                     sensor.set_metric_type(metric_type);
+                }
+                Task::none()
+            }
+            Message::ChangeProcessLimit(limit) => {
+                if let Some(sensor) = self.sensors.get_mut(ProcessData::table_name_static()) {
+                    sensor.set_process_limit(limit);
+                }
+                self.refresh_process_data();
+                Task::none()
+            }
+            Message::ChangeCustomProcessLimit(input) => {
+                let should_refresh = self
+                    .sensors
+                    .get_mut(ProcessData::table_name_static())
+                    .is_some_and(|sensor| sensor.set_custom_process_limit(input));
+                if should_refresh {
+                    self.refresh_process_data();
                 }
                 Task::none()
             }
@@ -465,14 +486,35 @@ impl App {
     }
 
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<SensorRecord> {
-        from_db(self.database.select_top_processes_average(time_range.seconds(), 10))
-            .into_iter()
-            .map(|(timestamp, data)| SensorRecord {
-                timestamp,
-                duration_ms: 0,
-                data,
-            })
-            .collect()
+        let process_limit = self
+            .sensors
+            .get(ProcessData::table_name_static())
+            .map(SensorState::process_limit)
+            .unwrap_or_else(|| ProcessLimit::default().resolve(None));
+        from_db(
+            self.database
+                .select_top_processes_average(time_range.seconds(), process_limit),
+        )
+        .into_iter()
+        .map(|(timestamp, data)| SensorRecord {
+            timestamp,
+            duration_ms: 0,
+            data,
+        })
+        .collect()
+    }
+
+    fn refresh_process_data(&mut self) {
+        let table_name = ProcessData::table_name_static();
+        let time_range = self
+            .sensors
+            .get(table_name)
+            .map(|sensor| sensor.current_time_range().clone())
+            .unwrap_or_default();
+        let process_data = self.load_process_data(time_range);
+        if let Some(sensor) = self.sensors.get_mut(table_name) {
+            sensor.load_history_batch(&process_data);
+        }
     }
 
     /// Builds the root UI element tree.
@@ -508,6 +550,7 @@ impl App {
                     &self.custom_carbon_input,
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
+                    self.launch_on_startup,
                 ),
                 Message::CloseSettings,
             )
