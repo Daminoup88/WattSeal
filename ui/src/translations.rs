@@ -356,7 +356,7 @@ pub fn disk_information(language: AppLanguage) -> &'static str {
 pub fn disk(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Disk",
-        AppLanguage::German => "Datenträger",
+        AppLanguage::German => "Laufwerk",
         AppLanguage::French => "Disque",
         AppLanguage::Chinese => "磁盘",
         AppLanguage::Romanian => "Disc",
@@ -692,7 +692,7 @@ pub fn last_hour(language: AppLanguage) -> &'static str {
 pub fn last_24_hours(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Last 24 Hours",
-        AppLanguage::German => "Letzte 24 Stunden",
+        AppLanguage::German => "Letzte 24 h",
         AppLanguage::French => "Dernières 24 heures",
         AppLanguage::Chinese => "最近 24 小时",
         AppLanguage::Romanian => "Ultimele 24 ore",
@@ -769,7 +769,7 @@ pub fn metric_usage(language: AppLanguage) -> &'static str {
 pub fn metric_speed(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Speed",
-        AppLanguage::German => "Geschwindigkeit",
+        AppLanguage::German => "Rate",
         AppLanguage::French => "Vitesse",
         AppLanguage::Chinese => "速度",
         AppLanguage::Romanian => "Viteză",
@@ -859,7 +859,7 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
     match english_name {
         "CPU" | "GPU" | "RAM" => english_name,
         "Disk" => match language {
-            AppLanguage::German => "Datenträger",
+            AppLanguage::German => "Laufwerk",
             AppLanguage::French => "Disque",
             AppLanguage::Chinese => "磁盘",
             AppLanguage::Romanian => "Disc",
