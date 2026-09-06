@@ -741,7 +741,7 @@ impl SensorState {
         &'b self,
         title: Option<&'b str>,
         extra_control: Option<Element<'b, Message, AppTheme>>,
-    ) -> Row<'b, Message, AppTheme> {
+    ) -> Element<'b, Message, AppTheme> {
         let default_name = sensor_name(self.language, &self.display_name);
         let title_widget = Text::new(title.unwrap_or(default_name))
             .size(FONT_SIZE_SUBTITLE)
@@ -788,10 +788,12 @@ impl SensorState {
         controls = controls.push(info_button);
 
         Row::new()
+            .width(Length::Fill)
             .spacing(SPACING_XLARGE)
             .align_y(Alignment::Center)
             .push(title_widget)
-            .push(controls)
+            .push(controls.wrap().vertical_spacing(SPACING_MEDIUM))
+            .into()
     }
 
     fn process_limit_control<'b>(&'b self, state: &'b ProcessesState) -> Element<'b, Message, AppTheme> {
