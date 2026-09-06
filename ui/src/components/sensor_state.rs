@@ -15,6 +15,7 @@ use iced::{
     widget::{
         Button, Column, Container, Row, Scrollable, Space, Text, button, image, pick_list,
         scrollable::{Direction, Scrollbar},
+        tooltip,
     },
 };
 
@@ -687,14 +688,23 @@ impl SensorState {
         extra_control: Option<Element<'b, Message, AppTheme>>,
     ) -> Row<'b, Message, AppTheme> {
         let default_name = sensor_name(self.language, &self.display_name);
-        let mut title_widget = Column::new().spacing(2).width(Length::Fill).push(
-            Text::new(title.unwrap_or(default_name))
-                .size(FONT_SIZE_SUBTITLE)
-                .font(FONT_BOLD),
-        );
-        if let Some(model) = self.hardware_model.as_deref() {
-            title_widget = title_widget.push(Text::new(model).size(FONT_SIZE_SMALL).class(TextStyle::Muted));
-        }
+        let title_widget = Text::new(title.unwrap_or(default_name))
+            .size(FONT_SIZE_SUBTITLE)
+            .font(FONT_BOLD);
+        let title_widget: Element<'b, Message, AppTheme> = match self.hardware_model.as_deref() {
+            Some(model) => tooltip(
+                title_widget,
+                Container::new(Text::new(model).size(FONT_SIZE_SMALL)).max_width(320),
+                tooltip::Position::Bottom,
+            )
+            .class(ContainerStyle::Card)
+            .padding(SPACING_SMALL)
+            .gap(SPACING_SMALL)
+            .delay(std::time::Duration::from_millis(350))
+            .into(),
+            None => title_widget.into(),
+        };
+        let title_widget = Container::new(title_widget).width(Length::Fill);
 
         let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)

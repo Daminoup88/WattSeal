@@ -41,7 +41,8 @@ use crate::{
 const FPS: u64 = 1;
 
 fn non_empty_string(value: &str) -> Option<String> {
-    (!value.trim().is_empty()).then(|| value.to_string())
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
 }
 
 /// Main application state managing pages, sensors, and database.
@@ -122,7 +123,14 @@ impl App {
                 let hardware_model = if table_name == CPUData::table_name_static() {
                     non_empty_string(&hardware_info.cpu.name)
                 } else if table_name == GPUData::table_name_static() {
-                    non_empty_string(&hardware_info.gpus.join(", "))
+                    non_empty_string(
+                        &hardware_info
+                            .gpus
+                            .iter()
+                            .filter_map(|name| non_empty_string(name))
+                            .collect::<Vec<_>>()
+                            .join("\n"),
+                    )
                 } else {
                     None
                 };
