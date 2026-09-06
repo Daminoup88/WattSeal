@@ -147,6 +147,7 @@ The following languages are supported by WattSeal:
 | English              | ✅ Fully supported | [Daminoup88](https://github.com/Daminoup88)       |
 | French               | ✅ Fully supported | [Daminoup88](https://github.com/Daminoup88)       |
 | Romanian             | ✅ Fully supported | [CodrinSocol](https://github.com/CodrinSocol)     |
+| German               | ✅ Fully supported | [LivingPixel-pixel](https://github.com/LivingPixel-pixel)|
 
 
 ## Troubleshooting
