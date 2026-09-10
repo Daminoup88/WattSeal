@@ -82,6 +82,7 @@ pub struct UiSettings {
     pub kwh_cost: String,
     pub theme: String,
     pub currency: String,
+    pub keep_running_on_close: bool,
 }
 
 /// Error types for database operations.
@@ -199,7 +200,8 @@ impl Database {
                 carbon_intensity TEXT NOT NULL DEFAULT 'World average',
                 kwh_cost         TEXT NOT NULL DEFAULT 'World average',
                 theme            TEXT NOT NULL DEFAULT 'Hunting',
-                currency         TEXT NOT NULL DEFAULT 'USD'
+                currency         TEXT NOT NULL DEFAULT 'USD',
+                keep_running_on_close INTEGER NOT NULL DEFAULT 0
             )",
         )?;
         // UI owned migration
@@ -207,6 +209,21 @@ impl Database {
             "ALTER TABLE ui_settings ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'",
             [],
         );
+        // Both UI and collector can open the database at startup. Serialize the
+        // schema check and update so concurrent opens cannot race the ALTER.
+        let tx = Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)?;
+        let has_close_preference: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('ui_settings') WHERE name = 'keep_running_on_close')",
+            [],
+            |row| row.get(0),
+        )?;
+        if !has_close_preference {
+            tx.execute(
+                "ALTER TABLE ui_settings ADD COLUMN keep_running_on_close INTEGER NOT NULL DEFAULT 0",
+                [],
+            )?;
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -367,7 +384,7 @@ impl Database {
     /// Loads all persisted UI settings.
     pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
         let mut stmt = self.conn.prepare(
-            "SELECT language, carbon_intensity, kwh_cost, theme, currency \
+            "SELECT language, carbon_intensity, kwh_cost, theme, currency, keep_running_on_close \
              FROM ui_settings WHERE id = 1",
         )?;
         let result = stmt
@@ -378,6 +395,7 @@ impl Database {
                     kwh_cost: row.get(2)?,
                     theme: row.get(3)?,
                     currency: row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "USD".to_string()),
+                    keep_running_on_close: row.get(5)?,
                 })
             })
             .optional()?;
@@ -387,16 +405,17 @@ impl Database {
     /// Persists all UI settings.
     pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency) \
-             VALUES (1, ?1, ?2, ?3, ?4, ?5) \
+            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency, keep_running_on_close) \
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6) \
              ON CONFLICT(id) DO UPDATE SET \
-               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5",
+               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, keep_running_on_close = ?6",
             params![
                 settings.language,
                 settings.carbon_intensity,
                 settings.kwh_cost,
                 settings.theme,
-                settings.currency
+                settings.currency,
+                settings.keep_running_on_close
             ],
         )?;
         Ok(())
@@ -1052,4 +1071,76 @@ fn to_system_time_records_with_duration(
 
 fn align_to_window_start(timestamp_ms: i64, window_ms: i64) -> i64 {
     timestamp_ms - timestamp_ms.rem_euclid(window_ms)
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    #[test]
+    fn existing_settings_default_to_asking_before_close() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE ui_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                language TEXT NOT NULL DEFAULT 'EN',
+                carbon_intensity TEXT NOT NULL DEFAULT 'World average',
+                kwh_cost TEXT NOT NULL DEFAULT 'World average',
+                theme TEXT NOT NULL DEFAULT 'Hunting'
+            );
+            INSERT INTO ui_settings VALUES (1, 'DE', 'Germany', '0.35', 'Hunting');",
+        )
+        .unwrap();
+
+        Database::create_settings_table_if_not_exists(&conn).unwrap();
+        Database::create_settings_table_if_not_exists(&conn).unwrap();
+        let database = Database { conn, tables: None };
+        let settings = database.load_ui_settings().unwrap().unwrap();
+        assert!(!settings.keep_running_on_close);
+        assert_eq!(settings.language, "DE");
+        assert_eq!(settings.carbon_intensity, "Germany");
+        assert_eq!(settings.kwh_cost, "0.35");
+        assert_eq!(settings.theme, "Hunting");
+        assert_eq!(settings.currency, "USD");
+    }
+
+    #[test]
+    fn close_preference_survives_reopening_and_can_be_disabled() {
+        let path = std::env::temp_dir().join(format!(
+            "wattseal-close-settings-{}-{}.db",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let open = || {
+            let conn = Connection::open(&path).unwrap();
+            Database::create_settings_table_if_not_exists(&conn).unwrap();
+            Database { conn, tables: None }
+        };
+        {
+            let mut database = open();
+            assert!(database.load_ui_settings().unwrap().is_none());
+            database
+                .conn
+                .execute("INSERT INTO ui_settings (id) VALUES (1)", [])
+                .unwrap();
+            let mut settings = database.load_ui_settings().unwrap().unwrap();
+            assert!(!settings.keep_running_on_close);
+            settings.keep_running_on_close = true;
+            settings.currency = "EUR".into();
+            database.save_ui_settings(&settings).unwrap();
+        }
+        {
+            let mut database = open();
+            let mut settings = database.load_ui_settings().unwrap().unwrap();
+            assert!(settings.keep_running_on_close);
+            assert_eq!(settings.currency, "EUR");
+            settings.keep_running_on_close = false;
+            database.save_ui_settings(&settings).unwrap();
+        }
+        assert!(!open().load_ui_settings().unwrap().unwrap().keep_running_on_close);
+        std::fs::remove_file(path).unwrap();
+    }
 }
