@@ -1780,6 +1780,26 @@ impl std::fmt::Display for TranslatedMetricType {
 
 // Close dialog
 
+pub fn settings_keep_running_on_close(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Keep running when window closes",
+        AppLanguage::German => "Nach Fensterschluss weiterlaufen",
+        AppLanguage::French => "Rester actif après fermeture",
+        AppLanguage::Chinese => "关闭窗口后继续运行",
+        AppLanguage::Romanian => "Continuă după închiderea ferestrei",
+    }
+}
+
+pub fn close_always_keep_running(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Always keep running",
+        AppLanguage::German => "Immer im Hintergrund weiterlaufen",
+        AppLanguage::French => "Toujours rester actif en arrière-plan",
+        AppLanguage::Chinese => "始终在后台运行",
+        AppLanguage::Romanian => "Continuă mereu în fundal",
+    }
+}
+
 pub fn close_dialog_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close WattSeal",

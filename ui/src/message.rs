@@ -19,6 +19,8 @@ pub enum Message {
     CustomKwhCostInput(String),
     ChangeCustomCurrency(Currency),
     ToggleLaunchOnStartup(bool),
+    ToggleKeepRunningOnClose(bool),
+    ToggleRememberKeepRunning(bool),
     OpenSettings,
     CloseSettings,
     ChangeChartMetricType(String, MetricKind),

@@ -8,7 +8,7 @@ use common::{
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
     time::{Duration, every},
-    widget::{Button, Column, Container, Row, Scrollable, Text, button, image, pick_list, stack, text_input},
+    widget::{Button, Column, Container, Row, Scrollable, Text, button, image, pick_list, stack, text_input, toggler},
     window,
 };
 
@@ -24,16 +24,18 @@ use crate::{
             SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL,
         },
         text::TextStyle,
+        toggler::TogglerStyle,
     },
     themes::AppTheme,
     translations::{
-        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description,
-        close_dialog_title, close_everything, close_ui_only, custom_carbon_invalid, custom_carbon_placeholder,
-        custom_kwh_cost_placeholder, database_migrating_description, database_migrating_title, format_emissions,
-        format_energy, format_number, info_modal_all_time_power, info_modal_all_time_top_consumer,
-        info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
-        info_modal_top_process, kwh_cost_invalid, modal_close, na, setup_choose_carbon, setup_choose_electricity,
-        setup_choose_language, setup_confirm, setup_welcome_title, theme_name,
+        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured,
+        close_always_keep_running, close_dialog_description, close_dialog_title, close_everything, close_ui_only,
+        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, database_migrating_description,
+        database_migrating_title, format_emissions, format_energy, format_number, info_modal_all_time_power,
+        info_modal_all_time_top_consumer, info_modal_current_power, info_modal_current_top_consumer,
+        info_modal_description, info_modal_title, info_modal_top_process, kwh_cost_invalid, modal_close, na,
+        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
+        theme_name,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
 };
@@ -69,6 +71,8 @@ pub struct App {
     all_time_data: AllTimeData,
     tick_count: u64,
     show_close_dialog: bool,
+    keep_running_on_close: bool,
+    remember_keep_running: bool,
     database_migration_pending: bool,
 }
 
@@ -86,22 +90,24 @@ impl App {
     fn ready(mut database: Database) -> (Self, Task<Message>) {
         let current_page = Page::Dashboard;
 
-        let (language, carbon_intensity, theme, electricity_cost, show_setup) = match database.load_ui_settings() {
-            Ok(Some(s)) => {
-                let lang = AppLanguage::from_code(&s.language);
-                let ci = CarbonIntensity::from_label(&s.carbon_intensity);
-                let theme = AppTheme::from_name(&s.theme);
-                let ec = ElectricityCost::from_label_and_currency(&s.kwh_cost, Some(&s.currency));
-                (lang, ci, theme, ec, false)
-            }
-            _ => (
-                AppLanguage::default(),
-                CarbonIntensity::PRESETS[8],
-                AppTheme::default(),
-                ElectricityCost::PRESETS[8],
-                true,
-            ),
-        };
+        let (language, carbon_intensity, theme, electricity_cost, show_setup, keep_running_on_close) =
+            match database.load_ui_settings() {
+                Ok(Some(s)) => {
+                    let lang = AppLanguage::from_code(&s.language);
+                    let ci = CarbonIntensity::from_label(&s.carbon_intensity);
+                    let theme = AppTheme::from_name(&s.theme);
+                    let ec = ElectricityCost::from_label_and_currency(&s.kwh_cost, Some(&s.currency));
+                    (lang, ci, theme, ec, false, s.keep_running_on_close)
+                }
+                _ => (
+                    AppLanguage::default(),
+                    CarbonIntensity::PRESETS[8],
+                    AppTheme::default(),
+                    ElectricityCost::PRESETS[8],
+                    true,
+                    false,
+                ),
+            };
         let custom_carbon_input = if carbon_intensity.is_custom() {
             format!("{:.0}", carbon_intensity.g_per_kwh)
         } else {
@@ -169,6 +175,8 @@ impl App {
                 all_time_data,
                 tick_count: 0,
                 show_close_dialog: false,
+                keep_running_on_close,
+                remember_keep_running: false,
                 database_migration_pending: false,
             },
             task,
@@ -204,6 +212,8 @@ impl App {
                 all_time_data: AllTimeData::default(),
                 tick_count: 0,
                 show_close_dialog: false,
+                keep_running_on_close: false,
+                remember_keep_running: false,
                 database_migration_pending: true,
             },
             Task::none(),
@@ -436,10 +446,35 @@ impl App {
                 Task::none()
             }
             Message::CloseRequested => {
+                if self.keep_running_on_close {
+                    return iced::exit();
+                }
+                self.remember_keep_running = false;
                 self.show_close_dialog = true;
                 Task::none()
             }
-            Message::CloseUIOnly => iced::exit(),
+            Message::ToggleKeepRunningOnClose(enabled) => {
+                let previous = self.keep_running_on_close;
+                self.keep_running_on_close = enabled;
+                if !self.persist_ui_settings() {
+                    self.keep_running_on_close = previous;
+                }
+                Task::none()
+            }
+            Message::ToggleRememberKeepRunning(enabled) => {
+                self.remember_keep_running = enabled;
+                Task::none()
+            }
+            Message::CloseUIOnly => {
+                if self.remember_keep_running {
+                    self.keep_running_on_close = true;
+                    if !self.persist_ui_settings() {
+                        self.keep_running_on_close = false;
+                        return Task::none();
+                    }
+                }
+                iced::exit()
+            }
             Message::CloseAll => {
                 std::process::exit(common::EXIT_CODE_SHUTDOWN_ALL);
             }
@@ -540,7 +575,9 @@ impl App {
             .push(self.footer.view(self.language))
             .into();
 
-        if self.settings_open {
+        if self.show_close_dialog {
+            modal(content, self.close_dialog_view(), Message::CloseUIOnly)
+        } else if self.settings_open {
             modal(
                 content,
                 self.settings_page.view(
@@ -551,13 +588,12 @@ impl App {
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
                     self.launch_on_startup,
+                    self.keep_running_on_close,
                 ),
                 Message::CloseSettings,
             )
         } else if self.show_setup {
             modal(content, self.setup_view(), Message::ConfirmSetup)
-        } else if self.show_close_dialog {
-            modal(content, self.close_dialog_view(), Message::CloseUIOnly)
         } else if let Some(ref target) = self.info_modal_open {
             modal(content, self.info_modal_view(target), Message::CloseInfoModal)
         } else {
@@ -854,7 +890,7 @@ impl App {
         }
     }
 
-    fn persist_ui_settings(&mut self) {
+    fn persist_ui_settings(&mut self) -> bool {
         let carbon_str = if self.carbon_intensity.is_custom() {
             format!("{}", self.carbon_intensity.g_per_kwh)
         } else {
@@ -871,8 +907,15 @@ impl App {
             kwh_cost: kwh_str,
             theme: theme_name(AppLanguage::English, self.theme).to_string(),
             currency: self.electricity_cost.currency_code.to_string(),
+            keep_running_on_close: self.keep_running_on_close,
         };
-        let _ = self.database.save_ui_settings(&settings);
+        match self.database.save_ui_settings(&settings) {
+            Ok(()) => true,
+            Err(error) => {
+                eprintln!("Failed to save UI settings: {error}");
+                false
+            }
+        }
     }
 
     fn close_dialog_view(&self) -> Element<'_, Message, AppTheme> {
@@ -893,15 +936,30 @@ impl App {
             .class(ButtonStyle::Standard)
             .on_press(Message::CloseAll);
 
-        let buttons = Row::new().spacing(SPACING_MEDIUM).push(ui_only_btn).push(close_all_btn);
+        let buttons = Row::new()
+            .spacing(SPACING_MEDIUM)
+            .push(ui_only_btn)
+            .push(close_all_btn)
+            .wrap()
+            .vertical_spacing(SPACING_MEDIUM);
 
-        let content = Column::new()
+        let mut content = Column::new()
             .spacing(SPACING_LARGE)
             .align_x(Alignment::Start)
             .push(title)
-            .push(description)
-            .align_x(Alignment::Center)
-            .push(buttons);
+            .push(description);
+
+        if !self.show_setup {
+            content = content.push(
+                toggler(self.remember_keep_running)
+                    .label(close_always_keep_running(language))
+                    .text_size(FONT_SIZE_BODY)
+                    .on_toggle(Message::ToggleRememberKeepRunning)
+                    .class(TogglerStyle::Standard),
+            );
+        }
+
+        let content = content.align_x(Alignment::Center).push(buttons);
 
         Container::new(content)
             .width(Length::Fixed(520.0))
