@@ -18,7 +18,7 @@ windows = { version = "0.62.2", features = [
 ] }
 
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
-nvml-wrapper = "0.12.1"
+nvml-wrapper = "0.13.0"
 
 [dependencies]
 common = { path = "../common" }
