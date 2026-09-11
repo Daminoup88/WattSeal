@@ -82,6 +82,34 @@ pub struct UiSettings {
     pub kwh_cost: String,
     pub theme: String,
     pub currency: String,
+    pub close_behavior: CloseBehavior,
+}
+
+/// The remembered action when the user closes the window.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum CloseBehavior {
+    #[default]
+    Ask,
+    WindowOnly,
+    Everything,
+}
+
+impl CloseBehavior {
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::Ask => "ask",
+            Self::WindowOnly => "window",
+            Self::Everything => "everything",
+        }
+    }
+
+    pub fn from_code(code: &str) -> Self {
+        match code {
+            "window" => Self::WindowOnly,
+            "everything" => Self::Everything,
+            _ => Self::Ask,
+        }
+    }
 }
 
 /// Error types for database operations.
@@ -199,7 +227,8 @@ impl Database {
                 carbon_intensity TEXT NOT NULL DEFAULT 'World average',
                 kwh_cost         TEXT NOT NULL DEFAULT 'World average',
                 theme            TEXT NOT NULL DEFAULT 'Hunting',
-                currency         TEXT NOT NULL DEFAULT 'USD'
+                currency         TEXT NOT NULL DEFAULT 'USD',
+                close_behavior TEXT NOT NULL DEFAULT 'ask'
             )",
         )?;
         // UI owned migration
@@ -207,6 +236,21 @@ impl Database {
             "ALTER TABLE ui_settings ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'",
             [],
         );
+        // Both UI and collector can open the database at startup. Serialize the
+        // schema check and update so concurrent opens cannot race the ALTER.
+        let tx = Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)?;
+        let has_close_preference: bool = tx.query_row(
+            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('ui_settings') WHERE name = 'close_behavior')",
+            [],
+            |row| row.get(0),
+        )?;
+        if !has_close_preference {
+            tx.execute(
+                "ALTER TABLE ui_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'ask'",
+                [],
+            )?;
+        }
+        tx.commit()?;
         Ok(())
     }
 
@@ -367,7 +411,7 @@ impl Database {
     /// Loads all persisted UI settings.
     pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
         let mut stmt = self.conn.prepare(
-            "SELECT language, carbon_intensity, kwh_cost, theme, currency \
+            "SELECT language, carbon_intensity, kwh_cost, theme, currency, close_behavior \
              FROM ui_settings WHERE id = 1",
         )?;
         let result = stmt
@@ -378,6 +422,7 @@ impl Database {
                     kwh_cost: row.get(2)?,
                     theme: row.get(3)?,
                     currency: row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "USD".to_string()),
+                    close_behavior: CloseBehavior::from_code(&row.get::<_, String>(5)?),
                 })
             })
             .optional()?;
@@ -387,16 +432,17 @@ impl Database {
     /// Persists all UI settings.
     pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency) \
-             VALUES (1, ?1, ?2, ?3, ?4, ?5) \
+            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency, close_behavior) \
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6) \
              ON CONFLICT(id) DO UPDATE SET \
-               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5",
+               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, close_behavior = ?6",
             params![
                 settings.language,
                 settings.carbon_intensity,
                 settings.kwh_cost,
                 settings.theme,
-                settings.currency
+                settings.currency,
+                settings.close_behavior.code()
             ],
         )?;
         Ok(())
@@ -1052,4 +1098,99 @@ fn to_system_time_records_with_duration(
 
 fn align_to_window_start(timestamp_ms: i64, window_ms: i64) -> i64 {
     timestamp_ms - timestamp_ms.rem_euclid(window_ms)
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    #[test]
+    fn existing_settings_default_to_asking_before_close() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE ui_settings (
+                id INTEGER PRIMARY KEY CHECK (id = 1),
+                language TEXT NOT NULL DEFAULT 'EN',
+                carbon_intensity TEXT NOT NULL DEFAULT 'World average',
+                kwh_cost TEXT NOT NULL DEFAULT 'World average',
+                theme TEXT NOT NULL DEFAULT 'Hunting'
+            );
+            INSERT INTO ui_settings VALUES (1, 'DE', 'Germany', '0.35', 'Hunting');",
+        )
+        .unwrap();
+
+        Database::create_settings_table_if_not_exists(&conn).unwrap();
+        Database::create_settings_table_if_not_exists(&conn).unwrap();
+        let database = Database { conn, tables: None };
+        let settings = database.load_ui_settings().unwrap().unwrap();
+        assert_eq!(settings.close_behavior, CloseBehavior::Ask);
+        assert_eq!(settings.language, "DE");
+        assert_eq!(settings.carbon_intensity, "Germany");
+        assert_eq!(settings.kwh_cost, "0.35");
+        assert_eq!(settings.theme, "Hunting");
+        assert_eq!(settings.currency, "USD");
+    }
+
+    #[test]
+    fn close_preference_survives_reopening_and_can_be_disabled() {
+        let path = std::env::temp_dir().join(format!(
+            "wattseal-close-settings-{}-{}.db",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        let open = || {
+            let conn = Connection::open(&path).unwrap();
+            Database::create_settings_table_if_not_exists(&conn).unwrap();
+            Database { conn, tables: None }
+        };
+        {
+            let mut database = open();
+            assert!(database.load_ui_settings().unwrap().is_none());
+            database
+                .conn
+                .execute("INSERT INTO ui_settings (id) VALUES (1)", [])
+                .unwrap();
+            let mut settings = database.load_ui_settings().unwrap().unwrap();
+            assert_eq!(settings.close_behavior, CloseBehavior::Ask);
+            settings.close_behavior = CloseBehavior::WindowOnly;
+            settings.currency = "EUR".into();
+            database.save_ui_settings(&settings).unwrap();
+        }
+        {
+            let mut database = open();
+            let mut settings = database.load_ui_settings().unwrap().unwrap();
+            assert_eq!(settings.close_behavior, CloseBehavior::WindowOnly);
+            assert_eq!(settings.currency, "EUR");
+            settings.close_behavior = CloseBehavior::Everything;
+            database.save_ui_settings(&settings).unwrap();
+        }
+        {
+            let mut database = open();
+            let mut settings = database.load_ui_settings().unwrap().unwrap();
+            assert_eq!(settings.close_behavior, CloseBehavior::Everything);
+            settings.close_behavior = CloseBehavior::Ask;
+            database.save_ui_settings(&settings).unwrap();
+        }
+        assert_eq!(
+            open().load_ui_settings().unwrap().unwrap().close_behavior,
+            CloseBehavior::Ask
+        );
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn unknown_close_behavior_prompts_instead_of_exiting() {
+        let conn = Connection::open_in_memory().unwrap();
+        Database::create_settings_table_if_not_exists(&conn).unwrap();
+        conn.execute("INSERT INTO ui_settings (id, close_behavior) VALUES (1, 'unknown')", [])
+            .unwrap();
+        let database = Database { conn, tables: None };
+        assert_eq!(
+            database.load_ui_settings().unwrap().unwrap().close_behavior,
+            CloseBehavior::Ask
+        );
+    }
 }

@@ -17,10 +17,10 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedCarbonIntensity, TranslatedElectricityCost, TranslatedTheme, custom_carbon_invalid,
-        custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
-        settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language,
-        settings_launch_on_startup, settings_theme, settings_title,
+        TranslatedCarbonIntensity, TranslatedCloseBehavior, TranslatedElectricityCost, TranslatedTheme,
+        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
+        settings_carbon_intensity, settings_close_behavior, settings_electricity_cost, settings_general,
+        settings_language, settings_launch_on_startup, settings_theme, settings_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
@@ -42,6 +42,7 @@ impl SettingsPage {
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
         launch_on_startup: bool,
+        close_behavior: common::CloseBehavior,
     ) -> Element<'a, Message, AppTheme> {
         let title = Text::new(settings_title(language))
             .size(FONT_SIZE_HEADER)
@@ -97,7 +98,20 @@ impl SettingsPage {
             content = content.push(launch_on_startup_row(language, launch_on_startup));
         }
 
-        let content = content.push(carbon_row).push(kwh_row);
+        let content = content
+            .push(settings_row(
+                settings_close_behavior(language),
+                pick_list(
+                    TranslatedCloseBehavior::all(language),
+                    Some(TranslatedCloseBehavior::new(close_behavior, language)),
+                    |choice| Message::ChangeCloseBehavior(choice.behavior),
+                )
+                .width(Length::FillPortion(3))
+                .padding(PADDING_MEDIUM)
+                .into(),
+            ))
+            .push(carbon_row)
+            .push(kwh_row);
 
         Container::new(content)
             .width(Length::Fixed(520.0))

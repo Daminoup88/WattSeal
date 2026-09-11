@@ -1780,6 +1780,63 @@ impl std::fmt::Display for TranslatedMetricType {
 
 // Close dialog
 
+pub fn settings_close_behavior(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "When closing",
+        AppLanguage::German => "Beim Schließen",
+        AppLanguage::French => "À la fermeture",
+        AppLanguage::Chinese => "关闭时",
+        AppLanguage::Romanian => "La închidere",
+    }
+}
+
+pub fn close_remember_choice(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Remember my choice",
+        AppLanguage::German => "Auswahl merken",
+        AppLanguage::French => "Mémoriser mon choix",
+        AppLanguage::Chinese => "记住我的选择",
+        AppLanguage::Romanian => "Reține alegerea mea",
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct TranslatedCloseBehavior {
+    pub behavior: common::CloseBehavior,
+    language: AppLanguage,
+}
+
+impl TranslatedCloseBehavior {
+    pub fn new(behavior: common::CloseBehavior, language: AppLanguage) -> Self {
+        Self { behavior, language }
+    }
+
+    pub fn all(language: AppLanguage) -> Vec<Self> {
+        use common::CloseBehavior;
+        [CloseBehavior::Ask, CloseBehavior::WindowOnly, CloseBehavior::Everything]
+            .into_iter()
+            .map(|behavior| Self::new(behavior, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedCloseBehavior {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let label = match self.behavior {
+            common::CloseBehavior::Ask => match self.language {
+                AppLanguage::English => "Ask every time",
+                AppLanguage::German => "Jedes Mal fragen",
+                AppLanguage::French => "Toujours demander",
+                AppLanguage::Chinese => "每次询问",
+                AppLanguage::Romanian => "Întreabă de fiecare dată",
+            },
+            common::CloseBehavior::WindowOnly => close_ui_only(self.language),
+            common::CloseBehavior::Everything => close_everything(self.language),
+        };
+        f.write_str(label)
+    }
+}
+
 pub fn close_dialog_title(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close WattSeal",

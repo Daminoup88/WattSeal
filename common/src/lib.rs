@@ -16,7 +16,9 @@ macro_rules! clog {
     }};
 }
 
-pub use database::{DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table};
+pub use database::{
+    CloseBehavior, DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table,
+};
 pub use singleton::SingletonGuard;
 pub use types::{
     AllTimeData, CPUData, ComputedSensorData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, IconData,
