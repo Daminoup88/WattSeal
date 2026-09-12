@@ -1,2 +1,0 @@
-[target.'cfg(not(target_os = "windows"))']
-rustflags = ["-C", "panic=abort"]
