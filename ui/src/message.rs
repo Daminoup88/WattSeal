@@ -19,6 +19,7 @@ pub enum Message {
     CustomKwhCostInput(String),
     ChangeCustomCurrency(Currency),
     ToggleLaunchOnStartup(bool),
+    OpenInstallFolder,
     OpenSettings,
     CloseSettings,
     ChangeChartMetricType(String, MetricKind),

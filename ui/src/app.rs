@@ -45,6 +45,15 @@ fn non_empty_string(value: &str) -> Option<String> {
     (!value.is_empty()).then(|| value.to_string())
 }
 
+/// Returns the directory containing the running executable, for display in Settings.
+///
+fn install_dir() -> String {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|dir| dir.display().to_string()))
+        .unwrap_or_default()
+}
+
 /// Main application state managing pages, sensors, and database.
 pub struct App {
     current_page: Page,
@@ -61,6 +70,7 @@ pub struct App {
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
     launch_on_startup: bool,
+    install_dir: String,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -162,6 +172,7 @@ impl App {
                 electricity_cost,
                 custom_kwh_cost_input,
                 launch_on_startup: common::autostart::is_enabled(),
+                install_dir: install_dir(),
                 show_setup,
                 theme,
                 database,
@@ -197,6 +208,7 @@ impl App {
                 electricity_cost: ElectricityCost::PRESETS[8],
                 custom_kwh_cost_input: String::new(),
                 launch_on_startup: common::autostart::is_enabled(),
+                install_dir: install_dir(),
                 show_setup: false,
                 theme,
                 database,
@@ -368,6 +380,10 @@ impl App {
                     }
                     Err(e) => common::clog!("✗ Failed to update launch-on-startup setting: {e}"),
                 }
+                Task::none()
+            }
+            Message::OpenInstallFolder => {
+                open::that(&self.install_dir).ok();
                 Task::none()
             }
             Message::ChangeChartMetricType(table_name, metric_type) => {
@@ -551,6 +567,7 @@ impl App {
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
                     self.launch_on_startup,
+                    &self.install_dir,
                 ),
                 Message::CloseSettings,
             )

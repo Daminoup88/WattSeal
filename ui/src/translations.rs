@@ -84,7 +84,27 @@ pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
         AppLanguage::German => "Beim Systemstart starten",
         AppLanguage::French => "Lancer au démarrage",
         AppLanguage::Chinese => "开机自启动",
-        AppLanguage::Romanian => "Pornește la conectare",
+        AppLanguage::Romanian => "Pornește la lansare",
+    }
+}
+
+pub fn settings_install_location(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Installation folder",
+        AppLanguage::German => "Installationsordner",
+        AppLanguage::French => "Dossier d'installation",
+        AppLanguage::Chinese => "安装文件夹",
+        AppLanguage::Romanian => "Dosar de instalare",
+    }
+}
+
+pub fn settings_open_folder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Open folder",
+        AppLanguage::German => "Ordner öffnen",
+        AppLanguage::French => "Ouvrir le dossier",
+        AppLanguage::Chinese => "打开文件夹",
+        AppLanguage::Romanian => "Deschide dosarul",
     }
 }
 
