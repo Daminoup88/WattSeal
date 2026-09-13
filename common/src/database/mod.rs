@@ -236,21 +236,10 @@ impl Database {
             "ALTER TABLE ui_settings ADD COLUMN currency TEXT NOT NULL DEFAULT 'USD'",
             [],
         );
-        // Both UI and collector can open the database at startup. Serialize the
-        // schema check and update so concurrent opens cannot race the ALTER.
-        let tx = Transaction::new_unchecked(conn, rusqlite::TransactionBehavior::Immediate)?;
-        let has_close_preference: bool = tx.query_row(
-            "SELECT EXISTS(SELECT 1 FROM pragma_table_info('ui_settings') WHERE name = 'close_behavior')",
+        let _ = conn.execute(
+            "ALTER TABLE ui_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'ask'",
             [],
-            |row| row.get(0),
-        )?;
-        if !has_close_preference {
-            tx.execute(
-                "ALTER TABLE ui_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'ask'",
-                [],
-            )?;
-        }
-        tx.commit()?;
+        );
         Ok(())
     }
 
