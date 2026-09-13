@@ -32,7 +32,7 @@ use crate::{
         scrollable::ScrollableStyle,
         style_constants::{
             FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_LARGE, SPACING_LARGE,
-            SPACING_MEDIUM, SPACING_SMALL, SPACING_XLARGE,
+            SPACING_MEDIUM, SPACING_SMALL,
         },
         text::TextStyle,
     },
@@ -759,7 +759,6 @@ impl SensorState {
             .into(),
             None => title_widget.into(),
         };
-        let title_widget = Container::new(title_widget).width(Length::Fill);
 
         let info_button: Button<'b, Message, AppTheme> = button(Text::new("?").size(FONT_SIZE_BODY).font(FONT_BOLD))
             .class(ButtonStyle::InfoHelp)
@@ -787,13 +786,13 @@ impl SensorState {
         }
         controls = controls.push(info_button);
 
-        Row::new()
-            .width(Length::Fill)
-            .spacing(SPACING_XLARGE)
-            .align_y(Alignment::Center)
-            .push(title_widget)
-            .push(controls.wrap().vertical_spacing(SPACING_MEDIUM))
-            .into()
+        super::chart_header::chart_header(
+            title_widget,
+            controls
+                .wrap()
+                .vertical_spacing(SPACING_MEDIUM)
+                .align_x(iced::alignment::Horizontal::Right),
+        )
     }
 
     fn process_limit_control<'b>(&'b self, state: &'b ProcessesState) -> Element<'b, Message, AppTheme> {
