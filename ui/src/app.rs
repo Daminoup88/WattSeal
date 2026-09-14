@@ -104,7 +104,7 @@ impl App {
                     AppTheme::default(),
                     ElectricityCost::PRESETS[8],
                     true,
-                    CloseBehavior::Ask,
+                    CloseBehavior::default(),
                 ),
             };
         let custom_carbon_input = if carbon_intensity.is_custom() {
@@ -211,7 +211,7 @@ impl App {
                 all_time_data: AllTimeData::default(),
                 tick_count: 0,
                 show_close_dialog: false,
-                close_behavior: CloseBehavior::Ask,
+                close_behavior: CloseBehavior::default(),
                 remember_close_choice: false,
                 database_migration_pending: true,
             },
