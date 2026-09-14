@@ -1,6 +1,10 @@
 use iced::{
     Alignment, Element, Length,
-    widget::{Button, Column, Container, Row, Text, button, pick_list, text_input, toggler},
+    widget::{
+        Button, Column, Container, Row, Text, button, pick_list,
+        text::Wrapping,
+        text_input, toggler,
+    },
 };
 
 use crate::{
@@ -19,8 +23,8 @@ use crate::{
     translations::{
         TranslatedCarbonIntensity, TranslatedElectricityCost, TranslatedTheme, custom_carbon_invalid,
         custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
-        settings_carbon_intensity, settings_electricity_cost, settings_general, settings_language,
-        settings_launch_on_startup, settings_theme, settings_title,
+        settings_carbon_intensity, settings_electricity_cost, settings_general, settings_install_location,
+        settings_language, settings_launch_on_startup, settings_open_folder, settings_theme, settings_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
@@ -42,6 +46,7 @@ impl SettingsPage {
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
         launch_on_startup: bool,
+        install_dir: &'a str,
     ) -> Element<'a, Message, AppTheme> {
         let title = Text::new(settings_title(language))
             .size(FONT_SIZE_HEADER)
@@ -91,7 +96,8 @@ impl SettingsPage {
             .push(top_row)
             .push(subtitle)
             .push(theme_row)
-            .push(language_row);
+            .push(language_row)
+            .push(install_location_row(language, install_dir));
 
         if common::autostart::is_supported() {
             content = content.push(launch_on_startup_row(language, launch_on_startup));
@@ -115,6 +121,88 @@ fn settings_row<'a>(label: &'a str, control: Element<'a, Message, AppTheme>) -> 
         .push(Text::new(label).size(FONT_SIZE_BODY).width(Length::FillPortion(2)))
         .push(control)
         .into()
+}
+
+/// Longest install path we'll display before middle-truncating it. Kept at roughly
+/// single-line capacity for this row: the text shaper treats `\` as a break point,
+/// so a path that doesn't fit on one line wraps right after the drive letter
+/// (e.g. "C:\" alone on line 1, everything else crammed onto line 2) rather than
+/// wrapping cleanly - so we truncate before that point instead of past it.
+const INSTALL_PATH_MAX_CHARS: usize = 42;
+
+/// Middle-truncates a long path, keeping the start (drive/root) and end (innermost
+/// folder) visible since those are the most useful parts to recognize at a glance.
+///
+/// Only ever drops whole path components (never cuts through the middle of a
+/// folder name) by growing the kept prefix/suffix one component at a time,
+/// replacing whatever's dropped in between with a lone "..." segment.
+fn truncate_path_display(path: &str, max_chars: usize) -> String {
+    if path.chars().count() <= max_chars {
+        return path.to_string();
+    }
+
+    let separator = if path.contains('\\') { '\\' } else { '/' };
+    let components: Vec<&str> = path.split(separator).collect();
+
+    let mut front_end = 1;
+    let mut back_start = components.len().saturating_sub(1);
+    if front_end >= back_start {
+        return path.to_string();
+    }
+
+    const ELLIPSIS: &str = "...";
+    let segment_len = |range: std::ops::Range<usize>| -> usize {
+        components[range].iter().map(|c| c.chars().count() + 1).sum()
+    };
+
+    let mut grow_front = true;
+    loop {
+        let (candidate_front, candidate_back) = if grow_front {
+            (front_end + 1, back_start)
+        } else {
+            (front_end, back_start - 1)
+        };
+        if candidate_front >= candidate_back {
+            break;
+        }
+        let total = segment_len(0..candidate_front) + ELLIPSIS.len() + segment_len(candidate_back..components.len());
+        if total > max_chars {
+            break;
+        }
+        front_end = candidate_front;
+        back_start = candidate_back;
+        grow_front = !grow_front;
+    }
+
+    let front = components[..front_end].join(&separator.to_string());
+    let back = components[back_start..].join(&separator.to_string());
+    format!("{front}{separator}{ELLIPSIS}{separator}{back}")
+}
+
+/// Renders as a labeled block (not a `settings_row`): the label sits on its own
+/// line, with the path (left-aligned, wrapping up to ~2 lines) and the "Open
+/// folder" button (right-aligned, inline with the path) directly beneath it.
+fn install_location_row<'a>(language: AppLanguage, install_dir: &'a str) -> Element<'a, Message, AppTheme> {
+    let label = Text::new(settings_install_location(language)).size(FONT_SIZE_BODY);
+
+    let path_text = Text::new(truncate_path_display(install_dir, INSTALL_PATH_MAX_CHARS))
+        .size(FONT_SIZE_BODY)
+        .class(TextStyle::Muted)
+        .wrapping(Wrapping::WordOrGlyph)
+        .width(Length::Fill);
+
+    let open_button: Button<'_, Message, AppTheme> =
+        button(Text::new(settings_open_folder(language)).size(FONT_SIZE_BODY))
+            .class(ButtonStyle::Standard)
+            .on_press(Message::OpenInstallFolder);
+
+    let path_row = Row::new()
+        .spacing(SPACING_LARGE)
+        .align_y(Alignment::Start)
+        .push(path_text)
+        .push(open_button);
+
+    Column::new().spacing(4).push(label).push(path_row).into()
 }
 
 fn launch_on_startup_row<'a>(language: AppLanguage, launch_on_startup: bool) -> Element<'a, Message, AppTheme> {
