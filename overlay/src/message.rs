@@ -1,7 +1,9 @@
 //! Messages handled by the overlay application.
 
-use crate::config::{Density, FontSize, Layout, Metric};
-use crate::theme::ThemeChoice;
+use crate::{
+    config::{Density, FontSize, Layout, Metric},
+    theme::ThemeChoice,
+};
 
 /// All events handled by [`crate::app::OverlayApp`].
 #[derive(Debug, Clone)]

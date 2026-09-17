@@ -356,10 +356,7 @@ fn setup_tray(
 /// Returns `true` if the tray was set up and the GTK loop ran (i.e. the app lifecycle
 /// was fully handled). Returns `false` if setup failed so the caller can fall back.
 #[cfg(target_os = "linux")]
-fn run_linux_tray(
-    ui_child: &Arc<Mutex<Option<Child>>>,
-    overlay_child: &Arc<Mutex<Option<Child>>>,
-) -> bool {
+fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>, overlay_child: &Arc<Mutex<Option<Child>>>) -> bool {
     if gtk::init().is_err() {
         return false;
     }

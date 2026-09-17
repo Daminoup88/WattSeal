@@ -1,7 +1,6 @@
-use std::{collections::HashMap, process::Command, time::SystemTime};
-
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
+use std::{collections::HashMap, process::Command, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
@@ -272,10 +271,7 @@ impl App {
                 // half the tick rate — it is a tiny file, and 2s lag is fine for
                 // a button label.
                 if self.tick_count % 2 == 0 {
-                    let requested = overlay_requested();
-                    if requested != self.overlay_on {
-                        self.overlay_on = requested;
-                    }
+                    self.overlay_on = overlay_requested();
                 }
                 if self.tick_count == 1 || self.tick_count % 10 == 0 {
                     self.refresh_process_data();

@@ -1,8 +1,9 @@
 //! WattSeal always-on-top overlay widget.
 //!
 //! This crate is a self-contained library that the **main binary** runs in its
-//! own process via `WattSeal.exe --overlay` (launched from the tray). It never
-//! blocks the main application thread and owns its own state, theme and config.
+//! own process via `WattSeal.exe --overlay` (started from the tray or from the
+//! main window's footer). It never blocks the main application thread and owns
+//! its own state, theme and config.
 
 pub mod app;
 pub mod config;
@@ -12,37 +13,32 @@ pub mod winlayer;
 
 /// Runs the overlay window.
 ///
-/// On Windows, per-pixel window transparency only composites correctly when the
-/// GPU surface exposes a pre/post-multiplied alpha mode — provided by Vulkan
-/// but usually not by DX12 (`AlphaMode::Ignore`). When the Vulkan loader is
-/// present we therefore prefer the Vulkan backend so the default `Auto`
-/// transparency mode stays translucent; the `Layered` mode works on any backend
-/// via a Win32 layered window.
+/// Transparency is delegated to the platform: [`config::Transparency::Auto`]
+/// resolves to a Win32 layered window on Windows (where the GPU surface exposes
+/// no alpha-capable composite mode) and to per-pixel surface alpha elsewhere.
 pub fn run() -> iced::Result {
     init_logging();
-
-    // The layered path is GPU-independent, so only steer towards Vulkan when
-    // the per-pixel surface path is selected and a Vulkan loader exists.
-    #[cfg(target_os = "windows")]
-    if !config::OverlayConfig::load()
-        .unwrap_or_default()
-        .transparency
-        .uses_layered()
-        && std::env::var_os("WGPU_BACKEND").is_none()
-        && vulkan_loader_present()
-    {
-        // SAFETY: called once at startup, before the event loop spawns threads.
-        unsafe { std::env::set_var("WGPU_BACKEND", "vulkan") };
-    }
-
     app::run()
 }
 
-/// Installs a tiny file logger so the renderer diagnostics — selected adapter,
-/// surface format and **alpha mode** — end up in `overlay.log`. This is the key
-/// data needed to explain why a window may still render opaque.
+/// Where the opt-in log is written: `overlay.log` next to the executable.
+static LOG_PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+
+/// Installs a tiny file logger, but only when `WATTSEAL_OVERLAY_LOG` is set.
+///
+/// The renderer diagnostics (selected adapter, surface format and **alpha mode**)
+/// are the only way to explain why a window renders opaque on a machine we cannot
+/// inspect, which is the kind of report an overlay attracts. It is opt-in so a
+/// normal run never writes to the user's disk.
 fn init_logging() {
     use std::io::Write;
+
+    if std::env::var_os("WATTSEAL_OVERLAY_LOG").is_none() {
+        return;
+    }
+    LOG_PATH
+        .set(config::OverlayConfig::path().with_file_name("overlay.log"))
+        .ok();
 
     struct FileLogger;
 
@@ -52,11 +48,10 @@ fn init_logging() {
         }
 
         fn log(&self, record: &log::Record) {
-            if let Ok(mut file) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("overlay.log")
-            {
+            let Some(path) = LOG_PATH.get() else {
+                return;
+            };
+            if let Ok(mut file) = std::fs::OpenOptions::new().create(true).append(true).open(path) {
                 let _ = writeln!(file, "[{}] {}", record.level(), record.args());
             }
         }
@@ -68,12 +63,4 @@ fn init_logging() {
 
     let _ = log::set_logger(&LOGGER);
     log::set_max_level(log::LevelFilter::Info);
-}
-
-/// Heuristic: the Vulkan loader (`vulkan-1.dll`) is installed in System32.
-#[cfg(target_os = "windows")]
-fn vulkan_loader_present() -> bool {
-    std::env::var("SystemRoot")
-        .map(|root| std::path::Path::new(&root).join("System32").join("vulkan-1.dll").exists())
-        .unwrap_or(false)
 }

@@ -11,21 +11,16 @@ use serde::{Deserialize, Serialize};
 use crate::config::{BgColor, TextColor};
 
 /// Overlay color scheme.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum ThemeChoice {
+    #[default]
     Dark,
     Light,
 }
 
 impl ThemeChoice {
     pub const ALL: &[ThemeChoice] = &[ThemeChoice::Dark, ThemeChoice::Light];
-}
-
-impl Default for ThemeChoice {
-    fn default() -> Self {
-        ThemeChoice::Dark
-    }
 }
 
 impl std::fmt::Display for ThemeChoice {

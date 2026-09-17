@@ -8,15 +8,11 @@ use std::collections::HashMap;
 use common::{ComputedSensorData, Database};
 use iced::{
     Alignment, Background, Border, Color, Element, Font, Length, Padding, Shadow, Subscription, Task, Theme, Vector,
-    font::{Family, Weight},
-    widget::{
-        Button, Column, Container, Row, Space, Text, button, checkbox, mouse_area, pick_list, slider,
-    },
-    window,
-};
-use iced::{
     event,
+    font::{Family, Weight},
     time::{Duration, every},
+    widget::{Button, Column, Container, Row, Space, Text, button, checkbox, mouse_area, pick_list, slider},
+    window,
 };
 
 use crate::{
@@ -46,9 +42,6 @@ const VALUE_CHAR_W: f32 = 0.62;
 /// Padding inside each right-click menu segment, and the gap between segments.
 const SEGMENT_PADDING: f32 = 6.0;
 const MENU_GAP: f32 = 3.0;
-
-
-
 
 const TOP_NAME_MAX: usize = 14;
 
@@ -95,10 +88,7 @@ impl OverlayApp {
             database,
         };
 
-        let task = Task::batch([
-            window::latest().map(Message::WindowId),
-            Task::done(Message::Tick),
-        ]);
+        let task = Task::batch([window::latest().map(Message::WindowId), Task::done(Message::Tick)]);
         (app, task)
     }
 
@@ -155,10 +145,7 @@ impl OverlayApp {
                 self.apply_click_through();
                 Task::none()
             }
-            Message::StartDrag => self
-                .window_id
-                .map(|id| window::drag::<Message>(id))
-                .unwrap_or_else(Task::none),
+            Message::StartDrag => self.window_id.map(window::drag::<Message>).unwrap_or_else(Task::none),
             Message::Moved(x, y) => {
                 self.config.position = Some((x, y));
                 Task::none()
@@ -269,7 +256,11 @@ impl OverlayApp {
             Message::ToggleAlwaysOnTop(v) => {
                 self.config.always_on_top = v;
                 self.persist();
-                self.set_level(if v { window::Level::AlwaysOnTop } else { window::Level::Normal })
+                self.set_level(if v {
+                    window::Level::AlwaysOnTop
+                } else {
+                    window::Level::Normal
+                })
             }
             Message::SetWidth(v) => {
                 self.config.width = v.clamp(60.0, 600.0);
@@ -336,9 +327,7 @@ impl OverlayApp {
             // No `spacing` here: the filler already carries the gap, and adding
             // one would make the content need more height than `fitted_height`
             // accounts for.
-            Column::new()
-                .push(Space::new().height(Length::Fill))
-                .push(body)
+            Column::new().push(Space::new().height(Length::Fill)).push(body)
         };
 
         let card = Container::new(column)
@@ -416,7 +405,6 @@ impl OverlayApp {
         mouse_area(bar).on_press(Message::StartDrag).into()
     }
 
-
     fn view_metrics(
         &self,
         palette: Palette,
@@ -470,7 +458,11 @@ impl OverlayApp {
                                 row = row.push(sep());
                             }
                             first = false;
-                            row = row.push(Text::new(truncate(name, TOP_NAME_MAX)).size(label_size).color(palette.muted));
+                            row = row.push(
+                                Text::new(truncate(name, TOP_NAME_MAX))
+                                    .size(label_size)
+                                    .color(palette.muted),
+                            );
                             row = row.push(
                                 Text::new(self.format_value(Some(*watts)))
                                     .size(value_size)
@@ -516,7 +508,12 @@ impl OverlayApp {
     ) -> Element<'_, Message, Theme> {
         let mut row = Row::new().spacing(6).align_y(Alignment::Center);
         if self.config.show_labels {
-            row = row.push(Text::new(label).size(label_size).color(palette.muted).width(Length::Fill));
+            row = row.push(
+                Text::new(label)
+                    .size(label_size)
+                    .color(palette.muted)
+                    .width(Length::Fill),
+            );
         } else {
             row = row.push(Space::new().width(Length::Fill));
         }
@@ -556,13 +553,52 @@ impl OverlayApp {
                 font,
                 palette,
             ))
-            .push(picker("Transparency", pick_list(Transparency::ALL, Some(self.config.transparency), Message::SetTransparency), font, palette))
-            .push(picker("Layout", pick_list(Layout::ALL, Some(self.config.layout), Message::SetLayout), font, palette))
-            .push(picker("Density", pick_list(Density::ALL, Some(self.config.density), Message::SetDensity), font, palette))
-            .push(picker("Text size", pick_list(FontSize::ALL, Some(self.config.font_size), Message::SetFontSize), font, palette))
-            .push(picker("Theme", pick_list(ThemeChoice::ALL, Some(self.config.theme), Message::SetTheme), font, palette))
-            .push(picker("Decimals", pick_list(DECIMALS, Some(self.config.decimals), Message::SetDecimals), font, palette))
-            .push(picker("Refresh", pick_list(REFRESH, Some(self.config.refresh_secs), Message::SetRefresh), font, palette))
+            .push(picker(
+                "Transparency",
+                pick_list(
+                    Transparency::ALL,
+                    Some(self.config.transparency),
+                    Message::SetTransparency,
+                ),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Layout",
+                pick_list(Layout::ALL, Some(self.config.layout), Message::SetLayout),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Density",
+                pick_list(Density::ALL, Some(self.config.density), Message::SetDensity),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Text size",
+                pick_list(FontSize::ALL, Some(self.config.font_size), Message::SetFontSize),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Theme",
+                pick_list(ThemeChoice::ALL, Some(self.config.theme), Message::SetTheme),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Decimals",
+                pick_list(DECIMALS, Some(self.config.decimals), Message::SetDecimals),
+                font,
+                palette,
+            ))
+            .push(picker(
+                "Refresh",
+                pick_list(REFRESH, Some(self.config.refresh_secs), Message::SetRefresh),
+                font,
+                palette,
+            ))
             .push(
                 Row::new()
                     .spacing(12)
@@ -665,13 +701,7 @@ impl OverlayApp {
             .width(Length::Fill)
             .push(window_col)
             .push(content_col)
-            .push(
-                Row::new()
-                    .spacing(8)
-                    .align_y(Alignment::Center)
-                    .push(done)
-                    .push(quit),
-            );
+            .push(Row::new().spacing(8).align_y(Alignment::Center).push(done).push(quit));
 
         Row::new()
             .spacing(20)
@@ -743,7 +773,11 @@ impl OverlayApp {
         match watts {
             Some(w) => {
                 let number = format!("{w:.prec$}", prec = self.config.decimals as usize);
-                if self.config.show_units { format!("{number}W") } else { number }
+                if self.config.show_units {
+                    format!("{number}W")
+                } else {
+                    number
+                }
             }
             None => String::from("—"),
         }
@@ -768,7 +802,11 @@ impl OverlayApp {
                 _ => continue,
             };
             if let Some(energy) = data.total_energy() {
-                let secs = if duration_ms > 0 { duration_ms as f64 / 1000.0 } else { 1.0 };
+                let secs = if duration_ms > 0 {
+                    duration_ms as f64 / 1000.0
+                } else {
+                    1.0
+                };
                 map.insert(metric.id().to_string(), energy.as_watts_for_seconds(secs));
             }
         }
@@ -822,9 +860,8 @@ impl OverlayApp {
     /// Applies the click-through extended styles for "pin mode".
     fn apply_click_through(&self) {
         if let Some(hwnd) = self.window_raw {
-            let through = self.config.pin_mode
-                && self.config.pin_click_through
-                && crate::winlayer::click_through_supported();
+            let through =
+                self.config.pin_mode && self.config.pin_click_through && crate::winlayer::click_through_supported();
             crate::winlayer::set_click_through(hwnd, through);
         }
     }
@@ -1003,10 +1040,7 @@ impl OverlayApp {
 /// Snaps to the top-right corner of the monitor, keeping a small margin.
 fn anchor_point(monitor: iced::Size, width: f32, _height: f32) -> iced::Point {
     const MARGIN: f32 = 16.0;
-    iced::Point::new(
-        (monitor.width - width - MARGIN).max(MARGIN),
-        MARGIN,
-    )
+    iced::Point::new((monitor.width - width - MARGIN).max(MARGIN), MARGIN)
 }
 
 fn truncate(name: &str, max: usize) -> String {
@@ -1058,7 +1092,9 @@ fn header_style(palette: Palette) -> impl Fn(&Theme) -> iced::widget::container:
 fn flat_button(palette: Palette) -> impl Fn(&Theme, button::Status) -> button::Style {
     move |_theme, status| button::Style {
         background: match status {
-            button::Status::Hovered | button::Status::Pressed => Some(Background::Color(with_alpha(palette.text, 0.12))),
+            button::Status::Hovered | button::Status::Pressed => {
+                Some(Background::Color(with_alpha(palette.text, 0.12)))
+            }
             _ => None,
         },
         text_color: palette.muted,
@@ -1069,14 +1105,22 @@ fn flat_button(palette: Palette) -> impl Fn(&Theme, button::Status) -> button::S
 }
 
 fn label<'a>(text: &'a str, font: f32, palette: Palette) -> Element<'a, Message, Theme> {
-    Text::new(text).size(font).color(palette.muted).width(Length::Fill).into()
+    Text::new(text)
+        .size(font)
+        .color(palette.muted)
+        .width(Length::Fill)
+        .into()
 }
 
 fn section_title<'a>(text: &'a str, font: f32, palette: Palette) -> Element<'a, Message, Theme> {
-    Text::new(text).size(font).font(Font {
-        weight: Weight::Bold,
-        ..Font::DEFAULT
-    }).color(palette.text).into()
+    Text::new(text)
+        .size(font)
+        .font(Font {
+            weight: Weight::Bold,
+            ..Font::DEFAULT
+        })
+        .color(palette.text)
+        .into()
 }
 
 fn picker<'a>(
@@ -1104,7 +1148,11 @@ fn toggle(
     font: f32,
     _palette: Palette,
 ) -> Element<'static, Message, Theme> {
-    checkbox(checked).label(title).text_size(font).on_toggle(on_toggle).into()
+    checkbox(checked)
+        .label(title)
+        .text_size(font)
+        .on_toggle(on_toggle)
+        .into()
 }
 
 fn step_button<'a>(text: &'a str, message: Message, palette: Palette, font: f32) -> Element<'a, Message, Theme> {

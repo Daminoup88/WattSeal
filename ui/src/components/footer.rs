@@ -60,10 +60,7 @@ impl Footer {
                 .spacing(SPACING_SMALL)
                 .align_y(Alignment::Center)
                 .push(Icon::Display.to_text().size(FONT_SIZE_SMALL))
-                .push(
-                    Text::new(if overlay_on { "Hide overlay" } else { "Show overlay" })
-                        .size(FONT_SIZE_SMALL),
-                ),
+                .push(Text::new(if overlay_on { "Hide overlay" } else { "Show overlay" }).size(FONT_SIZE_SMALL)),
         )
         .padding(Padding::from([4.0, 12.0]))
         .class(if overlay_on {

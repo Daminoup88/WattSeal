@@ -26,8 +26,7 @@ pub enum Metric {
 }
 
 impl Metric {
-    pub const DEFAULT_ORDER: &[Metric] =
-        &[Metric::Total, Metric::Cpu, Metric::Gpu, Metric::Ram, Metric::TopApps];
+    pub const DEFAULT_ORDER: &[Metric] = &[Metric::Total, Metric::Cpu, Metric::Gpu, Metric::Ram, Metric::TopApps];
 
     pub const ALL: &[Metric] = &[
         Metric::Total,
@@ -83,10 +82,11 @@ impl Metric {
 }
 
 /// Widget orientation.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
     /// One metric per line.
+    #[default]
     Vertical,
     /// All metrics on a single compact line (MSI-Afterburner OSD style).
     Horizontal,
@@ -94,12 +94,6 @@ pub enum Layout {
 
 impl Layout {
     pub const ALL: &[Layout] = &[Layout::Vertical, Layout::Horizontal];
-}
-
-impl Default for Layout {
-    fn default() -> Self {
-        Layout::Vertical
-    }
 }
 
 impl std::fmt::Display for Layout {
@@ -112,10 +106,11 @@ impl std::fmt::Display for Layout {
 }
 
 /// Layout density (padding / spacing).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Density {
     Ultra,
+    #[default]
     Compact,
     Normal,
 }
@@ -148,12 +143,6 @@ impl Density {
     }
 }
 
-impl Default for Density {
-    fn default() -> Self {
-        Density::Compact
-    }
-}
-
 impl std::fmt::Display for Density {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -166,9 +155,10 @@ impl std::fmt::Display for Density {
 }
 
 /// Text size.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum FontSize {
+    #[default]
     Small,
     Medium,
     Large,
@@ -194,12 +184,6 @@ impl FontSize {
     }
 }
 
-impl Default for FontSize {
-    fn default() -> Self {
-        FontSize::Small
-    }
-}
-
 impl std::fmt::Display for FontSize {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -216,10 +200,11 @@ impl std::fmt::Display for FontSize {
 /// Alpha cannot be controlled per-element on Windows (the swapchain only offers
 /// `Opaque`, so translucency is applied to the whole layered window), but the
 /// *hue* is free — this is how you tune the card's look.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BgColor {
     /// Follow the theme.
+    #[default]
     Auto,
     Slate,
     Graphite,
@@ -257,12 +242,6 @@ impl BgColor {
     }
 }
 
-impl Default for BgColor {
-    fn default() -> Self {
-        BgColor::Auto
-    }
-}
-
 impl std::fmt::Display for BgColor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -281,10 +260,11 @@ impl std::fmt::Display for BgColor {
 
 /// Selectable text color. Separate from the background so contrast stays
 /// tunable even though alpha cannot be.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TextColor {
     /// Follow the theme.
+    #[default]
     Auto,
     White,
     Silver,
@@ -322,12 +302,6 @@ impl TextColor {
     }
 }
 
-impl Default for TextColor {
-    fn default() -> Self {
-        TextColor::Auto
-    }
-}
-
 impl std::fmt::Display for TextColor {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let s = match self {
@@ -345,11 +319,12 @@ impl std::fmt::Display for TextColor {
 }
 
 /// How the window achieves translucency.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Transparency {
     /// Per-pixel alpha through the window surface (best quality). Needs a
     /// backend that exposes alpha — Vulkan does, DX12 usually does not.
+    #[default]
     Auto,
     /// Win32 layered window with uniform alpha (GPU-independent fallback: the
     /// whole window, text included, is composited at one alpha).
@@ -359,20 +334,19 @@ pub enum Transparency {
 }
 
 impl Transparency {
-    pub const ALL: &[Transparency] = &[
-        Transparency::Auto,
-        Transparency::Layered,
-        Transparency::Off,
-    ];
+    pub const ALL: &[Transparency] = &[Transparency::Auto, Transparency::Layered, Transparency::Off];
 
     /// Whether to composite through a Win32 layered window. `Auto` picks the
     /// layered path on Windows because DX12 drops surface alpha, and the
     /// per-pixel path elsewhere.
     pub fn uses_layered(self) -> bool {
+        // Kept as an explicit `match` rather than `matches!`: the `Auto` arm is
+        // `cfg`-dependent, so collapsing it would silently become wrong on the
+        // other platform.
         match self {
             Transparency::Auto => cfg!(target_os = "windows"),
             Transparency::Layered => true,
-            _ => false,
+            Transparency::Off => false,
         }
     }
 
@@ -386,12 +360,6 @@ impl Transparency {
 
     pub fn enabled(self) -> bool {
         !matches!(self, Transparency::Off)
-    }
-}
-
-impl Default for Transparency {
-    fn default() -> Self {
-        Transparency::Auto
     }
 }
 
