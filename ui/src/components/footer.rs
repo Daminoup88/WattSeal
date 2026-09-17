@@ -24,7 +24,7 @@ const ISSUES_URL: &str = "https://github.com/Daminoup88/WattSeal/issues/new/choo
 pub struct Footer;
 
 impl Footer {
-    pub fn view(&self, language: AppLanguage) -> Element<'_, Message, AppTheme> {
+    pub fn view(&self, language: AppLanguage, overlay_on: bool) -> Element<'_, Message, AppTheme> {
         let version = Text::new(format!("{} v{}", app_name(language), env!("CARGO_PKG_VERSION")))
             .size(FONT_SIZE_SMALL)
             .class(TextStyle::Muted);
@@ -52,9 +52,31 @@ impl Footer {
         .class(ButtonStyle::Footer)
         .on_press(Message::OpenUrl(ISSUES_URL.to_string()));
 
+        // Also the only entry point on systems without a tray (e.g. GNOME
+        // without the AppIndicator extension), so it lives in the footer rather
+        // than behind the tray menu.
+        let overlay_button = button(
+            Row::new()
+                .spacing(SPACING_SMALL)
+                .align_y(Alignment::Center)
+                .push(Icon::Display.to_text().size(FONT_SIZE_SMALL))
+                .push(
+                    Text::new(if overlay_on { "Hide overlay" } else { "Show overlay" })
+                        .size(FONT_SIZE_SMALL),
+                ),
+        )
+        .padding(Padding::from([4.0, 12.0]))
+        .class(if overlay_on {
+            ButtonStyle::FooterPrimary
+        } else {
+            ButtonStyle::Footer
+        })
+        .on_press(Message::ToggleOverlay(!overlay_on));
+
         let right_section = Row::new()
             .spacing(SPACING_MEDIUM)
             .align_y(Alignment::Center)
+            .push(overlay_button)
             .push(star_button)
             .push(issue_button);
 

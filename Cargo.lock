@@ -5631,6 +5631,7 @@ dependencies = [
  "iced",
  "image 0.25.10",
  "open",
+ "overlay",
  "plotters",
  "plotters-backend",
  "plotters-iced2",
