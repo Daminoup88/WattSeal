@@ -18,8 +18,13 @@ pub enum Message {
     Moved(f32, f32),
     /// Toggle the settings panel.
     ToggleSettings,
-    /// Show the native right-click context menu.
+    /// Replace the bar with the right-click menu.
     OpenMenu,
+    /// Put the metrics back, dismissing the menu.
+    CloseMenu,
+    /// Toggle pin mode.
+    TogglePin,
+    TogglePinClickThrough(bool),
 
     // appearance
     ChangeOpacity(f32),

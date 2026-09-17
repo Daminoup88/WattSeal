@@ -447,10 +447,22 @@ pub struct OverlayConfig {
     /// layout ignores it and measures its own content instead.
     #[serde(default = "default_width")]
     pub width: f32,
-    /// "Pin mode": the window becomes transparent to the mouse, so clicks land
-    /// on whatever is underneath. Only the tray can release it again.
+    /// Whether the overlay should be running. The main window flips this to
+    /// `false` to close the overlay; the overlay only ever reads it, so a
+    /// standalone `--overlay` run is unaffected by a stale value.
+    #[serde(default = "default_true")]
+    pub overlay_requested: bool,
+    /// "Pin mode": the overlay stops responding to the mouse so it cannot be
+    /// moved by accident. See `pin_click_through` for how far that goes.
     #[serde(default)]
     pub pin_mode: bool,
+    /// When set, pin mode also makes the window transparent to the mouse, so
+    /// every click lands on whatever is underneath. That is the strict overlay
+    /// behaviour, but it means the right-click menu can no longer be reached and
+    /// the overlay has to be released from the tray. Pinning always locks the
+    /// position, whether or not this is set.
+    #[serde(default = "default_true")]
+    pub pin_click_through: bool,
     #[serde(default)]
     pub blur: bool,
     #[serde(default)]
@@ -503,7 +515,9 @@ impl Default for OverlayConfig {
             refresh_secs: default_refresh(),
             always_on_top: true,
             width: default_width(),
+            overlay_requested: true,
             pin_mode: false,
+            pin_click_through: true,
             blur: false,
             position: None,
             metrics: default_metrics(),

@@ -77,3 +77,20 @@ pub fn set_click_through(hwnd: u64, enabled: bool) -> bool {
 pub fn set_click_through(_hwnd: u64, _enabled: bool) -> bool {
     false
 }
+
+/// Whether mouse pass-through can actually be applied here.
+///
+/// Only Windows is implemented; macOS (`setIgnoresMouseEvents`) and X11 (input
+/// shape) would each need their own branch, and Wayland has no protocol for it
+/// at all. Where it is unavailable, pin mode still locks the position and the
+/// right-click menu remains reachable.
+#[cfg(target_os = "windows")]
+pub const fn click_through_supported() -> bool {
+    true
+}
+
+/// See the Windows variant.
+#[cfg(not(target_os = "windows"))]
+pub const fn click_through_supported() -> bool {
+    false
+}

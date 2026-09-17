@@ -43,6 +43,10 @@ const SETTINGS_HEIGHT: f32 = 452.0;
 const LABEL_CHAR_W: f32 = 0.52;
 const VALUE_CHAR_W: f32 = 0.62;
 
+/// Padding inside each right-click menu segment, and the gap between segments.
+const SEGMENT_PADDING: f32 = 6.0;
+const MENU_GAP: f32 = 3.0;
+
 
 
 
@@ -59,7 +63,12 @@ pub struct OverlayApp {
     window_raw: Option<u64>,
     power: HashMap<String, f64>,
     top_apps: Vec<(String, f64)>,
+    /// Last `overlay_requested` value seen in the shared config. Only a true to
+    /// false transition closes the overlay.
+    requested: bool,
     show_settings: bool,
+    /// True while the bar's content is replaced by the right-click menu.
+    show_menu: bool,
     /// Size last requested from the OS, so the auto-fit does not resize — and
     /// flicker — on every tick.
     applied: iced::Size,
@@ -71,14 +80,17 @@ impl OverlayApp {
     pub fn new() -> (Self, Task<Message>) {
         let config = OverlayConfig::load().unwrap_or_default();
         let database = Database::open_without_migrations().ok();
+        let requested = config.overlay_requested;
 
         let app = Self {
             config,
+            requested,
             window_id: None,
             window_raw: None,
             power: HashMap::new(),
             top_apps: Vec::new(),
             show_settings: false,
+            show_menu: false,
             applied: iced::Size::ZERO,
             database,
         };
@@ -94,9 +106,12 @@ impl OverlayApp {
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => {
-                // Honour a tray-side pin toggle (the tray writes the shared
-                // config file; there is no IPC between the two processes).
-                self.sync_pin_mode();
+                // Honour flags written by the other processes (tray / main
+                // window). They only edit the shared config file, and this
+                // returns `true` when the overlay has been asked to close.
+                if self.sync_external_state() {
+                    return iced::exit();
+                }
                 // Keep re-opening until the collector has created the sensor
                 // tables (the overlay may start before the collector is ready).
                 let needs_open = self
@@ -151,19 +166,34 @@ impl OverlayApp {
 
             Message::ToggleSettings => {
                 self.show_settings = !self.show_settings;
+                self.show_menu = false;
                 self.resize_task()
             }
             Message::OpenMenu => {
-                // `TrackPopupMenu` blocks in its own modal loop, but that loop
-                // keeps pumping messages, so the window stays responsive.
-                match crate::winmenu::show(self.window_raw.unwrap_or(0)) {
-                    crate::winmenu::SETTINGS => {
-                        self.show_settings = true;
-                        self.resize_task()
-                    }
-                    crate::winmenu::QUIT => iced::exit(),
-                    _ => Task::none(),
+                if self.show_settings {
+                    return Task::none();
                 }
+                self.show_menu = true;
+                self.resize_task()
+            }
+            Message::CloseMenu => {
+                self.show_menu = false;
+                self.resize_task()
+            }
+            Message::TogglePin => {
+                self.config.pin_mode = !self.config.pin_mode;
+                self.persist();
+                self.apply_click_through();
+                // Close the menu so the metrics come back — and because with
+                // click-through on the menu is no longer reachable anyway.
+                self.show_menu = false;
+                self.resize_task()
+            }
+            Message::TogglePinClickThrough(v) => {
+                self.config.pin_click_through = v;
+                self.persist();
+                self.apply_click_through();
+                Task::none()
             }
 
             // appearance
@@ -265,6 +295,10 @@ impl OverlayApp {
             }
 
             Message::Quit | Message::CloseRequested => {
+                // Record that the overlay is no longer wanted, so the main
+                // window's footer toggle follows along instead of staying stuck
+                // on "Hide overlay" after an exit from the bar's own menu.
+                self.config.overlay_requested = false;
                 self.config.save();
                 iced::exit()
             }
@@ -281,6 +315,8 @@ impl OverlayApp {
 
         let body: Element<'_, Message, Theme> = if self.show_settings {
             self.view_settings(palette, label_size, spacing)
+        } else if self.show_menu {
+            self.view_menu(palette, label_size)
         } else {
             self.view_metrics(palette, label_size, value_size, spacing)
         };
@@ -311,14 +347,63 @@ impl OverlayApp {
             .padding(Padding::from(pad))
             .style(card_style(palette, self.card_alpha()));
 
-        if self.show_settings {
+        // The card is the drag / right-click surface only while the metrics are
+        // showing: the settings panel and the menu need clickable widgets. A
+        // pinned overlay is never draggable — that is the part of pin mode every
+        // platform can honour.
+        if self.show_settings || self.show_menu || self.config.pin_mode {
             card.into()
         } else {
-            // The whole card doubles as the drag handle and the right-click
-            // target; there is no resize grip because the window is always
-            // sized to its content.
             mouse_area(card).on_press(Message::StartDrag).into()
         }
+    }
+
+    /// Labels of the in-bar menu, in order.
+    fn menu_labels(&self) -> [&'static str; 4] {
+        [
+            "Resume",
+            "Settings",
+            if self.config.pin_mode { "Unpin" } else { "Pin" },
+            "Exit",
+        ]
+    }
+
+    /// Width that fits the four menu segments.
+    fn menu_width(&self) -> f32 {
+        let pad = self.config.density.padding();
+        let size = self.config.font_size.label();
+        let segments: f32 = self
+            .menu_labels()
+            .iter()
+            .map(|label| label.chars().count() as f32 * size * LABEL_CHAR_W + SEGMENT_PADDING * 2.0)
+            .sum();
+        let gaps = 3.0 * MENU_GAP;
+        (((pad * 2.0 + segments + gaps) / 4.0).ceil() * 4.0).max(80.0)
+    }
+
+    /// The right-click menu.
+    ///
+    /// The bar's own content is replaced by four segments instead of raising an
+    /// OS popup, so it behaves identically on Windows, Linux and macOS and can
+    /// never be clipped by the window's own size.
+    fn view_menu(&self, palette: Palette, font: f32) -> Element<'_, Message, Theme> {
+        let segment = |label: &'static str, message: Message| -> Element<'_, Message, Theme> {
+            button(Text::new(label).size(font).color(palette.text))
+                .style(flat_button(palette))
+                .padding(Padding::from([1.0, SEGMENT_PADDING]))
+                .on_press(message)
+                .into()
+        };
+        let labels = self.menu_labels();
+
+        Row::new()
+            .spacing(MENU_GAP)
+            .align_y(Alignment::Center)
+            .push(segment(labels[0], Message::CloseMenu))
+            .push(segment(labels[1], Message::ToggleSettings))
+            .push(segment(labels[2], Message::TogglePin))
+            .push(segment(labels[3], Message::Quit))
+            .into()
     }
 
     /// A slim drag handle, shown only in settings mode. Metrics mode needs no
@@ -511,7 +596,22 @@ impl OverlayApp {
                 Message::ToggleAlwaysOnTop,
                 font,
                 palette,
-            ));
+            ))
+            .push(if crate::winlayer::click_through_supported() {
+                toggle(
+                    "Pin makes it click-through",
+                    self.config.pin_click_through,
+                    Message::TogglePinClickThrough,
+                    font,
+                    palette,
+                )
+            } else {
+                hint(
+                    "Pin locks the position here: click-through is not available on this platform.",
+                    font,
+                    palette,
+                )
+            });
         // Only the vertical layout has a user-chosen width: the horizontal one
         // is measured from its own content and cannot be set.
         if self.config.layout == Layout::Vertical {
@@ -722,26 +822,42 @@ impl OverlayApp {
     /// Applies the click-through extended styles for "pin mode".
     fn apply_click_through(&self) {
         if let Some(hwnd) = self.window_raw {
-            crate::winlayer::set_click_through(hwnd, self.config.pin_mode);
+            let through = self.config.pin_mode
+                && self.config.pin_click_through
+                && crate::winlayer::click_through_supported();
+            crate::winlayer::set_click_through(hwnd, through);
         }
     }
 
-    /// Mirrors `pin_mode` from the shared config file, so the tray can toggle it
-    /// while the overlay keeps running.
-    fn sync_pin_mode(&mut self) {
+    /// Mirrors the externally controlled flags from the shared config file and
+    /// reports whether the main window has asked the overlay to close.
+    ///
+    /// There is no IPC: the tray and the main window only edit
+    /// `overlay_config.json`, and this polls it once per tick.
+    fn sync_external_state(&mut self) -> bool {
         let Ok(text) = std::fs::read_to_string(OverlayConfig::path()) else {
-            return;
+            return false;
         };
         let Ok(value) = serde_json::from_str::<serde_json::Value>(&text) else {
-            return;
+            return false;
         };
-        let Some(pinned) = value.get("pin_mode").and_then(|flag| flag.as_bool()) else {
-            return;
-        };
-        if pinned != self.config.pin_mode {
+
+        if let Some(pinned) = value.get("pin_mode").and_then(|flag| flag.as_bool())
+            && pinned != self.config.pin_mode
+        {
             self.config.pin_mode = pinned;
             self.apply_click_through();
         }
+
+        // Only a `true -> false` transition closes the overlay, so a stale
+        // `false` left behind by a previous session cannot kill a fresh run.
+        let requested = value
+            .get("overlay_requested")
+            .and_then(|flag| flag.as_bool())
+            .unwrap_or(true);
+        let closing = self.requested && !requested;
+        self.requested = requested;
+        closing
     }
 
     /// Applies the Win32 layered-window alpha when that mode is selected.
@@ -811,6 +927,10 @@ impl OverlayApp {
     fn fitted_size(&self) -> iced::Size {
         if self.show_settings {
             return iced::Size::new(SETTINGS_WIDTH, SETTINGS_HEIGHT);
+        }
+        // The menu replaces the metrics, so its own width is measured instead.
+        if self.show_menu {
+            return iced::Size::new(self.menu_width(), self.current_height());
         }
         let width = match self.config.layout {
             Layout::Horizontal => self.fitted_width(),

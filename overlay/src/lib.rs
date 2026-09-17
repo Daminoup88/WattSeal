@@ -9,7 +9,6 @@ pub mod config;
 pub mod message;
 pub mod theme;
 pub mod winlayer;
-pub mod winmenu;
 
 /// Runs the overlay window.
 ///

@@ -224,6 +224,20 @@ fn toggle_overlay_pin() -> bool {
     config.pin_mode
 }
 
+/// Asks the overlay to close through its own config file.
+///
+/// The overlay may have been launched by the main window rather than by this
+/// process, in which case there is no child handle to kill here. The config
+/// file is the only channel both processes share, and the overlay polls it.
+fn request_overlay_close() {
+    let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
+    if !config.overlay_requested {
+        return;
+    }
+    config.overlay_requested = false;
+    config.save();
+}
+
 /// Toggles the overlay subprocess: launches it when off, terminates it on.
 fn toggle_overlay(overlay_child: &Arc<Mutex<Option<Child>>>) {
     let mut guard = match overlay_child.lock() {
@@ -263,25 +277,29 @@ fn setup_tray(
     let tray_menu = Menu::new();
     let open_ui_i = MenuItem::new("Open UI", true, None);
     let toggle_overlay_i = MenuItem::new("Toggle Overlay", true, None);
+    // Only offered where pinning can actually hide the overlay from the mouse,
+    // because there the tray is the sole escape hatch. Where click-through is
+    // unavailable the overlay can always unlock itself from its own right-click
+    // menu, so the entry would just be noise — and the tray itself may not even
+    // exist (GNOME without an AppIndicator extension).
+    //
     // A plain item rather than a `CheckMenuItem`: muda's check items hold `Rc`
     // and are therefore not `Send`, so they cannot be moved into the event
     // handler to keep their tick in sync.
-    let pin_overlay_i = MenuItem::new("Pin / Unpin Overlay (click-through)", true, None);
+    let pin_overlay_i =
+        overlay::winlayer::click_through_supported().then(|| MenuItem::new("Pin / Unpin Overlay", true, None));
     let quit_i = MenuItem::new("Quit", true, None);
     let open_ui_id = open_ui_i.id().to_owned();
     let toggle_overlay_id = toggle_overlay_i.id().to_owned();
-    let pin_overlay_id = pin_overlay_i.id().to_owned();
+    let pin_overlay_id = pin_overlay_i.as_ref().map(|item| item.id().to_owned());
     let quit_id = quit_i.id().to_owned();
 
-    tray_menu
-        .append_items(&[
-            &open_ui_i,
-            &toggle_overlay_i,
-            &pin_overlay_i,
-            &PredefinedMenuItem::separator(),
-            &quit_i,
-        ])
-        .ok();
+    let separator = PredefinedMenuItem::separator();
+    tray_menu.append_items(&[&open_ui_i, &toggle_overlay_i]).ok();
+    if let Some(pin_overlay_i) = &pin_overlay_i {
+        tray_menu.append_items(&[pin_overlay_i]).ok();
+    }
+    tray_menu.append_items(&[&separator, &quit_i]).ok();
 
     let ui_child_menu = Arc::clone(ui_child);
     let overlay_child_menu = Arc::clone(overlay_child);
@@ -290,17 +308,20 @@ fn setup_tray(
             spawn_ui(&ui_child_menu).ok();
         } else if event.id == toggle_overlay_id {
             toggle_overlay(&overlay_child_menu);
-        } else if event.id == pin_overlay_id {
+        } else if pin_overlay_id.as_ref() == Some(&event.id) {
             // Pin mode lives in the overlay's own config file, which the overlay
             // polls once a second — so writing it is enough, no IPC required.
             let pinned = toggle_overlay_pin();
             spawn_overlay(&overlay_child_menu).ok();
             if pinned {
-                common::clog!("✓ Overlay pinned: mouse now passes through (unpin from this menu)");
+                common::clog!("✓ Overlay pinned (release it here or from its right-click menu)");
             } else {
-                common::clog!("✓ Overlay unpinned: mouse input restored");
+                common::clog!("✓ Overlay unpinned");
             }
         } else if event.id == quit_id {
+            // Ask first: the overlay may have been started from the main window,
+            // so this process may hold no handle for it and `kill` would miss it.
+            request_overlay_close();
             if let Ok(mut child_guard) = ui_child_menu.lock() {
                 if let Some(c) = child_guard.as_mut() {
                     let _ = c.kill();
