@@ -228,106 +228,6 @@ impl Display for AppLanguage {
     }
 }
 
-/// Carbon intensity preset for common countries / mixes.
-#[derive(Debug, Clone, Copy)]
-pub struct CarbonIntensity {
-    pub label: &'static str,
-    pub g_per_kwh: f64,
-}
-
-impl CarbonIntensity {
-    /// Carbon intensity presets for various countries and the world average (updated in 2026).
-    // Source:
-    // Our World in Data, “Carbon intensity of electricity,” Our World in Data, 2022. https://ourworldindata.org/grapher/carbon-intensity-electricity
-    // World average:
-    // Emissions – Electricity 2025 – Analysis - IEA, “Emissions – Electricity 2025 – Analysis - IEA,” IEA, 2025. https://www.iea.org/reports/electricity-2025/emissions
-    pub const PRESETS: &[CarbonIntensity] = &[
-        CarbonIntensity {
-            label: "France",
-            g_per_kwh: 42.0,
-        },
-        CarbonIntensity {
-            label: "Germany",
-            g_per_kwh: 332.0,
-        },
-        CarbonIntensity {
-            label: "UK",
-            g_per_kwh: 217.0,
-        },
-        CarbonIntensity {
-            label: "USA (average)",
-            g_per_kwh: 384.0,
-        },
-        CarbonIntensity {
-            label: "China",
-            g_per_kwh: 555.0,
-        },
-        CarbonIntensity {
-            label: "India",
-            g_per_kwh: 707.0,
-        },
-        CarbonIntensity {
-            label: "Sweden",
-            g_per_kwh: 35.0,
-        },
-        CarbonIntensity {
-            label: "Poland",
-            g_per_kwh: 592.0,
-        },
-        CarbonIntensity {
-            label: "World average",
-            g_per_kwh: 399.0,
-        },
-        CarbonIntensity {
-            label: "Custom",
-            g_per_kwh: 0.0,
-        },
-    ];
-
-    /// Returns true if this is a user-defined value.
-    pub fn is_custom(self) -> bool {
-        self.label == "Custom"
-    }
-
-    /// Finds the matching preset or creates a custom entry.
-    pub fn from_g_per_kwh(value: f64) -> Self {
-        Self::PRESETS
-            .iter()
-            .find(|p| (p.g_per_kwh - value).abs() < 0.5)
-            .copied()
-            .unwrap_or(CarbonIntensity {
-                label: "Custom",
-                g_per_kwh: value,
-            })
-    }
-
-    /// Resolves a stored string to a preset entry.
-    pub fn from_label(label: &str) -> Self {
-        if let Some(preset) = Self::PRESETS.iter().find(|p| !p.is_custom() && p.label == label) {
-            return *preset;
-        }
-        if let Ok(value) = label.trim().parse::<f64>() {
-            return CarbonIntensity {
-                label: "Custom",
-                g_per_kwh: value,
-            };
-        }
-        *Self::PRESETS.iter().find(|p| p.label == "World average").unwrap()
-    }
-}
-
-impl PartialEq for CarbonIntensity {
-    fn eq(&self, other: &Self) -> bool {
-        self.label == other.label
-    }
-}
-
-impl Display for CarbonIntensity {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ({:.0} g/kWh)", self.label, self.g_per_kwh)
-    }
-}
-
 /// Supported currencies for energy cost calculations.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Currency {
@@ -566,7 +466,249 @@ impl Display for Currency {
     }
 }
 
-/// Electricity cost preset for common countries / regions.
+/// Centralized country preset containing country code, display label, carbon intensity, and electricity pricing.
+#[derive(Debug, Clone, Copy)]
+pub struct CountryPreset {
+    pub code: &'static str,
+    pub label: &'static str,
+    pub carbon_intensity: Option<f64>,
+    pub electricity_price: Option<f64>,
+    pub currency: Option<Currency>,
+}
+
+impl CountryPreset {
+    /// World average preset.
+    pub const WORLD_AVERAGE: CountryPreset = CountryPreset {
+        code: "WORLD",
+        label: "World average",
+        carbon_intensity: Some(399.0),
+        electricity_price: Some(0.18),
+        currency: Some(Currency::USD),
+    };
+
+    /// Centralized registry of countries and regional presets (updated in 2026).
+    // Sources:
+    // Carbon: Our World in Data, “Carbon intensity of electricity,” 2022. https://ourworldindata.org/grapher/carbon-intensity-electricity
+    // World avg carbon: Emissions – Electricity 2025 – Analysis - IEA, 2025. https://www.iea.org/reports/electricity-2025/emissions
+    // Electricity prices: Global Petrol Prices, "Household electricity prices around the world," GlobalPetrolPrices.com, 2026. https://www.globalpetrolprices.com/electricity_prices/
+    pub const ALL: &'static [CountryPreset] = &[
+        CountryPreset {
+            code: "FR",
+            label: "France",
+            carbon_intensity: Some(42.0),
+            electricity_price: Some(0.24),
+            currency: Some(Currency::EUR),
+        },
+        CountryPreset {
+            code: "DE",
+            label: "Germany",
+            carbon_intensity: Some(332.0),
+            electricity_price: Some(0.35),
+            currency: Some(Currency::EUR),
+        },
+        CountryPreset {
+            code: "ES",
+            label: "Spain",
+            carbon_intensity: None,
+            electricity_price: Some(0.22),
+            currency: Some(Currency::EUR),
+        },
+        CountryPreset {
+            code: "IT",
+            label: "Italy",
+            carbon_intensity: None,
+            electricity_price: Some(0.36),
+            currency: Some(Currency::EUR),
+        },
+        CountryPreset {
+            code: "NL",
+            label: "Netherlands",
+            carbon_intensity: None,
+            electricity_price: Some(0.25),
+            currency: Some(Currency::EUR),
+        },
+        CountryPreset {
+            code: "CH",
+            label: "Switzerland",
+            carbon_intensity: None,
+            electricity_price: Some(0.3),
+            currency: Some(Currency::CHF),
+        },
+        CountryPreset {
+            code: "GB",
+            label: "UK",
+            carbon_intensity: Some(217.0),
+            electricity_price: Some(0.3),
+            currency: Some(Currency::GBP),
+        },
+        CountryPreset {
+            code: "US",
+            label: "USA (average)",
+            carbon_intensity: Some(384.0),
+            electricity_price: Some(0.19),
+            currency: Some(Currency::USD),
+        },
+        CountryPreset {
+            code: "CN",
+            label: "China",
+            carbon_intensity: Some(555.0),
+            electricity_price: Some(0.51),
+            currency: Some(Currency::CNY),
+        },
+        CountryPreset {
+            code: "IN",
+            label: "India",
+            carbon_intensity: Some(707.0),
+            electricity_price: Some(7.33),
+            currency: Some(Currency::INR),
+        },
+        CountryPreset {
+            code: "ID",
+            label: "Indonesia",
+            carbon_intensity: None,
+            electricity_price: Some(1_602.0),
+            currency: Some(Currency::IDR),
+        },
+        CountryPreset {
+            code: "PH",
+            label: "Philippines",
+            carbon_intensity: None,
+            electricity_price: Some(12.69),
+            currency: Some(Currency::PHP),
+        },
+        CountryPreset {
+            code: "AU",
+            label: "Australia",
+            carbon_intensity: Some(525.18),
+            electricity_price: Some(0.36),
+            currency: Some(Currency::AUD),
+        },
+        CountryPreset {
+            code: "SE",
+            label: "Sweden",
+            carbon_intensity: Some(35.0),
+            electricity_price: Some(2.3),
+            currency: Some(Currency::SEK),
+        },
+        CountryPreset {
+            code: "PL",
+            label: "Poland",
+            carbon_intensity: Some(592.0),
+            electricity_price: Some(0.88),
+            currency: Some(Currency::PLN),
+        },
+        CountryPreset::WORLD_AVERAGE,
+    ];
+
+    /// Extracts the country/region code from a locale tag (e.g. "en-US" -> "US").
+    pub fn extract_country_code(locale: &str) -> Option<&str> {
+        let parts: Vec<&str> = locale.split(['-', '_']).collect();
+        if parts.len() >= 2 {
+            // Check the last segment
+            let candidate = parts[parts.len() - 1];
+            if candidate.len() == 2 && candidate.chars().all(|c| c.is_ascii_alphabetic()) {
+                return Some(candidate);
+            }
+            // If the second segment is 2 alpha chars
+            let candidate = parts[1];
+            if candidate.len() == 2 && candidate.chars().all(|c| c.is_ascii_alphabetic()) {
+                return Some(candidate);
+            }
+        }
+        None
+    }
+
+    /// Detects the OS country code from the locale or returns None.
+    pub fn from_os() -> Option<Self> {
+        let locale = sys_locale::get_locale()?;
+        let code = Self::extract_country_code(&locale)?;
+        Self::ALL.iter().find(|c| c.code.eq_ignore_ascii_case(code)).copied()
+    }
+}
+
+/// Carbon intensity data structure (g CO₂ per kWh).
+#[derive(Debug, Clone, Copy)]
+pub struct CarbonIntensity {
+    pub label: &'static str,
+    pub g_per_kwh: f64,
+}
+
+impl CarbonIntensity {
+    /// Returns all carbon intensity presets derived from [`CountryPreset::ALL`] plus Custom.
+    pub fn presets() -> Vec<CarbonIntensity> {
+        let mut list: Vec<CarbonIntensity> = CountryPreset::ALL
+            .iter()
+            .filter_map(|c| {
+                c.carbon_intensity.map(|g_per_kwh| CarbonIntensity {
+                    label: c.label,
+                    g_per_kwh,
+                })
+            })
+            .collect();
+        list.push(CarbonIntensity {
+            label: "Custom",
+            g_per_kwh: 0.0,
+        });
+        list
+    }
+
+    /// Returns the default preset based on OS locale, falling back to World average.
+    pub fn from_os() -> Self {
+        if let Some(country) = CountryPreset::from_os() {
+            if let Some(intensity) = country.carbon_intensity {
+                return CarbonIntensity {
+                    label: country.label,
+                    g_per_kwh: intensity,
+                };
+            }
+        }
+        CarbonIntensity {
+            label: CountryPreset::WORLD_AVERAGE.label,
+            g_per_kwh: CountryPreset::WORLD_AVERAGE.carbon_intensity.unwrap_or(399.0),
+        }
+    }
+
+    /// Returns true if this is a user-defined value.
+    pub fn is_custom(self) -> bool {
+        self.label == "Custom"
+    }
+
+    /// Resolves a stored string to a preset entry.
+    pub fn from_label(label: &str) -> Self {
+        if let Some(c) = CountryPreset::ALL.iter().find(|c| c.label == label) {
+            if let Some(intensity) = c.carbon_intensity {
+                return CarbonIntensity {
+                    label: c.label,
+                    g_per_kwh: intensity,
+                };
+            }
+        }
+        if let Ok(value) = label.trim().parse::<f64>() {
+            return CarbonIntensity {
+                label: "Custom",
+                g_per_kwh: value,
+            };
+        }
+        CarbonIntensity {
+            label: CountryPreset::WORLD_AVERAGE.label,
+            g_per_kwh: CountryPreset::WORLD_AVERAGE.carbon_intensity.unwrap_or(399.0),
+        }
+    }
+}
+
+impl PartialEq for CarbonIntensity {
+    fn eq(&self, other: &Self) -> bool {
+        self.label == other.label
+    }
+}
+
+impl Display for CarbonIntensity {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} ({:.0} g/kWh)", self.label, self.g_per_kwh)
+    }
+}
+
+/// Electricity cost data structure (price per kWh in local currency).
 #[derive(Debug, Clone, Copy)]
 pub struct ElectricityCost {
     pub label: &'static str,
@@ -579,110 +721,53 @@ pub struct ElectricityCost {
 }
 
 impl ElectricityCost {
-    /// Household electricity prices and currencies by country/region (prices and change rates updated in 2026).
-    // Source:
-    // Statista, “Electricity prices around the world 2018 | Statista,” Statista, 2018. https://www.statista.com/statistics/263492/electricity-prices-in-selected-countries/
-    // World average:
-    // Global Petrol Prices, "Household electricity prices around the world," GlobalPetrolPrices.com.
-    // Source URL: https://www.globalpetrolprices.com/electricity_prices/
-    pub const PRESETS: &[ElectricityCost] = &[
-        ElectricityCost {
-            label: "France",
-            price_per_kwh: 0.24,
-            currency_symbol: "€",
-            currency_code: "EUR",
-        },
-        ElectricityCost {
-            label: "China",
-            price_per_kwh: 0.51,
-            currency_symbol: "¥",
-            currency_code: "CNY",
-        },
-        ElectricityCost {
-            label: "India",
-            price_per_kwh: 7.33,
-            currency_symbol: "₹",
-            currency_code: "INR",
-        },
-        ElectricityCost {
-            label: "Indonesia",
-            price_per_kwh: 1_602.0,
-            currency_symbol: "Rp",
-            currency_code: "IDR",
-        },
-        ElectricityCost {
-            label: "Philippines",
-            price_per_kwh: 12.69,
-            currency_symbol: "₱",
-            currency_code: "PHP",
-        },
-        ElectricityCost {
-            label: "Germany",
-            price_per_kwh: 0.35,
-            currency_symbol: "€",
-            currency_code: "EUR",
-        },
-        ElectricityCost {
-            label: "Spain",
-            price_per_kwh: 0.22,
-            currency_symbol: "€",
-            currency_code: "EUR",
-        },
-        ElectricityCost {
-            label: "Italy",
-            price_per_kwh: 0.36,
-            currency_symbol: "€",
-            currency_code: "EUR",
-        },
-        ElectricityCost {
-            label: "Netherlands",
-            price_per_kwh: 0.25,
-            currency_symbol: "€",
-            currency_code: "EUR",
-        },
-        ElectricityCost {
-            label: "Switzerland",
-            price_per_kwh: 0.3,
-            currency_symbol: "CHF",
-            currency_code: "CHF",
-        },
-        ElectricityCost {
-            label: "UK",
-            price_per_kwh: 0.3,
-            currency_symbol: "£",
-            currency_code: "GBP",
-        },
-        ElectricityCost {
-            label: "USA (average)",
-            price_per_kwh: 0.19,
-            currency_symbol: "$",
-            currency_code: "USD",
-        },
-        ElectricityCost {
-            label: "Sweden",
-            price_per_kwh: 2.3,
-            currency_symbol: "kr",
-            currency_code: "SEK",
-        },
-        ElectricityCost {
-            label: "Poland",
-            price_per_kwh: 0.88,
-            currency_symbol: "zł",
-            currency_code: "PLN",
-        },
-        ElectricityCost {
-            label: "World average",
-            price_per_kwh: 0.17,
-            currency_symbol: "$",
-            currency_code: "USD",
-        },
-        ElectricityCost {
+    /// Returns all electricity cost presets derived from [`CountryPreset::ALL`] plus Custom.
+    pub fn presets() -> Vec<ElectricityCost> {
+        let mut list: Vec<ElectricityCost> = CountryPreset::ALL
+            .iter()
+            .filter_map(|c| {
+                if let (Some(price), Some(curr)) = (c.electricity_price, c.currency) {
+                    Some(ElectricityCost {
+                        label: c.label,
+                        price_per_kwh: price,
+                        currency_symbol: curr.symbol,
+                        currency_code: curr.code,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect();
+        list.push(ElectricityCost {
             label: "Custom",
             price_per_kwh: 0.0,
             currency_symbol: "$",
             currency_code: "USD",
-        },
-    ];
+        });
+        list
+    }
+
+    /// Returns the default preset based on OS locale, falling back to World average.
+    pub fn from_os() -> Self {
+        if let Some(country) = CountryPreset::from_os() {
+            if let (Some(price), Some(curr)) = (country.electricity_price, country.currency) {
+                return ElectricityCost {
+                    label: country.label,
+                    price_per_kwh: price,
+                    currency_symbol: curr.symbol,
+                    currency_code: curr.code,
+                };
+            }
+        }
+        let world = CountryPreset::WORLD_AVERAGE;
+        let curr = world.currency.unwrap_or(Currency::USD);
+        ElectricityCost {
+            label: world.label,
+            price_per_kwh: world.electricity_price.unwrap_or(0.18),
+            currency_symbol: curr.symbol,
+            currency_code: curr.code,
+        }
+    }
 
     pub fn is_custom(self) -> bool {
         self.label == "Custom"
@@ -693,24 +778,17 @@ impl ElectricityCost {
         Currency::from_code(self.currency_code)
     }
 
-    /// Finds the matching preset or creates a custom entry.
-    pub fn from_price_per_kwh(value: f64) -> Self {
-        Self::PRESETS
-            .iter()
-            .find(|p| !p.is_custom() && (p.price_per_kwh - value).abs() < 0.001)
-            .copied()
-            .unwrap_or(ElectricityCost {
-                label: "Custom",
-                price_per_kwh: value,
-                currency_symbol: "$",
-                currency_code: "USD",
-            })
-    }
-
     /// Resolves stored label and optional currency code to a preset entry.
     pub fn from_label_and_currency(label: &str, currency: Option<&str>) -> Self {
-        if let Some(preset) = Self::PRESETS.iter().find(|p| !p.is_custom() && p.label == label) {
-            return *preset;
+        if let Some(c) = CountryPreset::ALL.iter().find(|c| c.label == label) {
+            if let (Some(price), Some(curr)) = (c.electricity_price, c.currency) {
+                return ElectricityCost {
+                    label: c.label,
+                    price_per_kwh: price,
+                    currency_symbol: curr.symbol,
+                    currency_code: curr.code,
+                };
+            }
         }
         if let Ok(value) = label.trim().parse::<f64>() {
             let curr = currency.map(Currency::from_code).unwrap_or(Currency::USD);
@@ -721,7 +799,14 @@ impl ElectricityCost {
                 currency_code: curr.code,
             };
         }
-        *Self::PRESETS.iter().find(|p| p.label == "World average").unwrap()
+        let world = CountryPreset::WORLD_AVERAGE;
+        let curr = world.currency.unwrap_or(Currency::USD);
+        ElectricityCost {
+            label: world.label,
+            price_per_kwh: world.electricity_price.unwrap_or(0.18),
+            currency_symbol: curr.symbol,
+            currency_code: curr.code,
+        }
     }
 }
 
@@ -741,6 +826,43 @@ impl Display for ElectricityCost {
                 "{} ({:.2} {}/kWh)",
                 self.label, self.price_per_kwh, self.currency_symbol
             )
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_country_code() {
+        assert_eq!(CountryPreset::extract_country_code("en-US"), Some("US"));
+        assert_eq!(CountryPreset::extract_country_code("fr_FR"), Some("FR"));
+        assert_eq!(CountryPreset::extract_country_code("zh-Hans-CN"), Some("CN"));
+        assert_eq!(CountryPreset::extract_country_code("de-DE"), Some("DE"));
+        assert_eq!(CountryPreset::extract_country_code("en"), None);
+    }
+
+    #[test]
+    fn test_country_presets_consistency() {
+        let mut codes = std::collections::HashSet::new();
+        let mut labels = std::collections::HashSet::new();
+        for country in CountryPreset::ALL {
+            assert!(!country.code.is_empty());
+            assert!(!country.label.is_empty());
+            if let Some(intensity) = country.carbon_intensity {
+                assert!(intensity > 0.0);
+            }
+            if let Some(price) = country.electricity_price {
+                assert!(price > 0.0);
+                assert!(country.currency.is_some());
+            }
+            assert!(codes.insert(country.code), "Duplicate country code: {}", country.code);
+            assert!(
+                labels.insert(country.label),
+                "Duplicate country label: {}",
+                country.label
+            );
         }
     }
 }

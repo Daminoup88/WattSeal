@@ -2074,9 +2074,9 @@ impl TranslatedCarbonIntensity {
     }
 
     pub fn all(language: AppLanguage) -> Vec<Self> {
-        CarbonIntensity::PRESETS
-            .iter()
-            .map(|&p| Self::new(p, language))
+        CarbonIntensity::presets()
+            .into_iter()
+            .map(|p| Self::new(p, language))
             .collect()
     }
 }
@@ -2109,9 +2109,9 @@ impl TranslatedElectricityCost {
     }
 
     pub fn all(language: AppLanguage) -> Vec<Self> {
-        ElectricityCost::PRESETS
-            .iter()
-            .map(|&p| Self::new(p, language))
+        ElectricityCost::presets()
+            .into_iter()
+            .map(|p| Self::new(p, language))
             .collect()
     }
 }
