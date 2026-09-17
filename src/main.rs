@@ -23,10 +23,17 @@ use winit::{
     window::WindowId,
 };
 
+/// Windows process creation flag: spawn the child without a console window.
+#[cfg(target_os = "windows")]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 /// Configuration options for the application.
 #[derive(Debug, Clone)]
 struct Options {
     ui_mode: bool,
+    overlay_mode: bool,
     background_mode: bool,
     headless_mode: bool,
     mqtt_id: Option<String>,
@@ -44,6 +51,10 @@ struct Options {
 fn options() -> OptionParser<Options> {
     let ui_mode = long("ui")
         .help("Launch Wattseal with the graphical user interface.")
+        .switch();
+
+    let overlay_mode = long("overlay")
+        .help("Launch the always-on-top overlay widget.")
         .switch();
 
     let background_mode = short('b')
@@ -105,6 +116,7 @@ fn options() -> OptionParser<Options> {
 
         return construct!(Options {
             ui_mode,
+            overlay_mode,
             background_mode,
             headless_mode,
             mqtt_id,
@@ -123,6 +135,7 @@ fn options() -> OptionParser<Options> {
     {
         return construct!(Options {
             ui_mode,
+            overlay_mode,
             background_mode,
             headless_mode,
             mqtt_id,
@@ -175,6 +188,65 @@ fn spawn_ui(ui_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
     }
 }
 
+/// Spawns the overlay subprocess (`--overlay`) if it is not already running.
+/// The overlay runs in its own process so it never blocks the main thread.
+fn spawn_overlay(overlay_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
+    let mut guard = overlay_child
+        .lock()
+        .map_err(|e| format!("Failed to lock overlay child mutex: {e}"))?;
+    let already_running = guard.as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
+    if already_running {
+        return Ok(());
+    }
+    let exe = std::env::current_exe().map_err(|e| format!("Failed to determine executable path: {e}"))?;
+    let mut command = Command::new(exe);
+    command.arg("--overlay");
+    #[cfg(target_os = "windows")]
+    command.creation_flags(CREATE_NO_WINDOW);
+    match command.spawn() {
+        Ok(child) => {
+            *guard = Some(child);
+            Ok(())
+        }
+        Err(e) => Err(format!("Failed to spawn overlay process: {e}")),
+    }
+}
+
+/// Flips the overlay's click-through "pin mode" in the shared config file and
+/// returns the new state.
+///
+/// The overlay process polls that file, so this needs no IPC; it is also the
+/// only way to release the overlay, since a pinned window ignores the mouse.
+fn toggle_overlay_pin() -> bool {
+    let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
+    config.pin_mode = !config.pin_mode;
+    config.save();
+    config.pin_mode
+}
+
+/// Toggles the overlay subprocess: launches it when off, terminates it on.
+fn toggle_overlay(overlay_child: &Arc<Mutex<Option<Child>>>) {
+    let mut guard = match overlay_child.lock() {
+        Ok(g) => g,
+        Err(e) => {
+            common::clog!("✗ Failed to lock overlay child mutex: {e}");
+            return;
+        }
+    };
+    let running = guard.as_mut().is_some_and(|c| matches!(c.try_wait(), Ok(None)));
+    if running {
+        if let Some(child) = guard.as_mut() {
+            let _ = child.kill();
+        }
+        *guard = None;
+    } else {
+        drop(guard);
+        if let Err(e) = spawn_overlay(overlay_child) {
+            common::clog!("✗ {e}");
+        }
+    }
+}
+
 /// Loads the application icon from the embedded PNG for the system tray.
 fn load_tray_icon() -> Option<tray_icon::Icon> {
     let img = image::load_from_memory(WINDOW_ICON_BYTES).ok()?.into_rgba8();
@@ -184,24 +256,58 @@ fn load_tray_icon() -> Option<tray_icon::Icon> {
 
 /// Sets up the tray icon menu, event handlers, and builds the tray icon.
 /// Returns `Some(TrayIcon)` on success, `None` if icon loading or tray creation fails.
-fn setup_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> Option<tray_icon::TrayIcon> {
+fn setup_tray(
+    ui_child: &Arc<Mutex<Option<Child>>>,
+    overlay_child: &Arc<Mutex<Option<Child>>>,
+) -> Option<tray_icon::TrayIcon> {
     let tray_menu = Menu::new();
     let open_ui_i = MenuItem::new("Open UI", true, None);
+    let toggle_overlay_i = MenuItem::new("Toggle Overlay", true, None);
+    // A plain item rather than a `CheckMenuItem`: muda's check items hold `Rc`
+    // and are therefore not `Send`, so they cannot be moved into the event
+    // handler to keep their tick in sync.
+    let pin_overlay_i = MenuItem::new("Pin / Unpin Overlay (click-through)", true, None);
     let quit_i = MenuItem::new("Quit", true, None);
     let open_ui_id = open_ui_i.id().to_owned();
+    let toggle_overlay_id = toggle_overlay_i.id().to_owned();
+    let pin_overlay_id = pin_overlay_i.id().to_owned();
     let quit_id = quit_i.id().to_owned();
 
     tray_menu
-        .append_items(&[&open_ui_i, &PredefinedMenuItem::separator(), &quit_i])
+        .append_items(&[
+            &open_ui_i,
+            &toggle_overlay_i,
+            &pin_overlay_i,
+            &PredefinedMenuItem::separator(),
+            &quit_i,
+        ])
         .ok();
 
     let ui_child_menu = Arc::clone(ui_child);
+    let overlay_child_menu = Arc::clone(overlay_child);
     MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
         if event.id == open_ui_id {
             spawn_ui(&ui_child_menu).ok();
+        } else if event.id == toggle_overlay_id {
+            toggle_overlay(&overlay_child_menu);
+        } else if event.id == pin_overlay_id {
+            // Pin mode lives in the overlay's own config file, which the overlay
+            // polls once a second — so writing it is enough, no IPC required.
+            let pinned = toggle_overlay_pin();
+            spawn_overlay(&overlay_child_menu).ok();
+            if pinned {
+                common::clog!("✓ Overlay pinned: mouse now passes through (unpin from this menu)");
+            } else {
+                common::clog!("✓ Overlay unpinned: mouse input restored");
+            }
         } else if event.id == quit_id {
             if let Ok(mut child_guard) = ui_child_menu.lock() {
                 if let Some(c) = child_guard.as_mut() {
+                    let _ = c.kill();
+                }
+            }
+            if let Ok(mut overlay_guard) = overlay_child_menu.lock() {
+                if let Some(c) = overlay_guard.as_mut() {
                     let _ = c.kill();
                 }
             }
@@ -229,12 +335,15 @@ fn setup_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> Option<tray_icon::TrayIco
 /// Returns `true` if the tray was set up and the GTK loop ran (i.e. the app lifecycle
 /// was fully handled). Returns `false` if setup failed so the caller can fall back.
 #[cfg(target_os = "linux")]
-fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
+fn run_linux_tray(
+    ui_child: &Arc<Mutex<Option<Child>>>,
+    overlay_child: &Arc<Mutex<Option<Child>>>,
+) -> bool {
     if gtk::init().is_err() {
         return false;
     }
 
-    let _tray_icon = match setup_tray(ui_child) {
+    let _tray_icon = match setup_tray(ui_child, overlay_child) {
         Some(t) => t,
         None => return false,
     };
@@ -288,8 +397,8 @@ fn main() {
             return;
         }
 
-        // Prevent UI process from trying to setup the driver again
-        if !options.ui_mode {
+        // Prevent the UI / overlay subprocesses from setting up the driver again
+        if !options.ui_mode && !options.overlay_mode {
             collector::sensors::cpu::windows_cpu::setup();
         }
     }
@@ -315,6 +424,13 @@ fn main() {
     if options.ui_mode {
         if let Err(err) = ui::run() {
             common::clog!("✗ UI failed to start: {err}");
+        }
+        return;
+    }
+
+    if options.overlay_mode {
+        if let Err(err) = overlay::run() {
+            common::clog!("✗ Overlay failed to start: {err}");
         }
         return;
     }
@@ -374,6 +490,7 @@ fn main() {
     }
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
+    let overlay_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
     if !options.background_mode {
         spawn_ui(&ui_child).ok();
     }
@@ -389,7 +506,7 @@ fn main() {
             }
         };
 
-        let _tray_icon = setup_tray(&ui_child);
+        let _tray_icon = setup_tray(&ui_child, &overlay_child);
 
         let ui_child_watcher = Arc::clone(&ui_child);
         thread::spawn(move || {
@@ -417,6 +534,27 @@ fn main() {
             }
         });
 
+        // The overlay is a fire-and-forget subprocess: clean up its handle when
+        // it exits so the tray toggle reflects the real state.
+        let overlay_child_watcher = Arc::clone(&overlay_child);
+        thread::spawn(move || {
+            loop {
+                thread::sleep(Duration::from_millis(250));
+                let mut guard = match overlay_child_watcher.lock() {
+                    Ok(g) => g,
+                    Err(e) => {
+                        common::clog!("✗ Failed to lock overlay child mutex: {}", e);
+                        continue;
+                    }
+                };
+                if let Some(child) = guard.as_mut() {
+                    if child.try_wait().is_ok_and(|status| status.is_some()) {
+                        *guard = None;
+                    }
+                }
+            }
+        });
+
         struct TrayApp;
         impl ApplicationHandler for TrayApp {
             fn resumed(&mut self, event_loop: &ActiveEventLoop) {
@@ -430,7 +568,7 @@ fn main() {
     // Linux: try tray with GTK, fall back to simple monitoring
     #[cfg(target_os = "linux")]
     {
-        if !run_linux_tray(&ui_child) {
+        if !run_linux_tray(&ui_child, &overlay_child) {
             common::clog!("⚠ System tray unavailable, running without tray icon");
             loop {
                 thread::sleep(Duration::from_millis(250));

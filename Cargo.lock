@@ -3800,6 +3800,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "overlay"
+version = "1.0.5"
+dependencies = [
+ "common",
+ "iced",
+ "log",
+ "serde",
+ "serde_json",
+ "windows-sys 0.59.0",
+]
+
+[[package]]
 name = "owned_ttf_parser"
 version = "0.25.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5820,6 +5832,7 @@ dependencies = [
  "common",
  "gtk",
  "image 0.25.10",
+ "overlay",
  "runas",
  "tray-icon",
  "ui",

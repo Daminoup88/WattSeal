@@ -2,5 +2,6 @@
 *.db*
 *.log
 *.exe
+overlay_config.json
 
 .idea
