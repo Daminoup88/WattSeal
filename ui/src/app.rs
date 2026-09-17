@@ -100,9 +100,9 @@ impl App {
                 }
                 _ => (
                     AppLanguage::from_os(),
-                    CarbonIntensity::PRESETS[8],
+                    CarbonIntensity::from_os(),
                     AppTheme::default(),
-                    ElectricityCost::PRESETS[8],
+                    ElectricityCost::from_os(),
                     true,
                     CloseBehavior::default(),
                 ),
@@ -199,9 +199,9 @@ impl App {
                 settings_open: false,
                 info_modal_open: None,
                 language,
-                carbon_intensity: CarbonIntensity::PRESETS[8],
+                carbon_intensity: CarbonIntensity::from_os(),
                 custom_carbon_input: String::new(),
-                electricity_cost: ElectricityCost::PRESETS[8],
+                electricity_cost: ElectricityCost::from_os(),
                 custom_kwh_cost_input: String::new(),
                 launch_on_startup: common::autostart::is_enabled(),
                 show_setup: false,
