@@ -50,6 +50,39 @@ const DECIMALS: &[u8] = &[0, 1, 2, 3];
 const REFRESH: &[u32] = &[1, 2, 3, 5];
 const TOP_APPS: &[usize] = &[1, 2, 3, 4, 5, 6, 8];
 
+/// Advance of one character, as a fraction of the font size.
+///
+/// CJK glyphs are full-width — close to twice a Latin advance — and both the
+/// labels and the `Top apps` process names can contain them. Measuring every
+/// character at the Latin factor would under-measure a Chinese label by nearly
+/// half, which the horizontal layout and the menu have no slack to absorb.
+fn char_advance(character: char, latin_factor: f32) -> f32 {
+    let full_width = matches!(
+        character as u32,
+        0x1100..=0x115F
+            | 0x2E80..=0x303E
+            | 0x3041..=0x33FF
+            | 0x3400..=0x4DBF
+            | 0x4E00..=0x9FFF
+            | 0xA000..=0xA4CF
+            | 0xAC00..=0xD7A3
+            | 0xF900..=0xFAFF
+            | 0xFE30..=0xFE6F
+            | 0xFF00..=0xFF60
+            | 0xFFE0..=0xFFE6
+    );
+
+    if full_width { latin_factor * 1.9 } else { latin_factor }
+}
+
+/// Approximate rendered width of `text` at `size`.
+///
+/// The renderer owns the real metrics, so this stays an estimate — deliberately
+/// on the generous side, since a clipped value is worse than a little slack.
+fn text_width(text: &str, size: f32, latin_factor: f32) -> f32 {
+    text.chars().map(|c| char_advance(c, latin_factor)).sum::<f32>() * size
+}
+
 /// The overlay application state.
 pub struct OverlayApp {
     config: OverlayConfig,
@@ -377,7 +410,7 @@ impl OverlayApp {
         let segments: f32 = self
             .menu_labels()
             .iter()
-            .map(|label| label.chars().count() as f32 * size * LABEL_CHAR_W + SEGMENT_PADDING * 2.0)
+            .map(|label| text_width(label, size, LABEL_CHAR_W) + SEGMENT_PADDING * 2.0)
             .sum();
         let gaps = 3.0 * MENU_GAP;
         (((pad * 2.0 + segments + gaps) / 4.0).ceil() * 4.0).max(80.0)
@@ -938,8 +971,8 @@ impl OverlayApp {
         let label_size = self.config.font_size.label();
         let value_size = self.config.font_size.value();
 
-        let label_w = |text: &str| text.chars().count() as f32 * label_size * LABEL_CHAR_W;
-        let value_w = |text: &str| text.chars().count() as f32 * value_size * VALUE_CHAR_W;
+        let label_w = |text: &str| text_width(text, label_size, LABEL_CHAR_W);
+        let value_w = |text: &str| text_width(text, value_size, VALUE_CHAR_W);
 
         let mut rows: Vec<f32> = Vec::new();
         for metric in &self.config.metrics {

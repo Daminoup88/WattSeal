@@ -745,3 +745,84 @@ impl Localize for crate::config::TextColor {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        config::{BgColor, Density, FontSize, Layout, Metric, TextColor, Transparency},
+        theme::ThemeChoice,
+    };
+
+    /// Every language the dashboard ships, so that adding one over there cannot
+    /// quietly leave the checks below half-done.
+    const LANGUAGES: &[Language] = &[
+        Language::English,
+        Language::German,
+        Language::French,
+        Language::Chinese,
+        Language::Romanian,
+    ];
+
+    #[test]
+    fn parses_the_codes_the_dashboard_stores() {
+        assert_eq!(Language::from_code("EN"), Language::English);
+        assert_eq!(Language::from_code("DE"), Language::German);
+        assert_eq!(Language::from_code("FR"), Language::French);
+        assert_eq!(Language::from_code("ZH"), Language::Chinese);
+        assert_eq!(Language::from_code("RO"), Language::Romanian);
+    }
+
+    #[test]
+    fn an_unsaved_or_unknown_code_falls_back_to_english() {
+        assert_eq!(Language::from_code(""), Language::English);
+        assert_eq!(Language::from_code("xx"), Language::English);
+    }
+
+    #[test]
+    fn wording_matches_the_dashboard_where_the_setting_already_exists() {
+        assert_eq!(menu_settings(Language::German), "Einstellungen");
+        assert_eq!(menu_settings(Language::Chinese), "设置");
+        assert_eq!(label_theme(Language::German), "Darstellung");
+        assert_eq!(label_theme(Language::Chinese), "主题");
+        assert_eq!(metric_name(Language::German, Metric::Total), "Gesamt");
+        assert_eq!(metric_name(Language::Chinese, Metric::Network), "网络");
+    }
+
+    #[test]
+    fn a_pick_list_option_renders_its_translation() {
+        assert_eq!(Labeled::new(BgColor::Navy, Language::Chinese).to_string(), "海军蓝");
+        assert_eq!(Labeled::new(FontSize::Large, Language::German).to_string(), "Groß");
+    }
+
+    #[test]
+    fn every_option_is_labelled_in_every_language() {
+        for &language in LANGUAGES {
+            for &color in BgColor::ALL {
+                assert!(!color.localize(language).is_empty());
+            }
+            for &color in TextColor::ALL {
+                assert!(!color.localize(language).is_empty());
+            }
+            for &layout in Layout::ALL {
+                assert!(!layout.localize(language).is_empty());
+            }
+            for &density in Density::ALL {
+                assert!(!density.localize(language).is_empty());
+            }
+            for &size in FontSize::ALL {
+                assert!(!size.localize(language).is_empty());
+            }
+            for &mode in Transparency::ALL {
+                assert!(!mode.localize(language).is_empty());
+            }
+            for &theme in ThemeChoice::ALL {
+                assert!(!theme.localize(language).is_empty());
+            }
+            for &metric in Metric::ALL {
+                assert!(!metric.localize(language).is_empty());
+                assert!(!metric_short_name(language, metric).is_empty());
+            }
+        }
+    }
+}
