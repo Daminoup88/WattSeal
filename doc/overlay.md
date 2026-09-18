@@ -37,12 +37,17 @@ overlay to close when the overlay was launched by the dashboard rather than by t
 ### Sizing
 
 The height always follows the content that is currently enabled, so the widget never carries
-blank space below the text. The width is measured from the text as well — most visibly in the
-horizontal layout, which is a single line of metrics and would otherwise sit in a window much
-wider than its contents.
+blank space below the text.
 
-In the vertical layout the `Width` slider (60–600 px) sets a floor rather than an exact size: the
-widget never becomes narrower than its own text, which would clip the values.
+The width depends on the layout. The horizontal one is a single line of metrics, so it is measured
+from its own text — otherwise it would sit in a window much wider than its contents. The vertical
+one takes the width you set with the `Width` slider (60–600 px) exactly, and a label that does not
+fit is squeezed rather than allowed to widen the window behind your back. Only the values keep a
+veto: the widget never becomes narrower than a reading needs, because a clipped number is worse
+than a window a little wider than you asked for.
+
+Measured widths move along a ladder of 12 px rungs, and a change smaller than one rung does not
+move the window at all. That is what keeps the widget from twitching as the digits change.
 
 ## Language
 

@@ -124,8 +124,10 @@ eye on power draw without leaving the dashboard open — including on top of a f
 | **Trim it** | Choose which metrics appear (total, CPU, GPU, RAM, top apps), shorten the labels, set the decimals and the refresh interval |
 | **Language** | Follows the language you pick in the dashboard, with no restart |
 
-The widget sizes itself to its own content, so it is never wider or taller than the numbers it
-shows. A pinned widget is deliberately not clickable — release it from the tray menu.
+The height always fits the metrics you enabled, and in the horizontal layout the width does too. In
+the vertical layout the `Width` setting decides — labels are squeezed to fit it rather than being
+allowed to widen the window. A pinned widget is deliberately not clickable: release it from the
+tray menu, or by hiding and showing the overlay again.
 
 See [doc/overlay.md](doc/overlay.md) for the transparency model, the settings panel and the full
 config file reference.

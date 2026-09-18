@@ -40,6 +40,16 @@ const SETTINGS_HEIGHT: f32 = 452.0;
 const LABEL_CHAR_W: f32 = 0.52;
 const VALUE_CHAR_W: f32 = 0.62;
 
+/// The width ladder. A measured width is rounded up to a multiple of this, so
+/// the widget grows in visible steps instead of inching along every time a
+/// digit gets wider. The `Width` setting snaps to the same rungs, and a change
+/// smaller than one rung does not move the window at all.
+const WIDTH_STEP: f32 = 12.0;
+
+/// Narrowest usable width, matching the OS window minimum so a request is never
+/// clamped behind our back.
+const MIN_WIDTH: f32 = 24.0;
+
 /// Padding inside each right-click menu segment, and the gap between segments.
 const SEGMENT_PADDING: f32 = 6.0;
 const MENU_GAP: f32 = 3.0;
@@ -81,6 +91,18 @@ fn char_advance(character: char, latin_factor: f32) -> f32 {
 /// on the generous side, since a clipped value is worse than a little slack.
 fn text_width(text: &str, size: f32, latin_factor: f32) -> f32 {
     text.chars().map(|c| char_advance(c, latin_factor)).sum::<f32>() * size
+}
+
+/// Rounds a measured width up to the next rung of the ladder: a fitted width
+/// must never come out narrower than the text it has to hold.
+fn width_up(width: f32) -> f32 {
+    ((width / WIDTH_STEP).ceil() * WIDTH_STEP).max(MIN_WIDTH)
+}
+
+/// Rounds a chosen width to the nearest rung, so the `Width` slider lands on the
+/// same ladder the measured widths use.
+fn width_near(width: f32) -> f32 {
+    ((width / WIDTH_STEP).round() * WIDTH_STEP).max(WIDTH_STEP)
 }
 
 /// The overlay application state.
@@ -156,14 +178,13 @@ impl OverlayApp {
                 // is what makes the overlay follow a change made over there.
                 self.language = Language::from_database(self.database.as_ref());
 
-                // Keep the window fitted to the live content, but only issue a
-                // resize when the target actually changed.
-                // The window is always exactly its content's size, so this only
-                // has to react when the live values change the measured width.
+                // Keep the window fitted to the live content, but only resize
+                // when the target moved by a whole rung. Reacting to a couple of
+                // pixels is what made the widget jitter while the numbers moved.
                 let target = self.fitted_size();
-                if (target.width - self.applied.width).abs() >= 1.0
-                    || (target.height - self.applied.height).abs() >= 1.0
-                {
+                let width_moved = (target.width - self.applied.width).abs() >= WIDTH_STEP;
+                let height_moved = (target.height - self.applied.height).abs() >= 1.0;
+                if width_moved || height_moved {
                     return self.resize_task();
                 }
                 Task::none()
@@ -304,7 +325,9 @@ impl OverlayApp {
                 })
             }
             Message::SetWidth(v) => {
-                self.config.width = v.clamp(60.0, 600.0);
+                // Snap to the ladder, so the number shown next to the slider is
+                // the width the window actually takes.
+                self.config.width = width_near(v.clamp(60.0, 600.0));
                 self.persist();
                 self.resize_task()
             }
@@ -413,7 +436,7 @@ impl OverlayApp {
             .map(|label| text_width(label, size, LABEL_CHAR_W) + SEGMENT_PADDING * 2.0)
             .sum();
         let gaps = 3.0 * MENU_GAP;
-        (((pad * 2.0 + segments + gaps) / 4.0).ceil() * 4.0).max(80.0)
+        width_up(pad * 2.0 + segments + gaps).max(80.0)
     }
 
     /// The right-click menu.
@@ -964,7 +987,8 @@ impl OverlayApp {
     /// Window width that fits the current fonts, density, metrics and values.
     ///
     /// Text advances are approximated (the renderer owns the real metrics) and
-    /// the result is quantised to 4px so it stays stable as digits change.
+    /// the result is rounded up to the width ladder, which is what keeps the
+    /// window from moving every time a digit changes.
     fn fitted_width(&self) -> f32 {
         let pad = self.config.density.padding();
         let spacing = self.config.density.spacing();
@@ -1002,18 +1026,20 @@ impl OverlayApp {
         // The grip is an overlay, so it must NOT be measured here — otherwise
         // the fitted width would be larger than the text and the bar could never
         // be dragged down to the minimum.
-        let raw = pad * 2.0 + content;
-        // Never below the window's own minimum, otherwise the OS clamps the
-        // resize and the value we asked for and got would disagree.
-        ((raw / 4.0).ceil() * 4.0).max(24.0)
+        width_up(pad * 2.0 + content)
     }
 
     /// Size the window should have right now.
     ///
     /// The height is always the measured content height, so the overlay never
-    /// carries blank space. The width is measured exactly for the horizontal
-    /// layout (where any slack is glaring) and user-chosen — but never narrower
-    /// than the text — for the vertical one.
+    /// carries blank space. The width follows the layout: the horizontal one is
+    /// a single line and has to be measured, while the vertical one takes the
+    /// width the user picked.
+    ///
+    /// That width used to be only a floor — the measurement quietly overrode the
+    /// setting whenever a label or a process name was wide, which is why the
+    /// `Width` slider felt like it did nothing. A label that does not fit is
+    /// squeezed now instead; only a value keeps a veto.
     fn fitted_size(&self) -> iced::Size {
         if self.show_settings {
             return iced::Size::new(SETTINGS_WIDTH, SETTINGS_HEIGHT);
@@ -1024,9 +1050,33 @@ impl OverlayApp {
         }
         let width = match self.config.layout {
             Layout::Horizontal => self.fitted_width(),
-            Layout::Vertical => self.config.width.max(self.fitted_width()),
+            Layout::Vertical => self.config.width.max(self.values_floor()),
         };
         iced::Size::new(width, self.current_height())
+    }
+
+    /// Narrowest the vertical layout may be before a value would be clipped.
+    ///
+    /// The `Width` setting is otherwise authoritative, labels included, but a
+    /// reading that cannot be read is worse than a window a little wider than
+    /// the one that was asked for — so the numbers keep a veto.
+    fn values_floor(&self) -> f32 {
+        let pad = self.config.density.padding();
+        let value_size = self.config.font_size.value();
+        let value_w = |text: String| text_width(&text, value_size, VALUE_CHAR_W);
+
+        let widest = self.config.metrics.iter().fold(0.0_f32, |widest, metric| {
+            let value = if metric.is_multi() {
+                self.top_apps.iter().fold(0.0_f32, |widest, (_, watts)| {
+                    widest.max(value_w(self.format_value(Some(*watts))))
+                })
+            } else {
+                value_w(self.format_value(self.power.get(metric.id()).copied()))
+            };
+            widest.max(value)
+        });
+
+        width_up(pad * 2.0 + widest)
     }
 
     fn resize_task(&mut self) -> Task<Message> {
@@ -1381,5 +1431,20 @@ mod tests {
         // A widget wider than the monitor still lands inside it.
         let point = anchor_point(iced::Size::new(100.0, 100.0), 200.0, 50.0);
         assert_eq!(point.x, 16.0);
+    }
+
+    #[test]
+    fn a_measured_width_rounds_up_to_a_rung_of_the_ladder() {
+        assert_eq!(width_up(1.0), MIN_WIDTH);
+        assert_eq!(width_up(100.0), 108.0);
+        // Already on a rung: no extra step is added on top.
+        assert_eq!(width_up(108.0), 108.0);
+    }
+
+    #[test]
+    fn a_chosen_width_snaps_to_the_nearest_rung() {
+        assert_eq!(width_near(100.0), 96.0);
+        assert_eq!(width_near(110.0), 108.0);
+        assert_eq!(width_near(140.0), 144.0);
     }
 }
