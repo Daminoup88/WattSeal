@@ -97,9 +97,18 @@ panel (see `winlayer::click_through_supported`). macOS would need `setIgnoresMou
 an input shape; Wayland has no protocol for it at all. Where click-through is unavailable the
 settings panel says so rather than offering a toggle that cannot do anything.
 
-Because a click-through widget no longer receives mouse events, **an overlay that is both pinned
-and click-through can only be released from the tray menu**, or by editing the config file. This
-is deliberate: the widget cannot be grabbed by accident while it is meant to be out of the way.
+Because a click-through widget no longer receives mouse events, it cannot be released by clicking
+it. Three ways out exist:
+
+| Path | How |
+|---|---|
+| Tray menu | `Pin / Unpin Overlay`, which releases it straight away |
+| Dashboard footer | `Hide overlay` then `Show overlay`: opening clears the pin |
+| Config file | Set `pin_mode` to `false` |
+
+Only a standalone `WattSeal --overlay` run — no tray and no dashboard — has to fall back to the
+file. Locking the position is deliberate: the widget cannot be grabbed by accident while it is
+meant to be out of the way.
 
 ## Configuration
 
