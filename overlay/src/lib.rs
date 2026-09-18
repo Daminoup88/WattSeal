@@ -40,26 +40,36 @@ pub fn is_requested() -> bool {
         .unwrap_or(false)
 }
 
-/// Asks the overlay to open (`true`) or to close (`false`), reporting whether
-/// the request had to be written.
+/// Asks the overlay to open, clearing pin mode with it: a pinned overlay
+/// ignores the mouse, so it must not come back locked once the user has just
+/// asked for it.
 ///
-/// Opening also clears pin mode: a pinned overlay ignores the mouse, so it must
-/// not come back locked once the user has just asked for it. Callers say what
-/// they want instead of editing the file, which keeps the config layout in one
-/// place — the tray, the dashboard and the overlay itself all go through here.
-pub fn request(open: bool) -> bool {
+/// Callers say what they want instead of editing the file, which keeps the
+/// layout of that file in one place — the tray, the dashboard and the overlay
+/// itself all go through here.
+pub fn request_open() {
     let mut config = config::OverlayConfig::load().unwrap_or_default();
 
-    // Nothing to write when the flag already matches and no pin has to go.
-    if config.overlay_requested == open && !(open && config.pin_mode) {
-        return false;
+    // Nothing to write when it is already open and unpinned.
+    if config.overlay_requested && !config.pin_mode {
+        return;
     }
 
-    config.overlay_requested = open;
-    if open {
-        config.pin_mode = false;
+    config.overlay_requested = true;
+    config.pin_mode = false;
+    config.save();
+}
+
+/// Asks the overlay to close.
+pub fn request_close() {
+    let mut config = config::OverlayConfig::load().unwrap_or_default();
+
+    if !config.overlay_requested {
+        return;
     }
-    config.save()
+
+    config.overlay_requested = false;
+    config.save();
 }
 
 /// Flips "pin mode" and returns the new state.

@@ -297,7 +297,7 @@ fn setup_tray(
         } else if event.id == quit_id {
             // Ask first: the overlay may have been started from the main window,
             // so this process may hold no handle for it and `kill` would miss it.
-            overlay::request(false);
+            overlay::request_close();
             if let Ok(mut child_guard) = ui_child_menu.lock() {
                 if let Some(c) = child_guard.as_mut() {
                     let _ = c.kill();

@@ -29,7 +29,7 @@ fn overlay_requested() -> bool {
 /// ones where this process terminates immediately (`EXIT_CODE_SHUTDOWN_ALL`) and
 /// could otherwise leave the overlay orphaned.
 fn request_overlay_close() {
-    overlay::request(false);
+    overlay::request_close();
 }
 
 use crate::{
@@ -406,7 +406,11 @@ impl App {
                 // The overlay polls its config file, so writing the request is
                 // enough; opening also clears pin over there, so the widget comes
                 // back interactive rather than locked.
-                overlay::request(enabled);
+                if enabled {
+                    overlay::request_open();
+                } else {
+                    overlay::request_close();
+                }
 
                 if enabled {
                     match std::env::current_exe() {
