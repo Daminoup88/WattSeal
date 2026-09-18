@@ -113,14 +113,12 @@ fn width_near(width: f32) -> f32 {
     ((width / WIDTH_STEP).round() * WIDTH_STEP).max(WIDTH_STEP)
 }
 
-/// One entry of the horizontal bar, already formatted.
 struct BarItem {
     /// `None` when labels are switched off, or for an entry that has none.
     label: Option<String>,
     value: String,
 }
 
-/// The overlay application state.
 pub struct OverlayApp {
     config: OverlayConfig,
     window_id: Option<window::Id>,
@@ -167,7 +165,6 @@ impl OverlayApp {
         (app, task)
     }
 
-    /// Handles a message.
     pub fn update(&mut self, message: Message) -> Task<Message> {
         match message {
             Message::Tick => {
@@ -377,7 +374,6 @@ impl OverlayApp {
         }
     }
 
-    /// Renders the widget.
     pub fn view(&self) -> Element<'_, Message, Theme> {
         let palette = theme::palette_with(self.config.theme, self.config.bg_color, self.config.text_color);
         let pad = self.config.density.padding();

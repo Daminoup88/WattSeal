@@ -38,9 +38,7 @@ pub struct Palette {
     pub green: Color,
     /// Warning / amber value color.
     pub amber: Color,
-    /// Card border color.
     pub border: Color,
-    /// Shadow color.
     pub shadow: Color,
 }
 

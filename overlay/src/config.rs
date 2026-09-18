@@ -11,7 +11,6 @@ use crate::theme::ThemeChoice;
 
 const CONFIG_FILENAME: &str = "overlay_config.json";
 
-/// Metrics that can be displayed.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Metric {
@@ -74,7 +73,6 @@ impl Metric {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum Layout {
-    /// One metric per line.
     #[default]
     Vertical,
     /// All metrics on a single compact line (MSI-Afterburner OSD style).
@@ -123,7 +121,6 @@ impl Density {
     }
 }
 
-/// Text size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum FontSize {
@@ -161,7 +158,6 @@ impl FontSize {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum BgColor {
-    /// Follow the theme.
     #[default]
     Auto,
     Slate,
@@ -205,7 +201,6 @@ impl BgColor {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum TextColor {
-    /// Follow the theme.
     #[default]
     Auto,
     White,
@@ -255,7 +250,6 @@ pub enum Transparency {
     /// Win32 layered window with uniform alpha (GPU-independent fallback: the
     /// whole window, text included, is composited at one alpha).
     Layered,
-    /// Fully opaque.
     Off,
 }
 
@@ -326,8 +320,8 @@ pub struct OverlayConfig {
     // window
     #[serde(default = "default_true")]
     pub always_on_top: bool,
-    /// Width used by the **vertical** layout, in logical pixels. The horizontal
-    /// layout ignores it and measures its own content instead.
+    /// Widest the widget may get, in logical pixels. The content is measured and
+    /// the window stays at that width when it is narrower.
     #[serde(default = "default_width")]
     pub width: f32,
     /// Whether the overlay should be running. The main window flips this to

@@ -8,23 +8,17 @@ use crate::{
 /// All events handled by [`crate::app::OverlayApp`].
 #[derive(Debug, Clone)]
 pub enum Message {
-    /// Periodic data refresh.
     Tick,
     /// The overlay window id (from `window::latest`).
     WindowId(Option<iced::window::Id>),
     /// The raw OS window handle (used by the layered transparency mode).
     RawWindowId(u64),
-    /// Start dragging the widget.
     StartDrag,
     /// Window moved (persist position).
     Moved(f32, f32),
-    /// Toggle the settings panel.
     ToggleSettings,
-    /// Replace the bar with the right-click menu.
     OpenMenu,
-    /// Put the metrics back, dismissing the menu.
     CloseMenu,
-    /// Toggle pin mode.
     TogglePin,
     TogglePinClickThrough(bool),
 
