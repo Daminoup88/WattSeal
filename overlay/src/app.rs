@@ -299,6 +299,11 @@ impl OverlayApp {
                 self.apply_layered();
                 Task::none()
             }
+            Message::ToggleShadow(v) => {
+                self.config.shadow = v;
+                self.persist();
+                Task::none()
+            }
             Message::SetLayout(v) => {
                 self.config.layout = v;
                 self.persist();
@@ -444,7 +449,7 @@ impl OverlayApp {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(Padding::from(pad))
-            .style(card_style(palette, self.card_alpha()));
+            .style(card_style(palette, self.card_alpha(), self.config.draws_shadow()));
 
         // The card is the drag / right-click surface only while the metrics are
         // showing: the settings panel and the menu need clickable widgets. A
@@ -628,6 +633,20 @@ impl OverlayApp {
             ))
             .push(hint(self.opacity_hint(), font, palette));
 
+        // A shadow needs per-pixel alpha to fade into. Where the mode has none the
+        // toggle is kept — it is still the user's preference, and it takes effect
+        // again in a mode that can render it — but a hint says why nothing changed.
+        let mut shadow_row = Column::new().spacing(2).push(toggle(
+            translations::label_shadow(language),
+            self.config.shadow,
+            Message::ToggleShadow,
+            font,
+            palette,
+        ));
+        if self.config.shadow && !self.config.draws_shadow() {
+            shadow_row = shadow_row.push(hint(translations::hint_shadow_unavailable(language), font, palette));
+        }
+
         let appearance = Column::new()
             .spacing(spacing)
             .push(section_title(translations::section_appearance(language), font, palette))
@@ -655,6 +674,7 @@ impl OverlayApp {
                 font,
                 palette,
             ))
+            .push(shadow_row)
             .push(picker(
                 translations::label_layout(language),
                 labeled_pick(Layout::ALL, self.config.layout, language, Message::SetLayout),
@@ -1281,7 +1301,12 @@ fn with_alpha(color: Color, alpha: f32) -> Color {
     Color { a: alpha, ..color }
 }
 
-fn card_style(palette: Palette, opacity: f32) -> impl Fn(&Theme) -> iced::widget::container::Style {
+/// The card's container style.
+///
+/// `shadow` is the resolved verdict from [`OverlayConfig::draws_shadow`], not the
+/// raw setting: the caller knows the transparency mode, and a shadow drawn where
+/// the window cannot blend one is worse than no shadow at all.
+fn card_style(palette: Palette, opacity: f32, shadow: bool) -> impl Fn(&Theme) -> iced::widget::container::Style {
     move |_theme| iced::widget::container::Style {
         background: Some(Background::Color(palette.card_with_alpha(opacity))),
         border: Border {
@@ -1290,10 +1315,14 @@ fn card_style(palette: Palette, opacity: f32) -> impl Fn(&Theme) -> iced::widget
             radius: 12.0.into(),
         },
         text_color: Some(palette.text),
-        shadow: Shadow {
-            color: palette.shadow,
-            offset: Vector::new(0.0, 3.0),
-            blur_radius: 14.0,
+        shadow: if shadow {
+            Shadow {
+                color: palette.shadow,
+                offset: Vector::new(0.0, 3.0),
+                blur_radius: 14.0,
+            }
+        } else {
+            Shadow::default()
         },
         ..Default::default()
     }

@@ -38,10 +38,10 @@ broken feature.
   popup means the menu behaves identically on every platform and can never be clipped by the
   widget's own size.
 - **Settings** — two columns: `Appearance` on the left (opacity, background and text color,
-  transparency, layout, density, text size, theme, decimals, refresh interval, labels, units,
-  short labels), `Window` and `Content` on the right. `Content` lists the metrics in the order the
-  bar shows them, each with an arrow that moves it past its neighbour, and the metrics that are off
-  below them. `Done` returns to the metrics and `Quit overlay` ends the process.
+  transparency, drop shadow, layout, density, text size, theme, decimals, refresh interval, labels,
+  units, short labels), `Window` and `Content` on the right. `Content` lists the metrics in the
+  order the bar shows them, each with an arrow that moves it past its neighbour, and the metrics
+  that are off below them. `Done` returns to the metrics and `Quit overlay` ends the process.
 
 ### Sizing
 
@@ -96,6 +96,12 @@ alpha mode, the two cannot be decoupled, and offering the second slider would on
 control that does nothing. Contrast is tuned with `Bg color` and `Text color`, which always
 work because they change the *hue*, not the alpha.
 
+The same limit decides the **drop shadow**. A shadow is per-pixel alpha, so the layered path — one
+alpha for everything — flattens it into a dark ring around the card, and an opaque window has
+nothing behind it to fade into either. The card therefore draws its shadow only in a mode that
+carries per-pixel alpha. The `Drop shadow` toggle is still yours to set and is remembered for a mode
+that can render it; while it cannot, a line under the toggle says why the card stays flat.
+
 > Set `WATTSEAL_OVERLAY_LOG=1` to have the overlay write its renderer diagnostics to
 > `overlay.log` next to the executable: selected adapter, surface format and the alpha modes the
 > surface actually accepted. It is opt-in, so a normal run never writes to disk, and it is the
@@ -140,6 +146,7 @@ fall back to the defaults, so the file is safe to edit by hand.
 | `bg_color`           | `auto`  | Card color swatch, `auto` follows `theme`                             |
 | `text_color`         | `auto`  | Text color swatch, `auto` follows `theme`                             |
 | `transparency`       | `auto`  | `auto` / `layered` / `off`                                            |
+| `shadow`             | `true`  | Drop shadow, drawn only where the surface carries per-pixel alpha      |
 | `layout`             | `vertical` | `vertical` (one metric per line) or `horizontal` (single line)     |
 | `density`            | `compact` | Padding and spacing: `ultra` / `compact` / `normal`                 |
 | `font_size`          | `small` | `small` / `medium` / `large`                                          |

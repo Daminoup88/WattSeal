@@ -310,6 +310,10 @@ pub struct OverlayConfig {
     pub text_color: TextColor,
     #[serde(default)]
     pub transparency: Transparency,
+    /// Drop shadow under the card. Ignored where the mode cannot blend one —
+    /// see [`Self::draws_shadow`].
+    #[serde(default = "default_true")]
+    pub shadow: bool,
     #[serde(default)]
     pub layout: Layout,
     #[serde(default)]
@@ -394,6 +398,7 @@ impl Default for OverlayConfig {
             bg_color: BgColor::default(),
             text_color: TextColor::default(),
             transparency: Transparency::default(),
+            shadow: true,
             layout: Layout::default(),
             density: Density::default(),
             font_size: FontSize::default(),
@@ -458,6 +463,18 @@ impl OverlayConfig {
         std::fs::rename(&staging, &path).is_ok()
     }
 
+    /// Whether the card actually draws its drop shadow.
+    ///
+    /// A shadow is per-pixel alpha, so it can only be blended where the window
+    /// surface carries some. The layered path composites the whole window at one
+    /// constant alpha, which flattens the soft edge into a dark ring around the
+    /// card; with transparency off there is nothing behind the window to blend
+    /// into either. In both modes the setting is dropped rather than honoured
+    /// badly.
+    pub fn draws_shadow(&self) -> bool {
+        self.shadow && self.transparency.transparent_window()
+    }
+
     /// Clamps `top_apps` into the supported 1..=8 range.
     pub fn top_apps(&self) -> usize {
         self.top_apps.clamp(1, 8)
@@ -517,6 +534,22 @@ mod tests {
         assert_eq!(config.width, default_width());
         assert!(config.always_on_top);
         assert!(!config.pin_mode);
+    }
+
+    #[test]
+    fn the_shadow_is_dropped_where_no_surface_alpha_can_carry_it() {
+        let mut config = OverlayConfig {
+            shadow: true,
+            ..OverlayConfig::default()
+        };
+
+        // Neither of these composites per pixel: the layered window carries one
+        // alpha for everything, and an opaque window has nothing to fade into.
+        config.transparency = Transparency::Layered;
+        assert!(!config.draws_shadow());
+
+        config.transparency = Transparency::Off;
+        assert!(!config.draws_shadow());
     }
 
     #[test]

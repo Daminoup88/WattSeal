@@ -27,6 +27,7 @@ pub enum Message {
     SetBgColor(crate::config::BgColor),
     SetTextColor(crate::config::TextColor),
     SetTransparency(crate::config::Transparency),
+    ToggleShadow(bool),
     SetLayout(Layout),
     SetDensity(Density),
     SetFontSize(FontSize),

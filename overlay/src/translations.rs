@@ -200,6 +200,16 @@ pub fn label_transparency(language: Language) -> &'static str {
     }
 }
 
+pub fn label_shadow(language: Language) -> &'static str {
+    match language {
+        Language::English => "Drop shadow",
+        Language::German => "Schlagschatten",
+        Language::French => "Ombre portée",
+        Language::Chinese => "投影",
+        Language::Romanian => "Umbră",
+    }
+}
+
 pub fn label_layout(language: Language) -> &'static str {
     match language {
         Language::English => "Layout",
@@ -366,6 +376,28 @@ pub fn hint_pin_unavailable(language: Language) -> &'static str {
         Language::Chinese => "此平台仅锁定位置：不支持鼠标穿透。",
         Language::Romanian => {
             "Fixarea blochează poziția aici: trecerea clicurilor nu este disponibilă pe această platformă."
+        }
+    }
+}
+
+pub fn hint_shadow_unavailable(language: Language) -> &'static str {
+    match language {
+        Language::English => {
+            "This transparency mode has no per-pixel alpha for a shadow to fade into, so the card \
+             stays flat."
+        }
+        Language::German => {
+            "Dieser Transparenzmodus hat kein Alpha pro Pixel, in das ein Schatten auslaufen \
+             könnte, die Karte bleibt also flach."
+        }
+        Language::French => {
+            "Ce mode de transparence n'a pas d'alpha par pixel dans lequel une ombre puisse \
+             s'estomper : la carte reste plate."
+        }
+        Language::Chinese => "当前透明模式没有可让阴影淡出的逐像素 alpha，因此卡片保持无阴影。",
+        Language::Romanian => {
+            "Acest mod de transparență nu are alpha pe pixel în care o umbră să se estompeze, așa \
+             că cardul rămâne plat."
         }
     }
 }
