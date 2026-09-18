@@ -212,32 +212,6 @@ fn spawn_overlay(overlay_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String
     }
 }
 
-/// Flips the overlay's click-through "pin mode" in the shared config file and
-/// returns the new state.
-///
-/// The overlay process polls that file, so this needs no IPC; it is also the
-/// only way to release the overlay, since a pinned window ignores the mouse.
-fn toggle_overlay_pin() -> bool {
-    let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
-    config.pin_mode = !config.pin_mode;
-    config.save();
-    config.pin_mode
-}
-
-/// Asks the overlay to close through its own config file.
-///
-/// The overlay may have been launched by the main window rather than by this
-/// process, in which case there is no child handle to kill here. The config
-/// file is the only channel both processes share, and the overlay polls it.
-fn request_overlay_close() {
-    let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
-    if !config.overlay_requested {
-        return;
-    }
-    config.overlay_requested = false;
-    config.save();
-}
-
 /// Toggles the overlay subprocess: launches it when off, terminates it on.
 fn toggle_overlay(overlay_child: &Arc<Mutex<Option<Child>>>) {
     let mut guard = match overlay_child.lock() {
@@ -286,8 +260,7 @@ fn setup_tray(
     // A plain item rather than a `CheckMenuItem`: muda's check items hold `Rc`
     // and are therefore not `Send`, so they cannot be moved into the event
     // handler to keep their tick in sync.
-    let pin_overlay_i =
-        overlay::winlayer::click_through_supported().then(|| MenuItem::new("Pin / Unpin Overlay", true, None));
+    let pin_overlay_i = overlay::click_through_supported().then(|| MenuItem::new("Pin / Unpin Overlay", true, None));
     let quit_i = MenuItem::new("Quit", true, None);
     let open_ui_id = open_ui_i.id().to_owned();
     let toggle_overlay_id = toggle_overlay_i.id().to_owned();
@@ -315,7 +288,7 @@ fn setup_tray(
             // Deliberately does not start the overlay: pinning also makes the
             // window ignore the mouse, so launching one from here would hand the
             // user a window they never asked for and cannot grab.
-            let pinned = toggle_overlay_pin();
+            let pinned = overlay::toggle_pin();
             if pinned {
                 common::clog!("✓ Overlay pinned: release it from this menu or from the dashboard");
             } else {
@@ -324,7 +297,7 @@ fn setup_tray(
         } else if event.id == quit_id {
             // Ask first: the overlay may have been started from the main window,
             // so this process may hold no handle for it and `kill` would miss it.
-            request_overlay_close();
+            overlay::request(false);
             if let Ok(mut child_guard) = ui_child_menu.lock() {
                 if let Some(c) = child_guard.as_mut() {
                     let _ = c.kill();

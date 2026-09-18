@@ -14,28 +14,22 @@ use iced::{
     window,
 };
 
-/// Whether the overlay is currently requested, read from its own config file.
+/// Whether the overlay is currently requested.
 ///
-/// The overlay shares the process and directory with this binary, so the two
-/// communicate purely through that file — there is no IPC.
+/// It runs in its own process and the two communicate through the overlay's own
+/// config file rather than through IPC, so this asks the overlay crate instead
+/// of reading that file here.
 fn overlay_requested() -> bool {
-    overlay::config::OverlayConfig::load()
-        .map(|config| config.overlay_requested)
-        .unwrap_or(false)
+    overlay::is_requested()
 }
 
-/// Asks the overlay — a separate process — to close, through its config file.
+/// Asks the overlay — a separate process — to close.
 ///
 /// Doing this while shutting down covers every exit path at once, including the
 /// ones where this process terminates immediately (`EXIT_CODE_SHUTDOWN_ALL`) and
 /// could otherwise leave the overlay orphaned.
 fn request_overlay_close() {
-    let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
-    if !config.overlay_requested {
-        return;
-    }
-    config.overlay_requested = false;
-    config.save();
+    overlay::request(false);
 }
 
 use crate::{
@@ -409,15 +403,10 @@ impl App {
             }
             Message::ToggleOverlay(enabled) => {
                 self.overlay_on = enabled;
-                // The overlay polls its own config file, so writing the flag is
-                // enough to close it. Opening also clears pin, so the overlay
-                // comes back interactive rather than locked.
-                let mut config = overlay::config::OverlayConfig::load().unwrap_or_default();
-                config.overlay_requested = enabled;
-                if enabled {
-                    config.pin_mode = false;
-                }
-                config.save();
+                // The overlay polls its config file, so writing the request is
+                // enough; opening also clears pin over there, so the widget comes
+                // back interactive rather than locked.
+                overlay::request(enabled);
 
                 if enabled {
                     match std::env::current_exe() {

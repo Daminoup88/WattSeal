@@ -12,6 +12,8 @@ pub mod theme;
 pub mod translations;
 pub mod winlayer;
 
+pub use winlayer::click_through_supported;
+
 /// Runs the overlay window.
 ///
 /// Transparency is delegated to the platform: [`config::Transparency::Auto`]
@@ -26,6 +28,49 @@ pub fn run() -> iced::Result {
     }
     init_logging();
     app::run()
+}
+
+/// Whether the overlay is currently asked to be running.
+///
+/// The overlay and its callers talk through the config file rather than through
+/// IPC, so this is the read side of that channel.
+pub fn is_requested() -> bool {
+    config::OverlayConfig::load()
+        .map(|config| config.overlay_requested)
+        .unwrap_or(false)
+}
+
+/// Asks the overlay to open (`true`) or to close (`false`), reporting whether
+/// the request had to be written.
+///
+/// Opening also clears pin mode: a pinned overlay ignores the mouse, so it must
+/// not come back locked once the user has just asked for it. Callers say what
+/// they want instead of editing the file, which keeps the config layout in one
+/// place — the tray, the dashboard and the overlay itself all go through here.
+pub fn request(open: bool) -> bool {
+    let mut config = config::OverlayConfig::load().unwrap_or_default();
+
+    // Nothing to write when the flag already matches and no pin has to go.
+    if config.overlay_requested == open && !(open && config.pin_mode) {
+        return false;
+    }
+
+    config.overlay_requested = open;
+    if open {
+        config.pin_mode = false;
+    }
+    config.save()
+}
+
+/// Flips "pin mode" and returns the new state.
+///
+/// The overlay polls the file, so this needs no IPC. It is also how a pinned,
+/// click-through overlay is released, since that window ignores the mouse.
+pub fn toggle_pin() -> bool {
+    let mut config = config::OverlayConfig::load().unwrap_or_default();
+    config.pin_mode = !config.pin_mode;
+    config.save();
+    config.pin_mode
 }
 
 /// Where the opt-in log is written: `overlay.log` next to the executable.
