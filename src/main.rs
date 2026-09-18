@@ -311,12 +311,15 @@ fn setup_tray(
         } else if pin_overlay_id.as_ref() == Some(&event.id) {
             // Pin mode lives in the overlay's own config file, which the overlay
             // polls once a second — so writing it is enough, no IPC required.
+            //
+            // Deliberately does not start the overlay: pinning also makes the
+            // window ignore the mouse, so launching one from here would hand the
+            // user a window they never asked for and cannot grab.
             let pinned = toggle_overlay_pin();
-            spawn_overlay(&overlay_child_menu).ok();
             if pinned {
-                common::clog!("✓ Overlay pinned (release it here or from its right-click menu)");
+                common::clog!("✓ Overlay pinned: release it from this menu or from the dashboard");
             } else {
-                common::clog!("✓ Overlay unpinned");
+                common::clog!("✓ Overlay unpinned: mouse input restored");
             }
         } else if event.id == quit_id {
             // Ask first: the overlay may have been started from the main window,
