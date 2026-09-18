@@ -22,6 +22,14 @@ The three entry points do not talk to each other over IPC. They agree through th
 sets it back to `false` when it exits from its own menu. That is also how the tray can ask an
 overlay to close when the overlay was launched by the dashboard rather than by the tray itself.
 
+Only one overlay runs at a time. The three entry points start the process independently and none of
+them can see the others' handle, so the widget takes an exclusive lock on
+`overlay_config.json.lock`, beside the config file, and a second copy leaves right away. A previous
+instance that is being hidden only notices on its next poll, so a newcomer waits one poll interval
+for it to let go before concluding it is a real duplicate. If the lock file cannot be used at all,
+the widget runs anyway: two overlapping widgets read worse than one, but no widget at all is a
+broken feature.
+
 ## Using the widget
 
 - **Move it** — drag the widget with the left mouse button.
@@ -152,3 +160,6 @@ fall back to the defaults, so the file is safe to edit by hand.
 | `top_apps`           | `3`     | How many apps the `Top apps` metric lists (clamped to 1–8)             |
 
 Deleting the file restores every default.
+
+`overlay_config.json.lock` sits beside it and holds no settings at all: it exists only to be locked,
+so that one overlay process runs at a time.

@@ -425,6 +425,15 @@ impl OverlayConfig {
             .unwrap_or_else(|| PathBuf::from(CONFIG_FILENAME))
     }
 
+    /// Path of the single-instance lock, beside the config file.
+    ///
+    /// Next to the executable like the config, so two installations in different
+    /// folders get their own lock instead of excluding one another — and
+    /// `overlay_config.json*` in `.gitignore` already covers this name.
+    pub fn lock_path() -> PathBuf {
+        Self::path().with_file_name(format!("{CONFIG_FILENAME}.lock"))
+    }
+
     pub fn load() -> Option<Self> {
         let contents = std::fs::read_to_string(Self::path()).ok()?;
         serde_json::from_str(&contents).ok()

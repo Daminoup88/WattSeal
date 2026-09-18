@@ -3804,6 +3804,7 @@ name = "overlay"
 version = "1.0.5"
 dependencies = [
  "common",
+ "fs2",
  "iced",
  "log",
  "serde",

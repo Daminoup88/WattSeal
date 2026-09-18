@@ -7,6 +7,7 @@
 
 pub mod app;
 pub mod config;
+mod instance;
 pub mod message;
 pub mod theme;
 pub mod translations;
@@ -19,6 +20,9 @@ pub use winlayer::click_through_supported;
 /// Transparency is delegated to the platform: [`config::Transparency::Auto`]
 /// resolves to a Win32 layered window on Windows (where the GPU surface exposes
 /// no alpha-capable composite mode) and to per-pixel surface alpha elsewhere.
+///
+/// Returns as soon as another overlay already holds the single-instance lock:
+/// nothing failed, this process simply has nothing to add.
 pub fn run() -> iced::Result {
     // Match the collector and the dashboard: resolve the database — and the
     // config file written next to it — against the executable's directory
@@ -27,6 +31,19 @@ pub fn run() -> iced::Result {
         log::warn!("overlay: could not switch to the executable directory: {err}");
     }
     init_logging();
+
+    // The tray, the dashboard footer and `--overlay` each start this process and
+    // none of them can see the others' handle, so a second copy steps aside here
+    // rather than stacking a widget on top of the first.
+    let _instance = match instance::InstanceGuard::claim(instance::handover_wait()) {
+        instance::Claim::Held(guard) => guard,
+        instance::Claim::Taken => {
+            log::info!("overlay: another instance is already running; leaving");
+            return Ok(());
+        }
+        instance::Claim::Unavailable => return app::run(),
+    };
+
     app::run()
 }
 
