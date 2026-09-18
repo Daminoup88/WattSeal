@@ -418,10 +418,22 @@ impl OverlayConfig {
     }
 
     pub fn save(&self) -> bool {
-        match serde_json::to_string_pretty(self) {
-            Ok(json) => std::fs::write(Self::path(), json).is_ok(),
-            Err(_) => false,
+        let Ok(json) = serde_json::to_string_pretty(self) else {
+            return false;
+        };
+
+        // Written beside the real file and renamed onto it: the other two
+        // processes poll this file, and `fs::write` truncates before it writes,
+        // so a poll landing mid-write would read half a document, parse as
+        // nothing, and fall back to the defaults.
+        let path = Self::path();
+        let staging = path.with_file_name(format!("{CONFIG_FILENAME}.tmp"));
+
+        if std::fs::write(&staging, json).is_err() {
+            return false;
         }
+
+        std::fs::rename(&staging, &path).is_ok()
     }
 
     /// Clamps `top_apps` into the supported 1..=8 range.
