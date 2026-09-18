@@ -1094,11 +1094,11 @@ impl OverlayApp {
         iced::Size::new(self.target_width(), self.config.fitted_height())
     }
 
-    /// Narrowest the vertical layout may be before a value would be clipped.
+    /// Narrowest a value can be and still be read.
     ///
-    /// The `Width` setting is otherwise authoritative, labels included, but a
-    /// reading that cannot be read is worse than a window a little wider than
-    /// the one that was asked for — so the numbers keep a veto.
+    /// The `Width` slider stops here: a lower cap would cut the numbers
+    /// themselves, and an unreadable reading is worse than a window wider than
+    /// the one that was asked for.
     fn values_floor(&self) -> f32 {
         let pad = self.config.density.padding();
         let value_size = self.config.font_size.value();

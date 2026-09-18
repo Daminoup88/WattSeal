@@ -45,7 +45,7 @@ pub enum Message {
 
     // window
     ToggleAlwaysOnTop(bool),
-    /// Width (logical px) used by the vertical layout.
+    /// Width (logical px) the widget may grow to.
     SetWidth(f32),
 
     // content

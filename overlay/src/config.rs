@@ -435,7 +435,7 @@ impl OverlayConfig {
         self.top_apps.clamp(1, 8)
     }
 
-    /// Number of rendered lines in vertical layout.
+    /// Number of rows the vertical layout renders.
     fn content_rows(&self) -> usize {
         let mut rows = 0usize;
         for m in &self.metrics {
