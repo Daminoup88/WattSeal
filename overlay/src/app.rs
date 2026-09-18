@@ -1342,3 +1342,44 @@ fn platform_specific() -> window::settings::PlatformSpecific {
         window::settings::PlatformSpecific::default()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn full_width_glyphs_measure_wider_than_latin_ones() {
+        // Measuring CJK at the Latin advance is what clipped the Chinese
+        // labels, so the ratio itself is what is worth pinning down.
+        let ratio = char_advance('总', 1.0) / char_advance('A', 1.0);
+        assert!(ratio >= 1.5, "a full-width glyph measured at only {ratio}x a Latin one");
+    }
+
+    #[test]
+    fn a_label_mixing_scripts_adds_up() {
+        let latin = text_width("AB", 10.0, 0.5);
+        let chinese = text_width("总", 10.0, 0.5);
+
+        assert_eq!(text_width("AB总", 10.0, 0.5), latin + chinese);
+        assert_eq!(latin, 10.0);
+    }
+
+    #[test]
+    fn long_process_names_are_truncated_to_the_limit() {
+        assert_eq!(truncate("firefox", TOP_NAME_MAX), "firefox");
+        assert_eq!(truncate("a-very-long-process-name", 8), "a-very-…");
+        assert_eq!(truncate("a-very-long-process-name", 8).chars().count(), 8);
+    }
+
+    #[test]
+    fn the_widget_is_anchored_inside_the_monitor() {
+        assert_eq!(
+            anchor_point(iced::Size::new(1920.0, 1080.0), 200.0, 100.0),
+            iced::Point::new(1704.0, 16.0)
+        );
+
+        // A widget wider than the monitor still lands inside it.
+        let point = anchor_point(iced::Size::new(100.0, 100.0), 200.0, 50.0);
+        assert_eq!(point.x, 16.0);
+    }
+}

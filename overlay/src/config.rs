@@ -444,7 +444,7 @@ impl OverlayConfig {
         rows.max(1)
     }
 
-    /// Window height that fits the content (used when `fit_height` is on).
+    /// Window height that fits the metrics currently enabled.
     pub fn fitted_height(&self) -> f32 {
         let pad = self.density.padding();
         let spacing = self.density.spacing();
@@ -465,5 +465,40 @@ impl OverlayConfig {
             Layout::Vertical => 32.0,
         };
         (pad * 2.0 + content).ceil().max(floor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_keys_are_ignored_so_the_file_stays_hand_editable() {
+        let config: OverlayConfig =
+            serde_json::from_str(r#"{"layout":"horizontal","nonsense":1}"#).expect("valid json");
+
+        assert_eq!(config.layout, Layout::Horizontal);
+        assert_eq!(config.decimals, default_decimals());
+    }
+
+    #[test]
+    fn missing_keys_fall_back_to_their_defaults() {
+        let config: OverlayConfig = serde_json::from_str("{}").expect("valid json");
+
+        assert_eq!(config.opacity, default_opacity());
+        assert_eq!(config.width, default_width());
+        assert!(config.always_on_top);
+        assert!(!config.pin_mode);
+    }
+
+    #[test]
+    fn the_top_apps_count_is_clamped_to_what_can_be_listed() {
+        let mut config = OverlayConfig::default();
+
+        config.top_apps = 0;
+        assert_eq!(config.top_apps(), 1);
+
+        config.top_apps = 99;
+        assert_eq!(config.top_apps(), 8);
     }
 }
