@@ -18,6 +18,12 @@ pub mod winlayer;
 /// resolves to a Win32 layered window on Windows (where the GPU surface exposes
 /// no alpha-capable composite mode) and to per-pixel surface alpha elsewhere.
 pub fn run() -> iced::Result {
+    // Match the collector and the dashboard: resolve the database — and the
+    // config file written next to it — against the executable's directory
+    // instead of whatever directory this process happened to start in.
+    if let Err(err) = common::set_current_dir_to_exe_dir() {
+        log::warn!("overlay: could not switch to the executable directory: {err}");
+    }
     init_logging();
     app::run()
 }

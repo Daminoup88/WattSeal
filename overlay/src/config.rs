@@ -50,19 +50,8 @@ impl Metric {
         }
     }
 
-    pub fn label(self) -> &'static str {
-        match self {
-            Metric::Total => "Total",
-            Metric::Cpu => "CPU",
-            Metric::Gpu => "GPU",
-            Metric::Ram => "RAM",
-            Metric::Disk => "Disk",
-            Metric::Network => "Net",
-            Metric::TopApps => "Top",
-        }
-    }
-
-    /// Single-letter label used by the abbreviated mode.
+    /// Single-letter label used by the abbreviated mode in the Latin-script
+    /// languages; `translations::metric_short_name` owns the Chinese ones.
     pub fn short_label(self) -> &'static str {
         match self {
             Metric::Total => "T",
@@ -94,15 +83,6 @@ pub enum Layout {
 
 impl Layout {
     pub const ALL: &[Layout] = &[Layout::Vertical, Layout::Horizontal];
-}
-
-impl std::fmt::Display for Layout {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Layout::Vertical => write!(f, "Vertical"),
-            Layout::Horizontal => write!(f, "Horizontal"),
-        }
-    }
 }
 
 /// Layout density (padding / spacing).
@@ -143,17 +123,6 @@ impl Density {
     }
 }
 
-impl std::fmt::Display for Density {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Density::Ultra => "Ultra",
-            Density::Compact => "Compact",
-            Density::Normal => "Normal",
-        };
-        write!(f, "{s}")
-    }
-}
-
 /// Text size.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -181,17 +150,6 @@ impl FontSize {
             FontSize::Medium => 14.5,
             FontSize::Large => 16.5,
         }
-    }
-}
-
-impl std::fmt::Display for FontSize {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            FontSize::Small => "Small",
-            FontSize::Medium => "Medium",
-            FontSize::Large => "Large",
-        };
-        write!(f, "{s}")
     }
 }
 
@@ -242,22 +200,6 @@ impl BgColor {
     }
 }
 
-impl std::fmt::Display for BgColor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            BgColor::Auto => "Auto",
-            BgColor::Slate => "Slate",
-            BgColor::Graphite => "Graphite",
-            BgColor::Navy => "Navy",
-            BgColor::Plum => "Plum",
-            BgColor::Forest => "Forest",
-            BgColor::Sand => "Sand",
-            BgColor::White => "White",
-        };
-        write!(f, "{s}")
-    }
-}
-
 /// Selectable text color. Separate from the background so contrast stays
 /// tunable even though alpha cannot be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
@@ -299,22 +241,6 @@ impl TextColor {
             TextColor::Red => (0.98, 0.45, 0.45),
             TextColor::Ink => (0.06, 0.08, 0.12),
         })
-    }
-}
-
-impl std::fmt::Display for TextColor {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            TextColor::Auto => "Auto",
-            TextColor::White => "White",
-            TextColor::Silver => "Silver",
-            TextColor::Cyan => "Cyan",
-            TextColor::Green => "Green",
-            TextColor::Amber => "Amber",
-            TextColor::Red => "Red",
-            TextColor::Ink => "Ink",
-        };
-        write!(f, "{s}")
     }
 }
 
@@ -360,17 +286,6 @@ impl Transparency {
 
     pub fn enabled(self) -> bool {
         !matches!(self, Transparency::Off)
-    }
-}
-
-impl std::fmt::Display for Transparency {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let s = match self {
-            Transparency::Auto => "Auto",
-            Transparency::Layered => "Layered",
-            Transparency::Off => "Off",
-        };
-        write!(f, "{s}")
     }
 }
 

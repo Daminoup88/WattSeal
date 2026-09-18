@@ -23,15 +23,6 @@ impl ThemeChoice {
     pub const ALL: &[ThemeChoice] = &[ThemeChoice::Dark, ThemeChoice::Light];
 }
 
-impl std::fmt::Display for ThemeChoice {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            ThemeChoice::Dark => write!(f, "Dark"),
-            ThemeChoice::Light => write!(f, "Light"),
-        }
-    }
-}
-
 /// Resolved color set for a scheme.
 #[derive(Debug, Clone, Copy)]
 pub struct Palette {
