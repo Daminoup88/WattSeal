@@ -36,20 +36,23 @@ overlay to close when the overlay was launched by the dashboard rather than by t
 
 ### Sizing
 
-The `Width` setting applies to both layouts, and the content adapts to it:
+The widget hugs its numbers: the width is whatever the content needs, and the height follows the
+content that is enabled. Nothing is padded out to the `Width` setting — a wide setting on a short
+bar would otherwise leave a mostly empty window.
 
-| Layout | What the width does |
+The `Width` setting is therefore a **maximum**, and it applies to both layouts:
+
+| Setting | What happens |
 |---|---|
-| Vertical | One metric per row. A label that does not fit is squeezed rather than allowed to widen the window behind your back. |
-| Horizontal | The entries flow into as many lines as the width allows: a wide setting keeps them on one line, a narrow one stacks them. |
+| Wider than the content | The window is as wide as the content and no wider, so the setting has no effect. |
+| Narrower than the content | The window stops at the setting. The vertical layout squeezes a label to fit; the horizontal layout is a single line and cannot wrap, so its tail is cut — widen the setting or shorten the labels. |
 
-The height always follows from that, so the widget never carries blank space below the text. Only
-the values keep a veto on the width: the widget never becomes narrower than a reading needs,
-because a clipped number is worse than a window a little wider than the one you asked for. The
-slider starts at that floor for the same reason.
+Staying on one line is deliberate: wrapping the bar onto several lines was tried and read worse than
+a cut tail. The slider's own minimum is what a single value needs, so it cannot be dragged down to a
+width no reading fits in.
 
-Widths move along a ladder of 12 px rungs. The slider snaps to them and the settings panel shows
-the value the window actually takes.
+Widths move along a ladder of 12 px rungs, so the window changes in visible steps as the digits
+change instead of twitching a pixel at a time.
 
 ## Language
 

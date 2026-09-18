@@ -120,35 +120,6 @@ struct BarItem {
     value: String,
 }
 
-/// Greedily packs entry widths into lines that fit `usable`, counting `gap`
-/// between two entries on the same line.
-///
-/// Pure, and therefore tested: the horizontal bar is the one place where the
-/// widget's height follows from its content rather than from the settings.
-fn flow_lines(widths: &[f32], usable: f32, gap: f32) -> Vec<Vec<usize>> {
-    let mut lines: Vec<Vec<usize>> = Vec::new();
-    let mut line: Vec<usize> = Vec::new();
-    let mut used = 0.0_f32;
-
-    for (index, width) in widths.iter().enumerate() {
-        if line.is_empty() {
-            used = *width;
-        } else if used + gap + width <= usable {
-            used += gap + width;
-        } else {
-            lines.push(std::mem::take(&mut line));
-            used = *width;
-        }
-        line.push(index);
-    }
-
-    if !line.is_empty() {
-        lines.push(line);
-    }
-
-    lines
-}
-
 /// The overlay application state.
 pub struct OverlayApp {
     config: OverlayConfig,
@@ -563,31 +534,24 @@ impl OverlayApp {
                 column.into()
             }
             Layout::Horizontal => {
-                let (items, lines) = self.bar_flow();
-                let mut column = Column::new().spacing(spacing);
+                let mut row = Row::new().spacing(BAR_INNER_GAP).align_y(Alignment::Center);
 
-                for line in lines {
-                    let mut row = Row::new().spacing(BAR_INNER_GAP).align_y(Alignment::Center);
-                    for (position, index) in line.iter().enumerate() {
-                        if position > 0 {
-                            row = row.push(Text::new("·").size(label_size).color(palette.muted));
-                        }
-
-                        let item = &items[*index];
-                        if let Some(label) = &item.label {
-                            row = row.push(Text::new(label.clone()).size(label_size).color(palette.muted));
-                        }
-                        row = row.push(
-                            Text::new(item.value.clone())
-                                .size(value_size)
-                                .font(FONT_VALUE)
-                                .color(value_color),
-                        );
+                for (index, item) in self.bar_items().iter().enumerate() {
+                    if index > 0 {
+                        row = row.push(Text::new("·").size(label_size).color(palette.muted));
                     }
-                    column = column.push(row);
+                    if let Some(label) = &item.label {
+                        row = row.push(Text::new(label.clone()).size(label_size).color(palette.muted));
+                    }
+                    row = row.push(
+                        Text::new(item.value.clone())
+                            .size(value_size)
+                            .font(FONT_VALUE)
+                            .color(value_color),
+                    );
                 }
 
-                column.into()
+                row.into()
             }
         };
 
@@ -743,8 +707,9 @@ impl OverlayApp {
             } else {
                 hint(translations::hint_pin_unavailable(language), font, palette)
             });
-        // Both layouts take the width the user picks; the horizontal one flows
-        // its entries into as many lines as that width allows.
+        // The setting is the widest the widget may get: it hugs its numbers and
+        // stops here, which is the only way a single line can be capped without
+        // wrapping it or cutting it.
         let width_floor = self.width_floor();
         window_col = window_col.push(
             Column::new()
@@ -1028,25 +993,68 @@ impl OverlayApp {
         self.config.fitted_height()
     }
 
-    /// The width the widget is aiming for.
+    /// Width the content needs, before the `Width` setting is applied.
     ///
-    /// The `Width` setting is authoritative in both layouts; only the values keep
-    /// a veto, since a reading nobody can read is worse than a window a little
-    /// wider than the one that was asked for.
+    /// The vertical layout is as wide as its widest row and the horizontal one as
+    /// wide as its single line, so the widget hugs its numbers in both cases.
+    fn content_width(&self) -> f32 {
+        let pad = self.config.density.padding();
+        let label_size = self.config.font_size.label();
+        let value_size = self.config.font_size.value();
+
+        let widths: Vec<f32> = self
+            .bar_items()
+            .iter()
+            .map(|item| {
+                let value = text_width(&item.value, value_size, VALUE_CHAR_W);
+                match &item.label {
+                    Some(label) => text_width(label, label_size, LABEL_CHAR_W) + BAR_INNER_GAP + value,
+                    None => value,
+                }
+            })
+            .collect();
+
+        let content = match self.config.layout {
+            Layout::Horizontal => {
+                // Between two entries: the row spacing, the `·`, and the spacing again.
+                let separator = text_width("·", label_size, LABEL_CHAR_W) + BAR_INNER_GAP * 2.0;
+                let gaps = widths.len().saturating_sub(1) as f32;
+                widths.iter().sum::<f32>() + separator * gaps
+            }
+            Layout::Vertical => widths.iter().fold(0.0_f32, |widest, width| widest.max(*width)),
+        };
+
+        // The grip is an overlay, so it must NOT be measured here — otherwise the
+        // bar would reserve room it does not have.
+        width_up(pad * 2.0 + content)
+    }
+
+    /// The width the window should take: what the content needs, capped by the
+    /// `Width` setting.
     ///
-    /// The view and the sizing both call this, so the bar cannot end up laid out
-    /// into a different number of lines than the height that was reserved.
+    /// The setting is a maximum rather than an exact size on purpose. Neither
+    /// layout can be narrowed below its content without either wrapping it onto
+    /// more lines or cutting it, and both are worse than simply being as wide as
+    /// the numbers are — a window padded out to the setting would sit there
+    /// mostly empty.
     fn target_width(&self) -> f32 {
-        self.config.width.max(self.values_floor())
+        self.content_width().min(self.width_cap())
+    }
+
+    /// The `Width` setting, never below what a single value needs.
+    fn width_cap(&self) -> f32 {
+        self.config.width.max(self.width_floor())
     }
 
     /// Lowest width the `Width` slider offers, snapped to the ladder so the
-    /// number shown next to it is the width the window actually takes.
+    /// number shown next to it is a width the window can actually take.
     fn width_floor(&self) -> f32 {
         width_near(self.values_floor().max(MIN_CHOICE_WIDTH))
     }
 
-    /// The entries of the horizontal bar, in the order they are shown.
+    /// The entries of the bar, in the order they are shown.
+    ///
+    /// Both layouts are built from these; only their arrangement differs.
     fn bar_items(&self) -> Vec<BarItem> {
         let mut items = Vec::new();
 
@@ -1069,50 +1077,11 @@ impl OverlayApp {
         items
     }
 
-    /// The horizontal bar, packed into the lines that fit the target width.
-    fn bar_flow(&self) -> (Vec<BarItem>, Vec<Vec<usize>>) {
-        let pad = self.config.density.padding();
-        let label_size = self.config.font_size.label();
-        let value_size = self.config.font_size.value();
-
-        let items = self.bar_items();
-        let widths: Vec<f32> = items
-            .iter()
-            .map(|item| {
-                let value = text_width(&item.value, value_size, VALUE_CHAR_W);
-                match &item.label {
-                    Some(label) => text_width(label, label_size, LABEL_CHAR_W) + BAR_INNER_GAP + value,
-                    None => value,
-                }
-            })
-            .collect();
-
-        // Between two entries: the row spacing, the `·`, and the spacing again.
-        let separator = text_width("·", label_size, LABEL_CHAR_W) + BAR_INNER_GAP * 2.0;
-        // The grip is an overlay, so it must NOT be measured here — otherwise the
-        // bar would reserve room it does not have and flow too early.
-        let usable = (self.target_width() - pad * 2.0).max(MIN_WIDTH);
-
-        (items, flow_lines(&widths, usable, separator))
-    }
-
-    /// Height the horizontal bar needs at the target width.
-    fn horizontal_height(&self) -> f32 {
-        let pad = self.config.density.padding();
-        let spacing = self.config.density.spacing();
-        let row = self.config.density.row_height();
-        let lines = self.bar_flow().1.len().max(1) as f32;
-
-        (pad * 2.0 + lines * row + (lines - 1.0) * spacing).ceil()
-    }
-
     /// Size the window should have right now.
     ///
-    /// The width is the one the user picked, in both layouts, and the height
-    /// follows from what that width leaves room for: the vertical layout stacks
-    /// one metric per row, while the horizontal one flows its entries into as
-    /// many lines as they need. The horizontal width used to be measured, which
-    /// left that layout with no width control at all.
+    /// The width is what the content needs, capped by the `Width` setting, and
+    /// the height follows the content as it always did, so the widget hugs its
+    /// numbers in both layouts.
     fn fitted_size(&self) -> iced::Size {
         if self.show_settings {
             return iced::Size::new(SETTINGS_WIDTH, SETTINGS_HEIGHT);
@@ -1122,13 +1091,7 @@ impl OverlayApp {
             return iced::Size::new(self.menu_width(), self.current_height());
         }
 
-        let width = self.target_width();
-        let height = match self.config.layout {
-            Layout::Vertical => self.config.fitted_height(),
-            Layout::Horizontal => self.horizontal_height(),
-        };
-
-        iced::Size::new(width, height)
+        iced::Size::new(self.target_width(), self.config.fitted_height())
     }
 
     /// Narrowest the vertical layout may be before a value would be clipped.
@@ -1522,17 +1485,5 @@ mod tests {
         assert_eq!(width_near(100.0), 96.0);
         assert_eq!(width_near(110.0), 108.0);
         assert_eq!(width_near(140.0), 144.0);
-    }
-
-    #[test]
-    fn the_bar_flows_into_lines_that_fit_the_width() {
-        // Two 40px entries with a 10px gap fit in 100px; the third does not.
-        assert_eq!(flow_lines(&[40.0, 40.0, 40.0], 100.0, 10.0), vec![vec![0, 1], vec![2]]);
-
-        // Everything lands on one line when there is room for it.
-        assert_eq!(flow_lines(&[40.0, 40.0], 200.0, 10.0), vec![vec![0, 1]]);
-
-        // An entry wider than the line still gets a line, rather than being lost.
-        assert_eq!(flow_lines(&[500.0, 40.0], 100.0, 10.0), vec![vec![0], vec![1]]);
     }
 }
