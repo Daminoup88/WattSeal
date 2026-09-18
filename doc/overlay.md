@@ -36,18 +36,20 @@ overlay to close when the overlay was launched by the dashboard rather than by t
 
 ### Sizing
 
-The height always follows the content that is currently enabled, so the widget never carries
-blank space below the text.
+The `Width` setting applies to both layouts, and the content adapts to it:
 
-The width depends on the layout. The horizontal one is a single line of metrics, so it is measured
-from its own text — otherwise it would sit in a window much wider than its contents. The vertical
-one takes the width you set with the `Width` slider (60–600 px) exactly, and a label that does not
-fit is squeezed rather than allowed to widen the window behind your back. Only the values keep a
-veto: the widget never becomes narrower than a reading needs, because a clipped number is worse
-than a window a little wider than you asked for.
+| Layout | What the width does |
+|---|---|
+| Vertical | One metric per row. A label that does not fit is squeezed rather than allowed to widen the window behind your back. |
+| Horizontal | The entries flow into as many lines as the width allows: a wide setting keeps them on one line, a narrow one stacks them. |
 
-Measured widths move along a ladder of 12 px rungs, and a change smaller than one rung does not
-move the window at all. That is what keeps the widget from twitching as the digits change.
+The height always follows from that, so the widget never carries blank space below the text. Only
+the values keep a veto on the width: the widget never becomes narrower than a reading needs,
+because a clipped number is worse than a window a little wider than the one you asked for. The
+slider starts at that floor for the same reason.
+
+Widths move along a ladder of 12 px rungs. The slider snaps to them and the settings panel shows
+the value the window actually takes.
 
 ## Language
 

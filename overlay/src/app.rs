@@ -50,6 +50,14 @@ const WIDTH_STEP: f32 = 12.0;
 /// clamped behind our back.
 const MIN_WIDTH: f32 = 24.0;
 
+/// Range the `Width` slider offers.
+const MIN_CHOICE_WIDTH: f32 = 60.0;
+const MAX_CHOICE_WIDTH: f32 = 600.0;
+
+/// Gap between a label and its value, and between two entries of the horizontal
+/// bar. Matches the row spacing both are built with.
+const BAR_INNER_GAP: f32 = 6.0;
+
 /// Padding inside each right-click menu segment, and the gap between segments.
 const SEGMENT_PADDING: f32 = 6.0;
 const MENU_GAP: f32 = 3.0;
@@ -103,6 +111,42 @@ fn width_up(width: f32) -> f32 {
 /// same ladder the measured widths use.
 fn width_near(width: f32) -> f32 {
     ((width / WIDTH_STEP).round() * WIDTH_STEP).max(WIDTH_STEP)
+}
+
+/// One entry of the horizontal bar, already formatted.
+struct BarItem {
+    /// `None` when labels are switched off, or for an entry that has none.
+    label: Option<String>,
+    value: String,
+}
+
+/// Greedily packs entry widths into lines that fit `usable`, counting `gap`
+/// between two entries on the same line.
+///
+/// Pure, and therefore tested: the horizontal bar is the one place where the
+/// widget's height follows from its content rather than from the settings.
+fn flow_lines(widths: &[f32], usable: f32, gap: f32) -> Vec<Vec<usize>> {
+    let mut lines: Vec<Vec<usize>> = Vec::new();
+    let mut line: Vec<usize> = Vec::new();
+    let mut used = 0.0_f32;
+
+    for (index, width) in widths.iter().enumerate() {
+        if line.is_empty() {
+            used = *width;
+        } else if used + gap + width <= usable {
+            used += gap + width;
+        } else {
+            lines.push(std::mem::take(&mut line));
+            used = *width;
+        }
+        line.push(index);
+    }
+
+    if !line.is_empty() {
+        lines.push(line);
+    }
+
+    lines
 }
 
 /// The overlay application state.
@@ -173,7 +217,7 @@ impl OverlayApp {
                     self.database = Database::open_without_migrations().ok();
                 }
                 self.power = self.load_power();
-                self.top_apps = self.load_top_apps();
+                self.refresh_top_apps();
                 // The dashboard owns the language setting, so re-reading it here
                 // is what makes the overlay follow a change made over there.
                 self.language = Language::from_database(self.database.as_ref());
@@ -194,7 +238,7 @@ impl OverlayApp {
                 // Refresh *before* sizing, so the window opens already fitted to
                 // the content instead of a placeholder computed from empty data.
                 self.power = self.load_power();
-                self.top_apps = self.load_top_apps();
+                self.refresh_top_apps();
                 self.applied = self.fitted_size();
                 let raw = id
                     .map(|id| window::raw_id::<Message>(id).map(Message::RawWindowId))
@@ -326,8 +370,10 @@ impl OverlayApp {
             }
             Message::SetWidth(v) => {
                 // Snap to the ladder, so the number shown next to the slider is
-                // the width the window actually takes.
-                self.config.width = width_near(v.clamp(60.0, 600.0));
+                // the width the window actually takes, and keep it above what a
+                // value needs — the slider offers the same floor.
+                let floor = self.width_floor();
+                self.config.width = width_near(v.clamp(floor, MAX_CHOICE_WIDTH));
                 self.persist();
                 self.resize_task()
             }
@@ -517,49 +563,31 @@ impl OverlayApp {
                 column.into()
             }
             Layout::Horizontal => {
-                let mut row = Row::new().spacing(6).align_y(Alignment::Center);
-                let mut first = true;
-                let sep = || Text::new("·").size(label_size).color(palette.muted);
-                for metric in &self.config.metrics {
-                    if metric.is_multi() {
-                        for (name, watts) in &self.top_apps {
-                            if !first {
-                                row = row.push(sep());
-                            }
-                            first = false;
-                            row = row.push(
-                                Text::new(truncate(name, TOP_NAME_MAX))
-                                    .size(label_size)
-                                    .color(palette.muted),
-                            );
-                            row = row.push(
-                                Text::new(self.format_value(Some(*watts)))
-                                    .size(value_size)
-                                    .font(FONT_VALUE)
-                                    .color(value_color),
-                            );
+                let (items, lines) = self.bar_flow();
+                let mut column = Column::new().spacing(spacing);
+
+                for line in lines {
+                    let mut row = Row::new().spacing(BAR_INNER_GAP).align_y(Alignment::Center);
+                    for (position, index) in line.iter().enumerate() {
+                        if position > 0 {
+                            row = row.push(Text::new("·").size(label_size).color(palette.muted));
                         }
-                    } else {
-                        if !first {
-                            row = row.push(sep());
-                        }
-                        first = false;
-                        if self.config.show_labels {
-                            row = row.push(
-                                Text::new(self.metric_label(*metric))
-                                    .size(label_size)
-                                    .color(palette.muted),
-                            );
+
+                        let item = &items[*index];
+                        if let Some(label) = &item.label {
+                            row = row.push(Text::new(label.clone()).size(label_size).color(palette.muted));
                         }
                         row = row.push(
-                            Text::new(self.format_value(self.power.get(metric.id()).copied()))
+                            Text::new(item.value.clone())
                                 .size(value_size)
                                 .font(FONT_VALUE)
                                 .color(value_color),
                         );
                     }
+                    column = column.push(row);
                 }
-                row.into()
+
+                column.into()
             }
         };
 
@@ -715,24 +743,27 @@ impl OverlayApp {
             } else {
                 hint(translations::hint_pin_unavailable(language), font, palette)
             });
-        // Only the vertical layout has a user-chosen width: the horizontal one
-        // is measured from its own content and cannot be set.
-        if self.config.layout == Layout::Vertical {
-            window_col = window_col.push(
-                Column::new()
-                    .spacing(2)
-                    .push(
-                        Text::new(format!(
-                            "{}  {} px",
-                            translations::label_width(language),
-                            self.config.width.round()
-                        ))
-                        .size(font)
-                        .color(palette.muted),
-                    )
-                    .push(slider(60.0..=600.0, self.config.width, Message::SetWidth)),
-            );
-        }
+        // Both layouts take the width the user picks; the horizontal one flows
+        // its entries into as many lines as that width allows.
+        let width_floor = self.width_floor();
+        window_col = window_col.push(
+            Column::new()
+                .spacing(2)
+                .push(
+                    Text::new(format!(
+                        "{}  {} px",
+                        translations::label_width(language),
+                        self.config.width.max(width_floor).round()
+                    ))
+                    .size(font)
+                    .color(palette.muted),
+                )
+                .push(slider(
+                    width_floor..=MAX_CHOICE_WIDTH,
+                    self.config.width.max(width_floor),
+                    Message::SetWidth,
+                )),
+        );
 
         let mut metrics = Column::new().spacing(spacing);
         for &metric in Metric::ALL {
@@ -889,24 +920,37 @@ impl OverlayApp {
         map
     }
 
-    fn load_top_apps(&mut self) -> Vec<(String, f64)> {
-        let Some(db) = &mut self.database else {
-            return Vec::new();
-        };
+    /// The per-app rows for this tick, or `None` when there is nothing to show.
+    ///
+    /// The caller keeps the previous list on `None`. A tick that lands between
+    /// two collector samples comes back with no processes at all, and assigning
+    /// that would blink the rows out for a second — and, in the horizontal
+    /// layout, would briefly change how many lines the bar needs.
+    fn load_top_apps(&mut self) -> Option<Vec<(String, f64)>> {
+        let db = self.database.as_mut()?;
         let window = self.config.refresh_secs.max(1) as i64;
-        let Ok(rows) = db.select_top_processes_average(window, self.config.top_apps()) else {
-            return Vec::new();
+        let rows = db.select_top_processes_average(window, self.config.top_apps()).ok()?;
+        let (_ts, ComputedSensorData::Process(processes)) = rows.into_iter().next()? else {
+            return None;
         };
-        let Some((_ts, ComputedSensorData::Process(processes))) = rows.into_iter().next() else {
-            return Vec::new();
-        };
-        processes
+
+        let apps: Vec<(String, f64)> = processes
             .into_iter()
             .map(|p| {
                 let watts = p.process_energy.as_watts_for_seconds(window as f64);
                 (p.measured.app_name, watts)
             })
-            .collect()
+            .collect();
+
+        (!apps.is_empty()).then_some(apps)
+    }
+
+    /// Refreshes the per-app rows, keeping the previous ones when this tick has
+    /// no process sample to offer.
+    fn refresh_top_apps(&mut self) {
+        if let Some(apps) = self.load_top_apps() {
+            self.top_apps = apps;
+        }
     }
 
     fn persist(&self) {
@@ -984,62 +1028,91 @@ impl OverlayApp {
         self.config.fitted_height()
     }
 
-    /// Window width that fits the current fonts, density, metrics and values.
+    /// The width the widget is aiming for.
     ///
-    /// Text advances are approximated (the renderer owns the real metrics) and
-    /// the result is rounded up to the width ladder, which is what keeps the
-    /// window from moving every time a digit changes.
-    fn fitted_width(&self) -> f32 {
-        let pad = self.config.density.padding();
-        let spacing = self.config.density.spacing();
-        let label_size = self.config.font_size.label();
-        let value_size = self.config.font_size.value();
+    /// The `Width` setting is authoritative in both layouts; only the values keep
+    /// a veto, since a reading nobody can read is worse than a window a little
+    /// wider than the one that was asked for.
+    ///
+    /// The view and the sizing both call this, so the bar cannot end up laid out
+    /// into a different number of lines than the height that was reserved.
+    fn target_width(&self) -> f32 {
+        self.config.width.max(self.values_floor())
+    }
 
-        let label_w = |text: &str| text_width(text, label_size, LABEL_CHAR_W);
-        let value_w = |text: &str| text_width(text, value_size, VALUE_CHAR_W);
+    /// Lowest width the `Width` slider offers, snapped to the ladder so the
+    /// number shown next to it is the width the window actually takes.
+    fn width_floor(&self) -> f32 {
+        width_near(self.values_floor().max(MIN_CHOICE_WIDTH))
+    }
 
-        let mut rows: Vec<f32> = Vec::new();
+    /// The entries of the horizontal bar, in the order they are shown.
+    fn bar_items(&self) -> Vec<BarItem> {
+        let mut items = Vec::new();
+
         for metric in &self.config.metrics {
             if metric.is_multi() {
                 for (name, watts) in &self.top_apps {
-                    let name = truncate(name, TOP_NAME_MAX);
-                    rows.push(label_w(&name) + spacing + value_w(&self.format_value(Some(*watts))));
+                    items.push(BarItem {
+                        label: Some(truncate(name, TOP_NAME_MAX)),
+                        value: self.format_value(Some(*watts)),
+                    });
                 }
             } else {
-                let mut width = value_w(&self.format_value(self.power.get(metric.id()).copied()));
-                if self.config.show_labels {
-                    width += label_w(self.metric_label(*metric)) + spacing;
-                }
-                rows.push(width);
+                items.push(BarItem {
+                    label: self.config.show_labels.then(|| self.metric_label(*metric).to_string()),
+                    value: self.format_value(self.power.get(metric.id()).copied()),
+                });
             }
         }
 
-        let content = match self.config.layout {
-            Layout::Horizontal => {
-                let separator = label_w(" · ");
-                let gaps = rows.len().saturating_sub(1) as f32;
-                rows.iter().sum::<f32>() + separator * gaps
-            }
-            Layout::Vertical => rows.iter().fold(0.0_f32, |widest, row| widest.max(*row)),
-        };
+        items
+    }
 
-        // The grip is an overlay, so it must NOT be measured here — otherwise
-        // the fitted width would be larger than the text and the bar could never
-        // be dragged down to the minimum.
-        width_up(pad * 2.0 + content)
+    /// The horizontal bar, packed into the lines that fit the target width.
+    fn bar_flow(&self) -> (Vec<BarItem>, Vec<Vec<usize>>) {
+        let pad = self.config.density.padding();
+        let label_size = self.config.font_size.label();
+        let value_size = self.config.font_size.value();
+
+        let items = self.bar_items();
+        let widths: Vec<f32> = items
+            .iter()
+            .map(|item| {
+                let value = text_width(&item.value, value_size, VALUE_CHAR_W);
+                match &item.label {
+                    Some(label) => text_width(label, label_size, LABEL_CHAR_W) + BAR_INNER_GAP + value,
+                    None => value,
+                }
+            })
+            .collect();
+
+        // Between two entries: the row spacing, the `·`, and the spacing again.
+        let separator = text_width("·", label_size, LABEL_CHAR_W) + BAR_INNER_GAP * 2.0;
+        // The grip is an overlay, so it must NOT be measured here — otherwise the
+        // bar would reserve room it does not have and flow too early.
+        let usable = (self.target_width() - pad * 2.0).max(MIN_WIDTH);
+
+        (items, flow_lines(&widths, usable, separator))
+    }
+
+    /// Height the horizontal bar needs at the target width.
+    fn horizontal_height(&self) -> f32 {
+        let pad = self.config.density.padding();
+        let spacing = self.config.density.spacing();
+        let row = self.config.density.row_height();
+        let lines = self.bar_flow().1.len().max(1) as f32;
+
+        (pad * 2.0 + lines * row + (lines - 1.0) * spacing).ceil()
     }
 
     /// Size the window should have right now.
     ///
-    /// The height is always the measured content height, so the overlay never
-    /// carries blank space. The width follows the layout: the horizontal one is
-    /// a single line and has to be measured, while the vertical one takes the
-    /// width the user picked.
-    ///
-    /// That width used to be only a floor — the measurement quietly overrode the
-    /// setting whenever a label or a process name was wide, which is why the
-    /// `Width` slider felt like it did nothing. A label that does not fit is
-    /// squeezed now instead; only a value keeps a veto.
+    /// The width is the one the user picked, in both layouts, and the height
+    /// follows from what that width leaves room for: the vertical layout stacks
+    /// one metric per row, while the horizontal one flows its entries into as
+    /// many lines as they need. The horizontal width used to be measured, which
+    /// left that layout with no width control at all.
     fn fitted_size(&self) -> iced::Size {
         if self.show_settings {
             return iced::Size::new(SETTINGS_WIDTH, SETTINGS_HEIGHT);
@@ -1048,11 +1121,14 @@ impl OverlayApp {
         if self.show_menu {
             return iced::Size::new(self.menu_width(), self.current_height());
         }
-        let width = match self.config.layout {
-            Layout::Horizontal => self.fitted_width(),
-            Layout::Vertical => self.config.width.max(self.values_floor()),
+
+        let width = self.target_width();
+        let height = match self.config.layout {
+            Layout::Vertical => self.config.fitted_height(),
+            Layout::Horizontal => self.horizontal_height(),
         };
-        iced::Size::new(width, self.current_height())
+
+        iced::Size::new(width, height)
     }
 
     /// Narrowest the vertical layout may be before a value would be clipped.
@@ -1446,5 +1522,17 @@ mod tests {
         assert_eq!(width_near(100.0), 96.0);
         assert_eq!(width_near(110.0), 108.0);
         assert_eq!(width_near(140.0), 144.0);
+    }
+
+    #[test]
+    fn the_bar_flows_into_lines_that_fit_the_width() {
+        // Two 40px entries with a 10px gap fit in 100px; the third does not.
+        assert_eq!(flow_lines(&[40.0, 40.0, 40.0], 100.0, 10.0), vec![vec![0, 1], vec![2]]);
+
+        // Everything lands on one line when there is room for it.
+        assert_eq!(flow_lines(&[40.0, 40.0], 200.0, 10.0), vec![vec![0, 1]]);
+
+        // An entry wider than the line still gets a line, rather than being lost.
+        assert_eq!(flow_lines(&[500.0, 40.0], 100.0, 10.0), vec![vec![0], vec![1]]);
     }
 }
