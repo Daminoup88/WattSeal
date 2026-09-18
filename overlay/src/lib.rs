@@ -40,35 +40,43 @@ pub fn is_requested() -> bool {
         .unwrap_or(false)
 }
 
-/// Asks the overlay to open, clearing pin mode with it: a pinned overlay
-/// ignores the mouse, so it must not come back locked once the user has just
-/// asked for it.
+/// Asks the overlay to open.
 ///
 /// Callers say what they want instead of editing the file, which keeps the
 /// layout of that file in one place — the tray, the dashboard and the overlay
 /// itself all go through here.
+///
+/// Pin mode is left alone: it changes when something pins, and by nothing else,
+/// so a widget pinned before it was opened comes back pinned. Clearing it here
+/// meant the tray's pin entry silently did nothing whenever the overlay happened
+/// to be closed, which read as "pin does not work".
 pub fn request_open() {
     let mut config = config::OverlayConfig::load().unwrap_or_default();
 
-    // Nothing to write when it is already open and unpinned.
-    if config.overlay_requested && !config.pin_mode {
+    // Nothing to write when it is already open.
+    if config.overlay_requested {
         return;
     }
 
     config.overlay_requested = true;
-    config.pin_mode = false;
     config.save();
 }
 
-/// Asks the overlay to close.
+/// Asks the overlay to close, and clears pin mode with it.
+///
+/// Closing is the escape hatch a click-through widget needs: it is how the
+/// dashboard's `Hide overlay` releases one where there is no tray. Opening
+/// deliberately leaves the pin alone, so a widget pinned from the tray while it
+/// was closed comes back pinned.
 pub fn request_close() {
     let mut config = config::OverlayConfig::load().unwrap_or_default();
 
-    if !config.overlay_requested {
+    if !config.overlay_requested && !config.pin_mode {
         return;
     }
 
     config.overlay_requested = false;
+    config.pin_mode = false;
     config.save();
 }
 

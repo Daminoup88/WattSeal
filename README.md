@@ -126,8 +126,8 @@ eye on power draw without leaving the dashboard open — including on top of a f
 
 The widget hugs its numbers — the height always follows the content, and the width is whatever the
 numbers need, capped by the `Width` setting. It never wraps onto a second line. A pinned widget is
-deliberately not clickable: release it from the tray menu, or by hiding and showing the overlay
-again.
+deliberately not draggable, and with click-through on it does not take the mouse either: release it
+from the tray menu, or by hiding the overlay from the dashboard footer and showing it again.
 
 See [doc/overlay.md](doc/overlay.md) for the transparency model, the settings panel and the full
 config file reference.

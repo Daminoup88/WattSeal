@@ -247,14 +247,14 @@ impl OverlayApp {
             Message::ToggleSettings => {
                 self.show_settings = !self.show_settings;
                 self.show_menu = false;
-                self.resize_task()
+                self.resize_task().chain(self.keep_on_screen())
             }
             Message::OpenMenu => {
                 if self.show_settings {
                     return Task::none();
                 }
                 self.show_menu = true;
-                self.resize_task()
+                self.resize_task().chain(self.keep_on_screen())
             }
             Message::CloseMenu => {
                 self.show_menu = false;
@@ -397,6 +397,10 @@ impl OverlayApp {
                 // window's footer toggle follows along instead of staying stuck
                 // on "Hide overlay" after an exit from the bar's own menu.
                 self.config.overlay_requested = false;
+                // Closing clears the pin too: that is what makes the dashboard's
+                // hide-and-show a way out of a pinned, click-through widget on a
+                // system with no tray.
+                self.config.pin_mode = false;
                 self.config.save();
                 iced::exit()
             }
@@ -1206,6 +1210,27 @@ impl OverlayApp {
         Task::batch(tasks)
     }
 
+    /// Nudges the window back inside the monitor after it grew.
+    ///
+    /// A window grows from its top-left corner, so one docked to the right edge
+    /// used to push the settings panel or the menu off the screen.
+    fn keep_on_screen(&self) -> Task<Message> {
+        let (Some(id), Some((x, y))) = (self.window_id, self.config.position) else {
+            return Task::none();
+        };
+
+        let size = self.fitted_size();
+        window::monitor_size(id).and_then(move |monitor| {
+            let target = clamp_point(monitor, size, iced::Point::new(x, y));
+
+            if target == iced::Point::new(x, y) {
+                Task::none()
+            } else {
+                window::move_to::<Message>(id, target)
+            }
+        })
+    }
+
     fn reset_position(&self) -> Task<Message> {
         let Some(id) = self.window_id else {
             return Task::none();
@@ -1229,6 +1254,16 @@ impl OverlayApp {
 fn anchor_point(monitor: iced::Size, width: f32, _height: f32) -> iced::Point {
     const MARGIN: f32 = 16.0;
     iced::Point::new((monitor.width - width - MARGIN).max(MARGIN), MARGIN)
+}
+
+/// Pulls a window back so that one of `size` at `point` still fits the monitor,
+/// keeping the same margin the anchor uses.
+fn clamp_point(monitor: iced::Size, size: iced::Size, point: iced::Point) -> iced::Point {
+    const MARGIN: f32 = 16.0;
+    let right = (monitor.width - size.width - MARGIN).max(MARGIN);
+    let bottom = (monitor.height - size.height - MARGIN).max(MARGIN);
+
+    iced::Point::new(point.x.clamp(MARGIN, right), point.y.clamp(MARGIN, bottom))
 }
 
 fn truncate(name: &str, max: usize) -> String {
@@ -1550,6 +1585,20 @@ mod tests {
         // A widget wider than the monitor still lands inside it.
         let point = anchor_point(iced::Size::new(100.0, 100.0), 200.0, 50.0);
         assert_eq!(point.x, 16.0);
+    }
+
+    #[test]
+    fn a_window_that_grew_is_nudged_back_inside_the_monitor() {
+        let monitor = iced::Size::new(1920.0, 1080.0);
+        let docked = iced::Point::new(1704.0, 16.0);
+
+        // The metrics bar keeps its place while it fits where it is.
+        assert_eq!(clamp_point(monitor, iced::Size::new(200.0, 40.0), docked), docked);
+
+        // Opening the settings panel there would stick out, so it comes back.
+        let nudged = clamp_point(monitor, iced::Size::new(560.0, 452.0), docked);
+        assert_eq!(nudged.x, 1920.0 - 560.0 - 16.0);
+        assert_eq!(nudged.y, 16.0);
     }
 
     #[test]

@@ -114,7 +114,7 @@ it. Three ways out exist:
 | Path | How |
 |---|---|
 | Tray menu | `Pin / Unpin Overlay`, which releases it straight away |
-| Dashboard footer | `Hide overlay` then `Show overlay`: opening clears the pin |
+| Dashboard footer | `Hide overlay` then `Show overlay`: closing clears the pin, opening leaves it alone |
 | Config file | Set `pin_mode` to `false` |
 
 Only a standalone `WattSeal --overlay` run — no tray and no dashboard — has to fall back to the
