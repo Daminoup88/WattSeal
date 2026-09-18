@@ -449,6 +449,9 @@ impl OverlayApp {
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(Padding::from(pad))
+            // `draws_shadow` is the verdict already resolved for the active
+            // transparency mode, not the raw setting: a surface with no per-pixel
+            // alpha would only turn the soft edge into a dark ring.
             .style(card_style(palette, self.card_alpha(), self.config.draws_shadow()));
 
         // The card is the drag / right-click surface only while the metrics are
@@ -1002,13 +1005,18 @@ impl OverlayApp {
         }
     }
 
-    /// Color the OS window is cleared with. In layered mode we clear with the
-    /// card color so the whole (layered) window composites uniformly.
+    /// Color the OS window is cleared with.
+    ///
+    /// Where the surface has no per-pixel alpha, whatever the card does not paint
+    /// shows this color. That is the corner wedges a rounded card leaves, and it
+    /// has to be the card's *own* color, overrides included: clearing with the
+    /// theme's stock card painted a dark frame around a card set to another
+    /// swatch.
     fn window_background(&self) -> Color {
         if self.config.transparency.transparent_window() {
             Color::TRANSPARENT
         } else {
-            theme::palette(self.config.theme).card
+            theme::palette_with(self.config.theme, self.config.bg_color, self.config.text_color).card
         }
     }
 
