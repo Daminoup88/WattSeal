@@ -31,8 +31,9 @@ overlay to close when the overlay was launched by the dashboard rather than by t
   widget's own size.
 - **Settings** — two columns: `Appearance` on the left (opacity, background and text color,
   transparency, layout, density, text size, theme, decimals, refresh interval, labels, units,
-  short labels), `Window` and `Content` on the right. `Done` returns to the metrics and
-  `Quit overlay` ends the process.
+  short labels), `Window` and `Content` on the right. `Content` lists the metrics in the order the
+  bar shows them, each with an arrow that moves it past its neighbour, and the metrics that are off
+  below them. `Done` returns to the metrics and `Quit overlay` ends the process.
 
 ### Sizing
 
@@ -141,7 +142,7 @@ fall back to the defaults, so the file is safe to edit by hand.
 | `decimals`           | `1`     | Decimals shown on the values                                           |
 | `refresh_secs`       | `1`     | How often the metrics are re-read                                      |
 | `always_on_top`      | `true`  | Keep the widget above other windows                                    |
-| `width`              | `140.0` | Minimum width in the vertical layout, ignored by the horizontal one     |
+| `width`              | `140.0` | Widest the widget may get; the window stays narrower when the content needs less |
 | `overlay_requested`  | `true`  | Whether the overlay should be running                                  |
 | `pin_mode`           | `false` | Position locked, and click-through if the next key allows it            |
 | `pin_click_through`  | `true`  | Whether pinning also makes the window ignore the mouse                  |

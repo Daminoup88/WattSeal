@@ -52,7 +52,7 @@ const MIN_WIDTH: f32 = 24.0;
 
 /// Range the `Width` slider offers.
 const MIN_CHOICE_WIDTH: f32 = 60.0;
-const MAX_CHOICE_WIDTH: f32 = 600.0;
+const MAX_CHOICE_WIDTH: f32 = 1200.0;
 
 /// Gap between a label and its value, and between two entries of the horizontal
 /// bar. Matches the row spacing both are built with.
@@ -111,6 +111,25 @@ fn width_up(width: f32) -> f32 {
 /// same ladder the measured widths use.
 fn width_near(width: f32) -> f32 {
     ((width / WIDTH_STEP).round() * WIDTH_STEP).max(WIDTH_STEP)
+}
+
+/// Swaps `metric` with the neighbour `delta` places away, and reports whether it
+/// moved.
+///
+/// Pure, so the ordering rules are tested rather than clicked: a metric that is
+/// switched off has no place in the order, and either end of the list is a wall.
+fn move_metric(order: &mut [Metric], metric: Metric, delta: isize) -> bool {
+    let Some(index) = order.iter().position(|m| *m == metric) else {
+        return false;
+    };
+
+    let target = index as isize + delta;
+    if target < 0 || target as usize >= order.len() {
+        return false;
+    }
+
+    order.swap(index, target as usize);
+    true
 }
 
 struct BarItem {
@@ -354,6 +373,16 @@ impl OverlayApp {
                 } else {
                     self.config.metrics.retain(|m| *m != metric);
                 }
+                self.persist();
+                self.resize_task()
+            }
+            Message::MoveMetricUp(metric) => {
+                move_metric(&mut self.config.metrics, metric, -1);
+                self.persist();
+                self.resize_task()
+            }
+            Message::MoveMetricDown(metric) => {
+                move_metric(&mut self.config.metrics, metric, 1);
                 self.persist();
                 self.resize_task()
             }
@@ -726,16 +755,37 @@ impl OverlayApp {
                 )),
         );
 
+        // Display order first: the metrics that are on, in the order the bar shows
+        // them, each with the arrows that move it past its neighbour. The ones that
+        // are off follow, and a metric switched on is appended to the end.
+        let name_of = |metric: Metric| {
+            if metric.is_multi() {
+                translations::metric_top_apps_setting(language)
+            } else {
+                translations::metric_name(language, metric)
+            }
+        };
+
         let mut metrics = Column::new().spacing(spacing);
-        for &metric in Metric::ALL {
-            let enabled = self.config.metrics.contains(&metric);
+        for &metric in &self.config.metrics {
             metrics = metrics.push(
-                checkbox(enabled)
-                    .label(if metric.is_multi() {
-                        translations::metric_top_apps_setting(language)
-                    } else {
-                        translations::metric_name(language, metric)
-                    })
+                Row::new()
+                    .spacing(BAR_INNER_GAP)
+                    .align_y(Alignment::Center)
+                    .push(
+                        checkbox(true)
+                            .label(name_of(metric))
+                            .text_size(font)
+                            .on_toggle(move |v| Message::ToggleMetric(metric, v)),
+                    )
+                    .push(step_button("▲", Message::MoveMetricUp(metric), palette, font))
+                    .push(step_button("▼", Message::MoveMetricDown(metric), palette, font)),
+            );
+        }
+        for metric in Metric::ALL.iter().copied().filter(|m| !self.config.metrics.contains(m)) {
+            metrics = metrics.push(
+                checkbox(false)
+                    .label(name_of(metric))
                     .text_size(font)
                     .on_toggle(move |v| Message::ToggleMetric(metric, v)),
             );
@@ -1438,6 +1488,40 @@ mod tests {
         // labels, so the ratio itself is what is worth pinning down.
         let ratio = char_advance('总', 1.0) / char_advance('A', 1.0);
         assert!(ratio >= 1.5, "a full-width glyph measured at only {ratio}x a Latin one");
+    }
+
+    #[test]
+    fn metrics_move_one_place_and_stop_at_the_ends() {
+        let mut order = vec![Metric::Total, Metric::Cpu, Metric::Gpu];
+
+        assert!(move_metric(&mut order, Metric::Cpu, -1));
+        assert_eq!(order, vec![Metric::Cpu, Metric::Total, Metric::Gpu]);
+
+        // Neither end of the list gives way, and a metric that is switched off has
+        // no place to move from.
+        assert!(!move_metric(&mut order, Metric::Cpu, -1));
+        assert!(!move_metric(&mut order, Metric::Gpu, 1));
+        assert!(!move_metric(&mut order, Metric::Ram, 1));
+        assert_eq!(order, vec![Metric::Cpu, Metric::Total, Metric::Gpu]);
+    }
+
+    #[test]
+    fn a_row_fits_the_font_it_is_drawn_with() {
+        // Ultra is the tightest density, so it is the one that clipped: the value
+        // font's line box is taller than the row the density used to reserve.
+        for density in [Density::Ultra, Density::Compact, Density::Normal] {
+            for font in [FontSize::Small, FontSize::Medium, FontSize::Large] {
+                let row = density.row_height(font);
+                assert!(
+                    row >= font.value() * 1.2,
+                    "{density:?} at {font:?} reserves {row}px for a {}px font",
+                    font.value()
+                );
+            }
+        }
+
+        // The density still shows through where the font leaves room for it.
+        assert!(Density::Normal.row_height(FontSize::Small) > Density::Ultra.row_height(FontSize::Small));
     }
 
     #[test]

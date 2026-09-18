@@ -44,6 +44,9 @@ pub enum Message {
 
     // content
     ToggleMetric(Metric, bool),
+    /// Moves a metric one place earlier or later in the bar.
+    MoveMetricUp(Metric),
+    MoveMetricDown(Metric),
     SetTopApps(usize),
 
     /// Quit the overlay.

@@ -121,7 +121,7 @@ eye on power draw without leaving the dashboard open — including on top of a f
 | **Menu** | Right-click for `Resume` / `Settings` / `Pin` / `Exit` |
 | **Pin it** | Locks the position, and on Windows also makes the widget ignore the mouse so your clicks reach the app underneath |
 | **Style it** | Vertical or horizontal layout, three densities, three text sizes, light/dark theme, background and text colors, opacity |
-| **Trim it** | Choose which metrics appear (total, CPU, GPU, RAM, top apps), shorten the labels, set the decimals and the refresh interval |
+| **Trim it** | Choose which metrics appear and in which order (total, CPU, GPU, RAM, top apps), shorten the labels, set the decimals and the refresh interval |
 | **Language** | Follows the language you pick in the dashboard, with no restart |
 
 The widget hugs its numbers — the height always follows the content, and the width is whatever the

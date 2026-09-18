@@ -83,6 +83,12 @@ impl Layout {
     pub const ALL: &[Layout] = &[Layout::Vertical, Layout::Horizontal];
 }
 
+/// How tall a font's line box is relative to its glyph size.
+///
+/// Generous on purpose, like the width estimate: slack in the height costs a few
+/// pixels, a clipped row costs a reading.
+const LINE_HEIGHT_RATIO: f32 = 1.35;
+
 /// Layout density (padding / spacing).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
@@ -112,12 +118,19 @@ impl Density {
         }
     }
 
-    pub fn row_height(self) -> f32 {
-        match self {
+    /// Height of one row at a given text size.
+    ///
+    /// The density is only a floor: the row still has to hold the value font's line
+    /// box, which is taller than the glyph size. Ignoring that made a tall enough
+    /// stack clip — the shortfall accumulates, so the bottom row is the one cut.
+    pub fn row_height(self, font: FontSize) -> f32 {
+        let floor: f32 = match self {
             Density::Ultra => 15.0,
             Density::Compact => 18.0,
             Density::Normal => 21.0,
-        }
+        };
+
+        floor.max((font.value() * LINE_HEIGHT_RATIO).ceil())
     }
 }
 
@@ -454,7 +467,7 @@ impl OverlayConfig {
     pub fn fitted_height(&self) -> f32 {
         let pad = self.density.padding();
         let spacing = self.density.spacing();
-        let row = self.density.row_height();
+        let row = self.density.row_height(self.font_size);
 
         // No header is drawn in metrics mode, so it must not be counted here —
         // doing so used to leave a visible empty strip under the text.
