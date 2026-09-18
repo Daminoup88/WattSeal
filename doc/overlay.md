@@ -44,6 +44,17 @@ wider than its contents.
 In the vertical layout the `Width` slider (60–600 px) sets a floor rather than an exact size: the
 widget never becomes narrower than its own text, which would clip the values.
 
+## Language
+
+The overlay follows the language the dashboard is set to. Changing it in the dashboard's settings
+is enough: the overlay notices within a second and redraws itself, without a restart. It offers
+the same five languages as the dashboard (English, German, French, Chinese, Romanian).
+
+The overlay reads the setting from the same `ui_settings` row the dashboard writes, so there is no
+second place to configure it. Until the dashboard has saved a language, English is used — which is
+also what a standalone `WattSeal --overlay` run shows. The strings live in
+`overlay/src/translations.rs`.
+
 ## Transparency
 
 | Mode      | What it does                                                   |

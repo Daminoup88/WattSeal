@@ -122,6 +122,7 @@ eye on power draw without leaving the dashboard open — including on top of a f
 | **Pin it** | Locks the position, and on Windows also makes the widget ignore the mouse so your clicks reach the app underneath |
 | **Style it** | Vertical or horizontal layout, three densities, three text sizes, light/dark theme, background and text colors, opacity |
 | **Trim it** | Choose which metrics appear (total, CPU, GPU, RAM, top apps), shorten the labels, set the decimals and the refresh interval |
+| **Language** | Follows the language you pick in the dashboard, with no restart |
 
 The widget sizes itself to its own content, so it is never wider or taller than the numbers it
 shows. A pinned widget is deliberately not clickable — release it from the tray menu.

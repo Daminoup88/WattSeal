@@ -19,6 +19,7 @@ use crate::{
     config::{BgColor, Density, FontSize, Layout, Metric, OverlayConfig, TextColor, Transparency},
     message::Message,
     theme::{self, Palette, ThemeChoice},
+    translations::{self, Labeled, Language, Localize},
 };
 
 /// Monospace bold font for values (clean, aligned digits).
@@ -65,6 +66,8 @@ pub struct OverlayApp {
     /// Size last requested from the OS, so the auto-fit does not resize — and
     /// flicker — on every tick.
     applied: iced::Size,
+    /// Language the dashboard is set to; the overlay follows it.
+    language: Language,
     database: Option<Database>,
 }
 
@@ -74,6 +77,7 @@ impl OverlayApp {
         let config = OverlayConfig::load().unwrap_or_default();
         let database = Database::open_without_migrations().ok();
         let requested = config.overlay_requested;
+        let language = Language::from_database(database.as_ref());
 
         let app = Self {
             config,
@@ -85,6 +89,7 @@ impl OverlayApp {
             show_settings: false,
             show_menu: false,
             applied: iced::Size::ZERO,
+            language,
             database,
         };
 
@@ -114,6 +119,9 @@ impl OverlayApp {
                 }
                 self.power = self.load_power();
                 self.top_apps = self.load_top_apps();
+                // The dashboard owns the language setting, so re-reading it here
+                // is what makes the overlay follow a change made over there.
+                self.language = Language::from_database(self.database.as_ref());
 
                 // Keep the window fitted to the live content, but only issue a
                 // resize when the target actually changed.
@@ -349,11 +357,16 @@ impl OverlayApp {
 
     /// Labels of the in-bar menu, in order.
     fn menu_labels(&self) -> [&'static str; 4] {
+        let language = self.language;
         [
-            "Resume",
-            "Settings",
-            if self.config.pin_mode { "Unpin" } else { "Pin" },
-            "Exit",
+            translations::menu_resume(language),
+            translations::menu_settings(language),
+            if self.config.pin_mode {
+                translations::menu_unpin(language)
+            } else {
+                translations::menu_pin(language)
+            },
+            translations::menu_exit(language),
         ]
     }
 
@@ -522,13 +535,14 @@ impl OverlayApp {
     }
 
     fn view_settings(&self, palette: Palette, font: f32, spacing: f32) -> Element<'_, Message, Theme> {
+        let language = self.language;
         let bg_dec = (self.config.opacity - 0.05).clamp(0.05, 1.0);
         let bg_inc = (self.config.opacity + 0.05).clamp(0.05, 1.0);
 
         let opacity_row = Column::new()
             .spacing(2)
             .push(stepper_row(
-                "Opacity",
+                translations::label_opacity(language),
                 self.config.opacity,
                 Message::ChangeOpacity(bg_dec),
                 Message::ChangeOpacity(bg_inc),
@@ -539,62 +553,63 @@ impl OverlayApp {
 
         let appearance = Column::new()
             .spacing(spacing)
-            .push(section_title("Appearance", font, palette))
+            .push(section_title(translations::section_appearance(language), font, palette))
             .push(opacity_row)
             .push(picker(
-                "Bg color",
-                pick_list(BgColor::ALL, Some(self.config.bg_color), Message::SetBgColor),
+                translations::label_bg_color(language),
+                labeled_pick(BgColor::ALL, self.config.bg_color, language, Message::SetBgColor),
                 font,
                 palette,
             ))
             .push(picker(
-                "Text color",
-                pick_list(TextColor::ALL, Some(self.config.text_color), Message::SetTextColor),
+                translations::label_text_color(language),
+                labeled_pick(TextColor::ALL, self.config.text_color, language, Message::SetTextColor),
                 font,
                 palette,
             ))
             .push(picker(
-                "Transparency",
-                pick_list(
+                translations::label_transparency(language),
+                labeled_pick(
                     Transparency::ALL,
-                    Some(self.config.transparency),
+                    self.config.transparency,
+                    language,
                     Message::SetTransparency,
                 ),
                 font,
                 palette,
             ))
             .push(picker(
-                "Layout",
-                pick_list(Layout::ALL, Some(self.config.layout), Message::SetLayout),
+                translations::label_layout(language),
+                labeled_pick(Layout::ALL, self.config.layout, language, Message::SetLayout),
                 font,
                 palette,
             ))
             .push(picker(
-                "Density",
-                pick_list(Density::ALL, Some(self.config.density), Message::SetDensity),
+                translations::label_density(language),
+                labeled_pick(Density::ALL, self.config.density, language, Message::SetDensity),
                 font,
                 palette,
             ))
             .push(picker(
-                "Text size",
-                pick_list(FontSize::ALL, Some(self.config.font_size), Message::SetFontSize),
+                translations::label_text_size(language),
+                labeled_pick(FontSize::ALL, self.config.font_size, language, Message::SetFontSize),
                 font,
                 palette,
             ))
             .push(picker(
-                "Theme",
-                pick_list(ThemeChoice::ALL, Some(self.config.theme), Message::SetTheme),
+                translations::label_theme(language),
+                labeled_pick(ThemeChoice::ALL, self.config.theme, language, Message::SetTheme),
                 font,
                 palette,
             ))
             .push(picker(
-                "Decimals",
+                translations::label_decimals(language),
                 pick_list(DECIMALS, Some(self.config.decimals), Message::SetDecimals),
                 font,
                 palette,
             ))
             .push(picker(
-                "Refresh",
+                translations::label_refresh(language),
                 pick_list(REFRESH, Some(self.config.refresh_secs), Message::SetRefresh),
                 font,
                 palette,
@@ -605,29 +620,29 @@ impl OverlayApp {
                     .align_y(Alignment::Center)
                     .push(
                         checkbox(self.config.show_labels)
-                            .label("Show labels")
+                            .label(translations::label_show_labels(language))
                             .text_size(font)
                             .on_toggle(Message::ToggleLabels),
                     )
                     .push(
                         checkbox(self.config.show_units)
-                            .label("Show units")
+                            .label(translations::label_show_units(language))
                             .text_size(font)
                             .on_toggle(Message::ToggleUnits),
                     ),
             )
             .push(
                 checkbox(self.config.abbreviated)
-                    .label("Short labels (Total→T, CPU→C…)")
+                    .label(translations::label_short_labels(language))
                     .text_size(font)
                     .on_toggle(Message::ToggleAbbreviated),
             );
 
         let mut window_col = Column::new()
             .spacing(spacing)
-            .push(section_title("Window", font, palette))
+            .push(section_title(translations::section_window(language), font, palette))
             .push(toggle(
-                "Always on top",
+                translations::label_always_on_top(language),
                 self.config.always_on_top,
                 Message::ToggleAlwaysOnTop,
                 font,
@@ -635,18 +650,14 @@ impl OverlayApp {
             ))
             .push(if crate::winlayer::click_through_supported() {
                 toggle(
-                    "Pin makes it click-through",
+                    translations::label_pin_click_through(language),
                     self.config.pin_click_through,
                     Message::TogglePinClickThrough,
                     font,
                     palette,
                 )
             } else {
-                hint(
-                    "Pin locks the position here: click-through is not available on this platform.",
-                    font,
-                    palette,
-                )
+                hint(translations::hint_pin_unavailable(language), font, palette)
             });
         // Only the vertical layout has a user-chosen width: the horizontal one
         // is measured from its own content and cannot be set.
@@ -655,9 +666,13 @@ impl OverlayApp {
                 Column::new()
                     .spacing(2)
                     .push(
-                        Text::new(format!("Width  {} px", self.config.width.round()))
-                            .size(font)
-                            .color(palette.muted),
+                        Text::new(format!(
+                            "{}  {} px",
+                            translations::label_width(language),
+                            self.config.width.round()
+                        ))
+                        .size(font)
+                        .color(palette.muted),
                     )
                     .push(slider(60.0..=600.0, self.config.width, Message::SetWidth)),
             );
@@ -668,31 +683,36 @@ impl OverlayApp {
             let enabled = self.config.metrics.contains(&metric);
             metrics = metrics.push(
                 checkbox(enabled)
-                    .label(if metric.is_multi() { "Top apps" } else { metric.label() })
+                    .label(if metric.is_multi() {
+                        translations::metric_top_apps_setting(language)
+                    } else {
+                        translations::metric_name(language, metric)
+                    })
                     .text_size(font)
                     .on_toggle(move |v| Message::ToggleMetric(metric, v)),
             );
         }
         let mut content_col = Column::new()
             .spacing(spacing)
-            .push(section_title("Content", font, palette))
+            .push(section_title(translations::section_content(language), font, palette))
             .push(metrics);
         if self.config.metrics.contains(&Metric::TopApps) {
             content_col = content_col.push(picker(
-                "Top count",
+                translations::label_top_count(language),
                 pick_list(TOP_APPS, Some(self.config.top_apps()), Message::SetTopApps),
                 font,
                 palette,
             ));
         }
 
-        let done: Button<'_, Message, Theme> = button(Text::new("Done").size(font))
+        let done: Button<'_, Message, Theme> = button(Text::new(translations::button_done(language)).size(font))
             .style(flat_button(palette))
             .on_press(Message::ToggleSettings);
 
-        let quit: Button<'_, Message, Theme> = button(Text::new("Quit overlay").size(font))
-            .style(flat_button(palette))
-            .on_press(Message::Quit);
+        let quit: Button<'_, Message, Theme> =
+            button(Text::new(translations::button_quit_overlay(language)).size(font))
+                .style(flat_button(palette))
+                .on_press(Message::Quit);
 
         // Two balanced columns: appearance on the left, window/content on the
         // right. This halves the height, so no scrollbar is needed.
@@ -749,23 +769,23 @@ impl OverlayApp {
 
     /// Explains how the two opacity settings interact in the active mode.
     fn opacity_hint(&self) -> &'static str {
+        let language = self.language;
         let mode = self.config.transparency;
         if mode.uses_layered() {
-            "One alpha covers the whole window, so text fades with the card. This GPU exposes no \
-             alpha-capable surface, so only the card's color (not its alpha) is adjustable."
+            translations::hint_opacity_layered(language)
         } else if mode.transparent_window() {
-            "Surface: card and text alphas are independent."
+            translations::hint_opacity_surface(language)
         } else {
-            "Transparency is off — the overlay is fully opaque."
+            translations::hint_opacity_off(language)
         }
     }
 
     /// Label shown for a metric, honouring the short-label mode.
     fn metric_label(&self, metric: Metric) -> &'static str {
         if self.config.abbreviated {
-            metric.short_label()
+            translations::metric_short_name(self.language, metric)
         } else {
-            metric.label()
+            translations::metric_name(self.language, metric)
         }
     }
 
@@ -1121,6 +1141,34 @@ fn section_title<'a>(text: &'a str, font: f32, palette: Palette) -> Element<'a, 
         })
         .color(palette.text)
         .into()
+}
+
+/// A pick-list whose options and selected value are rendered in `language`.
+///
+/// `pick_list` displays items through `Display`, so the translation has to
+/// travel with each value — the same problem the dashboard solves with its
+/// `TranslatedMetricType` wrapper.
+fn labeled_pick<'a, T>(
+    options: &'a [T],
+    selected: T,
+    language: Language,
+    on_select: impl Fn(T) -> Message + 'a,
+) -> Element<'a, Message, Theme>
+where
+    T: Localize + Clone + PartialEq + 'a,
+{
+    let choices: Vec<Labeled<T>> = options
+        .iter()
+        .cloned()
+        .map(|value| Labeled::new(value, language))
+        .collect();
+
+    pick_list(
+        choices,
+        Some(Labeled::new(selected, language)),
+        move |option: Labeled<T>| on_select(option.value),
+    )
+    .into()
 }
 
 fn picker<'a>(

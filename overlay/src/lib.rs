@@ -9,6 +9,7 @@ pub mod app;
 pub mod config;
 pub mod message;
 pub mod theme;
+pub mod translations;
 pub mod winlayer;
 
 /// Runs the overlay window.
