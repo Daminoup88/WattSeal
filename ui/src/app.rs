@@ -8,37 +8,37 @@ use common::{
 use iced::{
     Alignment, Element, Length, Subscription, Task, event,
     time::{Duration, every},
-    widget::{Button, Column, Container, Row, Scrollable, Text, button, checkbox, image, pick_list, stack, text_input},
+    widget::{Button, Column, Container, Row, Scrollable, Text, button, checkbox, image, stack},
     window,
 };
 
 use crate::{
     components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
     message::Message,
-    pages::{Page, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
+    pages::{
+        Page,
+        dashboard::DashboardPage,
+        info::InfoPage,
+        settings::{SettingsPage, setup_view},
+    },
     styles::{
         button::ButtonStyle,
         container::ContainerStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_XLARGE,
-            SPACING_LARGE, SPACING_MEDIUM, SPACING_SMALL,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SUBTITLE, PADDING_XLARGE, SPACING_LARGE,
+            SPACING_MEDIUM,
         },
         text::TextStyle,
     },
     themes::AppTheme,
     translations::{
-        TranslatedCarbonIntensity, TranslatedElectricityCost, app_name, carbon_info_measured, close_dialog_description,
-        close_dialog_title, close_everything, close_remember_choice, close_ui_only, custom_carbon_invalid,
-        custom_carbon_placeholder, custom_kwh_cost_placeholder, database_migrating_description,
-        database_migrating_title, format_emissions, format_energy, format_number, info_modal_all_time_power,
-        info_modal_all_time_top_consumer, info_modal_current_power, info_modal_current_top_consumer,
-        info_modal_description, info_modal_title, info_modal_top_process, kwh_cost_invalid, modal_close, na,
-        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
-        theme_name,
+        app_name, carbon_info_measured, close_dialog_description, close_dialog_title, close_everything,
+        close_remember_choice, close_ui_only, database_migrating_description, database_migrating_title,
+        format_emissions, format_energy, format_number, info_modal_all_time_power, info_modal_all_time_top_consumer,
+        info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
+        info_modal_top_process, modal_close, na, theme_name,
     },
-    types::{
-        AppLanguage, CarbonIntensity, CountryKey, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange,
-    },
+    types::{AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
 };
 
 const FPS: u64 = 1;
@@ -588,7 +588,17 @@ impl App {
                 Message::CloseSettings,
             )
         } else if self.show_setup {
-            modal(content, self.setup_view(), Message::ConfirmSetup)
+            modal(
+                content,
+                setup_view(
+                    self.language,
+                    self.carbon_intensity,
+                    &self.custom_carbon_input,
+                    self.electricity_cost,
+                    &self.custom_kwh_cost_input,
+                ),
+                Message::ConfirmSetup,
+            )
         } else if let Some(ref target) = self.info_modal_open {
             modal(content, self.info_modal_view(target), Message::CloseInfoModal)
         } else {
@@ -971,130 +981,6 @@ impl App {
         }
 
         let content = content.align_x(Alignment::Center).push(buttons);
-
-        Container::new(content)
-            .width(Length::Fixed(520.0))
-            .padding(PADDING_XLARGE)
-            .class(ContainerStyle::ModalCard)
-            .into()
-    }
-
-    fn setup_view(&self) -> Element<'_, Message, AppTheme> {
-        let language = self.language;
-
-        let title = Text::new(setup_welcome_title(language))
-            .size(FONT_SIZE_HEADER)
-            .font(FONT_BOLD)
-            .width(Length::Fill);
-
-        let lang_label = Text::new(setup_choose_language(language)).size(FONT_SIZE_BODY);
-        let lang_picker = pick_list(AppLanguage::all(), Some(self.language), Message::ChangeLanguage)
-            .width(Length::Fill)
-            .padding(8);
-
-        let ci_label = Text::new(setup_choose_carbon(language)).size(FONT_SIZE_BODY);
-        let ci_picker = pick_list(
-            TranslatedCarbonIntensity::all(language),
-            Some(TranslatedCarbonIntensity::new(self.carbon_intensity, language)),
-            |tci| Message::ChangeCarbonIntensity(tci.intensity),
-        )
-        .width(Length::Fill)
-        .padding(8);
-
-        let custom_input_valid = self
-            .custom_carbon_input
-            .parse::<f64>()
-            .ok()
-            .filter(|&v| v > 0.0)
-            .is_some();
-
-        let carbon_section: Element<'_, Message, AppTheme> = if self.carbon_intensity.is_custom() {
-            let input = text_input(custom_carbon_placeholder(language), &self.custom_carbon_input)
-                .on_input(Message::CustomCarbonInput)
-                .width(Length::Fill)
-                .padding(8);
-            let input_row = Row::new()
-                .spacing(4)
-                .align_y(Alignment::Center)
-                .push(input)
-                .push(Text::new("g/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted));
-            let mut col = Column::new().spacing(SPACING_SMALL).push(ci_picker).push(input_row);
-            if !self.custom_carbon_input.is_empty() && !custom_input_valid {
-                col = col.push(
-                    Text::new(custom_carbon_invalid(language))
-                        .size(FONT_SIZE_SMALL)
-                        .class(TextStyle::Muted),
-                );
-            }
-            col.into()
-        } else {
-            ci_picker.into()
-        };
-
-        let custom_kwh_valid = self
-            .custom_kwh_cost_input
-            .parse::<f64>()
-            .ok()
-            .filter(|&v| v >= 0.0)
-            .is_some();
-
-        let ec_label = Text::new(setup_choose_electricity(language)).size(FONT_SIZE_BODY);
-        let ec_picker = pick_list(
-            TranslatedElectricityCost::all(language),
-            Some(TranslatedElectricityCost::new(self.electricity_cost, language)),
-            |tec| Message::ChangeElectricityCost(tec.cost),
-        )
-        .width(Length::Fill)
-        .padding(8);
-
-        let electricity_section: Element<'_, Message, AppTheme> = if self.electricity_cost.is_custom() {
-            let input = text_input(custom_kwh_cost_placeholder(language), &self.custom_kwh_cost_input)
-                .on_input(Message::CustomKwhCostInput)
-                .width(Length::Fill)
-                .padding(8);
-            let currency_picker = pick_list(
-                Currency::ALL,
-                Some(self.electricity_cost.currency()),
-                Message::ChangeCustomCurrency,
-            )
-            .padding(8);
-            let mut col = Column::new().spacing(SPACING_SMALL).push(ec_picker).push(
-                Row::new()
-                    .spacing(4)
-                    .align_y(Alignment::Center)
-                    .push(input.width(Length::FillPortion(2)))
-                    .push(currency_picker.width(Length::FillPortion(2)))
-                    .push(Text::new("/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted)),
-            );
-            if !self.custom_kwh_cost_input.is_empty() && !custom_kwh_valid {
-                col = col.push(
-                    Text::new(kwh_cost_invalid(language, self.electricity_cost.currency_symbol))
-                        .size(FONT_SIZE_SMALL)
-                        .class(TextStyle::Muted),
-                );
-            }
-            col.into()
-        } else {
-            ec_picker.into()
-        };
-
-        let can_confirm = (!self.carbon_intensity.is_custom() || custom_input_valid)
-            && (!self.electricity_cost.is_custom() || custom_kwh_valid);
-        let confirm_btn = button(Text::new(setup_confirm(language)).size(FONT_SIZE_BODY))
-            .class(ButtonStyle::Standard)
-            .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
-
-        let content = Column::new()
-            .spacing(SPACING_LARGE)
-            .align_x(Alignment::Start)
-            .push(title)
-            .push(lang_label)
-            .push(lang_picker)
-            .push(ci_label)
-            .push(carbon_section)
-            .push(ec_label)
-            .push(electricity_section)
-            .push(confirm_btn);
 
         Container::new(content)
             .width(Length::Fixed(520.0))
