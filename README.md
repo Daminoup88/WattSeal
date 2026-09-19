@@ -1,17 +1,18 @@
 <div align="center">
 
-<img src="resources/svg/banner.svg" alt="WattSeal, Real-time PC power consumption monitoring" width="100%"/>
+<img src="resources/svg/banner.svg" alt="WattSeal – real-time PC power consumption monitoring" width="100%"/>
 
-WattSeal shows you a live breakdown of power consumption of your PC, by component and by app. Monitor which hardware is drawing the most energy, which apps are the biggest energy hogs, and how your usage changes over time.
+### See where your PC's power actually goes, live, by app and by component.
 
-Available in English and French.
+Available in English, Français, 简体中文, and Română.
 
-[![Windows](https://img.shields.io/badge/Windows-x86__64-0078D4?style=flat-square&logo=windows)](https://github.com/daminoup88/wattseal/releases)
-[![Linux](https://img.shields.io/badge/Linux-x86__64-FCC624?style=flat-square&logo=linux&logoColor=black)](https://github.com/daminoup88/wattseal/releases)
-[![macOS](https://img.shields.io/badge/macOS-aarch64-000000?style=flat-square&logo=apple)](https://github.com/daminoup88/wattseal/releases)
-[![GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue?style=flat-square)](LICENSE)
+[![Windows](https://img.shields.io/badge/Windows-x64-00cce6?style=for-the-badge&logo=data:image/svg%2bxml;base64,PHN2ZwogICB3aWR0aD0iODAwcHgiCiAgIGhlaWdodD0iODAwcHgiCiAgIHZpZXdCb3g9IjAgMCAyNCAyNCIKICAgdmVyc2lvbj0iMS4xIgogICBpZD0ic3ZnMSIKICAgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICB4bWxuczpzdmc9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIgogICB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiCiAgIHhtbG5zOmNjPSJodHRwOi8vY3JlYXRpdmVjb21tb25zLm9yZy9ucyMiCiAgIHhtbG5zOmRjPSJodHRwOi8vcHVybC5vcmcvZGMvZWxlbWVudHMvMS4xLyI+CiAgPHRpdGxlCiAgICAgaWQ9InRpdGxlMSI+d2luZG93czwvdGl0bGU+CiAgPGRlc2MKICAgICBpZD0iZGVzYzEiPkNyZWF0ZWQgd2l0aCBTa2V0Y2guPC9kZXNjPgogIDxkZWZzCiAgICAgaWQ9ImRlZnMxIiAvPgogIDxwYXRoCiAgICAgZD0iTTEzLjE0NTg2NDcsNzI4OS40MzQyNiBDMTMuMTUwODc3Miw3MjkxLjQzMzE2IDEzLjE1Njg5MjIsNzI5NC44MjkyOSAxMy4xNjE5MDQ4LDcyOTcuNDY4ODQgQzE2Ljc3NTkzOTgsNzI5Ny45NTc1NyAyMC4zODk5NzQ5LDcyOTguNDYxMyAyMy45OTc5OTUsNzI5OSBDMjMuOTk3OTk1LDcyOTUuODQ4NzMgMjQuMDAyMDA1LDcyOTIuNzExNDYgMjMuOTk3OTk1LDcyODkuNzEzMTEgQzIwLjM4MDk1MjQsNzI4OS43MTMxMSAxNi43NjQ5MTIzLDcyODkuNDM0MjYgMTMuMTQ1ODY0Nyw3Mjg5LjQzNDI2IE00LDcyODkuNDM1MjYgTDQsNzI5Ni4yMjE1MyBDNi43MjU4MTQ1NCw3Mjk2LjU4OTMzIDkuNDUxNjI5MDcsNzI5Ni45NDExMyAxMi4xNzI0MzExLDcyOTcuMzQyOTEgQzEyLjE3NzQ0MzYsNzI5NC43MTczNiAxMi4xNzA0MjYxLDcyOTIuMDkwOCAxMi4xNzA0MjYxLDcyODkuNDY1MjQgQzkuNDQ2NjE2NTQsNzI4OS40NzAyNCA2LjcyMzgwOTUyLDcyODkuNDI2MjcgNCw3Mjg5LjQzNTI2IE00LDcyODEuODQzNDQgTDQsNzI4OC42MTA3MSBDNi43MjU4MTQ1NCw3Mjg4LjYxNzcxIDkuNDUxNjI5MDcsNzI4OC41NzY3MyAxMi4xNzc0NDM2LDcyODguNTc5NzMgQzEyLjE3NTQzODYsNzI4NS45NjAxNyAxMi4xNzU0Mzg2LDcyODMuMzQzNjEgMTIuMTcyNDMxMSw3MjgwLjcyNDA1IEM5LjQ0NDYxMTUzLDcyODEuMDY0ODYgNi43MTY3OTE5OCw3MjgxLjQyNTY3IDQsNzI4MS44NDM0NCBNMjQsNzI4OC40NzE3OSBDMjAuMzg3OTY5OSw3Mjg4LjQ4NTc4IDE2Ljc3NTkzOTgsNzI4OC41NDA3NSAxMy4xNjE5MDQ4LDcyODguNTUxNzUgQzEzLjE1OTg5OTcsNzI4NS44ODkyMSAxMy4xNTk4OTk3LDcyODMuMjI5NjcgMTMuMTYxOTA0OCw3MjgwLjU2OTE0IEMxNi43Njg5MjIzLDcyODAuMDE4NDQgMjAuMzgzOTU5OSw3Mjc5LjUwMDcyIDIzLjk5Nzk5NSw3Mjc5IEMyNCw3MjgyLjE1ODI2IDIzLjk5Nzk5NSw3Mjg1LjMxMzUzIDI0LDcyODguNDcxNzkiCiAgICAgaWQ9IndpbmRvd3MtWyMxNzRdIgogICAgIHRyYW5zZm9ybT0idHJhbnNsYXRlKC00LC03Mjc5KSIKICAgICBzdHlsZT0iZmlsbDojZmZmZmZmO2ZpbGwtb3BhY2l0eToxO3N0cm9rZTpub25lIiAvPgogIDxtZXRhZGF0YQogICAgIGlkPSJtZXRhZGF0YTEiPgogICAgPHJkZjpSREY+CiAgICAgIDxjYzpXb3JrCiAgICAgICAgIHJkZjphYm91dD0iIj4KICAgICAgICA8ZGM6dGl0bGU+d2luZG93czwvZGM6dGl0bGU+CiAgICAgIDwvY2M6V29yaz4KICAgIDwvcmRmOlJERj4KICA8L21ldGFkYXRhPgo8L3N2Zz4=)](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-windows.exe)
+[![Linux](https://img.shields.io/badge/Linux-x64-e6b300?style=for-the-badge&logo=linux&logoColor=white)](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-linux)
+[![macOS](https://img.shields.io/badge/macOS-Apple%20Silicon-111111?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-macos)
 
-<img src="resources/dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="80%" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); margin-top: 20px;"/>
+
+
+<img src="resources/dashboard.png" alt="WattSeal app dashboard showing real-time power consumption breakdown by application and component" width="85%" style="border-radius: 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1); margin-top: 20px;"/>
 
 </div>
 
@@ -19,46 +20,48 @@ Available in English and French.
 
 ## Why use WattSeal?
 
-Most people have no idea how much electricity their computer actually uses, or which apps are silently draining power in the background. WattSeal gives you that visibility:
+Most people have no idea how much electricity their computer actually uses, or which apps are silently draining power in the background.
 
-- 🔍 **Live dashboard**: watch power draw update every second
+WattSeal gives you that visibility:
+- ⚡ **Live power draw**, updated every second
 - 🧩 **Per-component breakdown**: CPU, GPU, RAM, storage, network
-- 📋 **Per-app breakdown**: find out which processes are costing you the most
-- 📈 **Historical charts**: spot trends over time
-- 💾 **Local database**: all your data stays on your machine, private
+- 📋 **Per-app breakdown**: catch the process quietly draining your battery
+- 📈 **History**: charts from the last minute to the last year
+- 🔒 **100% local**: all your data stays on your machine, private
+- 🏠 **MQTT + Home Assistant** ready, for anyone who wants it in their smart home dashboard
+- 🌍 **Carbon & cost estimates** based on your grid and electricity price
+- 🪶 Single executable, no installer, no runtime to manage
 
-> Power readings are validated against real hardware measurements using a [Shelly Plug Gen3 S](https://www.shelly.com/products/shelly-plug-s-gen3) smart plug.
+<!-- 📸 placeholder: short feature GIF (dashboard live update / theme switch) -->
 
 ---
 
-## Getting Started
+## Quick start
 
-### Step 1 — Download
+WattSeal is a single executable. No installer, no dependencies to manage.
 
-Grab the latest release for your operating system from the **[Releases page](https://github.com/daminoup88/wattseal/releases)**:
+Download the executable for your OS below and run it:
 
-| Your system | File to download |
+| OS | Download |
 |---|---|
-| Windows (64-bit) | `WattSeal-windows.exe` |
-| Linux (64-bit) | `WattSeal-linux` |
-| macOS (Apple Silicon) | `WattSeal-macos` |
+| 🪟 Windows (x64) | **[WattSeal-windows.exe](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-windows.exe)** |
+| 🐧 Linux (x64) | **[WattSeal-linux](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-linux)** |
+| 🍎 macOS (Apple Silicon) | **[WattSeal-macos](https://github.com/Daminoup88/WattSeal/releases/latest/download/WattSeal-macos)** |
 
-WattSeal is a single executable file — no installation needed. Just download it, and you're ready for the next step.
+Admin/root is optional everywhere. Without it, WattSeal still runs fully, CPU power just falls back to a usage-based estimate instead of a direct hardware reading.
 
----
+### Step by step instructions
 
-### Step 2 — Run it
-
-WattSeal doesn't need administrative privileges to run, but Windows needs a one-time admin step to install the CPU MSR driver for precise power measurements. If you skip that step, you'll still get power estimates based on CPU usage, but they won't be as accurate.
+Detailed instructions for each platform are below.
 
 <details>
 <summary><strong>🪟 Windows</strong></summary>
 
-1. Double-click the downloaded `WattSeal-windows-x86_64.exe` file
-2. If prompted by Windows Defender SmartScreen, click "More info" and then "Run anyway" to launch the app. This is a standard warning for new apps that haven't yet built up reputation on Windows.
-3. If prompted by User Account Control (UAC) to install the CPU MSR driver, click "Yes" to install it (this is a one-time step). If you click "No", WattSeal will still run but CPU power readings will be estimated.
+1. Download and double-click `WattSeal-windows.exe`.
+2. If SmartScreen warns you, click **More info → Run anyway**. This is normal for new apps without an established reputation yet.
+3. If prompted by UAC, click **Yes** for accurate CPU power via the WinRing0 driver, or **No** to run without admin (CPU power will be estimated).
 
-The app will launch in the system tray in the taskbar and the dashboard will open in a new window. If you close the dashboard, WattSeal will keep running in the background and you can reopen it by clicking the tray icon.
+The dashboard opens in a window and a tray icon is added. Closing the window keeps WattSeal running in the tray, reopen it from there.
 
 </details>
 
@@ -72,169 +75,56 @@ chmod +x WattSeal-linux
 sudo ./WattSeal-linux
 ```
 
-> **Note:** the only extra runtime dependency is an X11 system tray library.
-> If either `libappindicator` **or** `libayatana-appindicator` is installed
-> the app will show a tray icon with menu items; otherwise WattSeal will
-> simply run in the background without a tray icon (you can still open the
-> dashboard by re‑running the command).
+Root is needed to read `/sys/class/powercap` for CPU energy. Tray icon requires `libappindicator` or `libayatana-appindicator`; without either, WattSeal just runs without one.
 
 </details>
 
 <details>
 <summary><strong>🍎 macOS</strong></summary>
 
-Run the app normally, WattSeal will work without admin privileges.
+Open a terminal in the folder where you downloaded WattSeal and run:
+
+```bash
+chmod +x WattSeal-macos
+./WattSeal-macos
+```
+
+If macOS blocks the app because "Apple could not verify if it's free of malware", go to **System Settings → Privacy & Security** and allow WattSeal to run.
+
+It is normal as we did not pay Apple to notarize the app.
 
 </details>
 
 ---
 
-## What can WattSeal measure?
+## Documentation
 
-| Component | How it's measured |
+Quick reference, everything deeper lives in the **[Wiki](https://github.com/Daminoup88/WattSeal/wiki)**:
+
+| | |
 |---|---|
-| **CPU (Intel / AMD)** | Direct hardware energy counters (RAPL) — very accurate |
-| **GPU (NVIDIA)** | NVML vendor API — very accurate |
-| **GPU (AMD, Windows)** | ADLX vendor API — very accurate |
-| **GPU (Intel, Windows)** | PDH performance counters |
-| **RAM** | Estimated from memory usage |
-| **Disk** | Estimated from read/write activity |
-| **Network** | Estimated from data throughput |
-| **Per-process** | CPU + GPU + I/O breakdown per app |
-
-> **What does "estimated" mean?** For components without built-in energy sensors, WattSeal calculates a best-guess power draw based on how hard the hardware is working and its known power specs. It's less precise than hardware counters, but still gives a solid picture.
+| 🖥️ [Platform Support](https://github.com/Daminoup88/WattSeal/wiki/Platform-Support) | What's measured directly vs. estimated, per OS |
+| ❓ [FAQ & Troubleshooting](https://github.com/Daminoup88/WattSeal/wiki/FAQ-Troubleshooting) | Common issues, quick fixes |
+| ⌨️ [CLI Reference](https://github.com/Daminoup88/WattSeal/wiki/CLI-Reference) | Flags, headless mode, background mode |
+| 📡 [MQTT Integration](https://github.com/Daminoup88/WattSeal/wiki/MQTT-Integration) | Publish live data to a broker |
+| 🏠 [Home Assistant Integration](https://github.com/Daminoup88/WattSeal/wiki/Home-Assistant-Integration) | Wire WattSeal into your smart home |
+| 🔬 [Sensor Sources](https://github.com/Daminoup88/WattSeal/wiki/Sensor-Sources) | Formulas and citations behind every reading |
+| 🏗️ [Architecture](https://github.com/Daminoup88/WattSeal/wiki/Architecture) | Crate layout, database, data flow |
 
 ---
 
-## Platform Support
+## Contributing
 
-With admin privileges, WattSeal provides the most comprehensive power monitoring experience possible on each platform:
+Issues and PRs are welcome, small or large. See **[CONTRIBUTING.md](CONTRIBUTING.md)** to get started and **[ROADMAP.md](ROADMAP.md)** for what's planned.
 
-|  | Windows | Linux | macOS |
-|---|:---:|:---:|:---:|
-| Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | ✅ | ✅ | Estimated |
-| NVIDIA GPU | ✅ | ✅ | ❌ |
-| AMD GPU | ✅ | ❌ | ❌ |
-| Intel GPU | ✅ | ❌ | ❌ |
-| Other sensors (usage, I/O) | ✅ | ✅ | ✅ |
-| Auto admin elevation | ✅ UAC (one time) | Manual (`sudo`) | Manual |
+To translate WattSeal into your native language, see **[🌏 App translations](https://github.com/Daminoup88/WattSeal/issues/112)**.
 
-<details>
-<summary><strong>Support without admin privileges</strong></summary>
+## License
 
-|  | Windows | Linux | macOS |
-|---|:---:|:---:|:---:|
-| Full application | ✅ | ✅ | ✅ |
-| CPU energy counters | ✅ (after driver install) | Estimated | Estimated |
-| NVIDIA GPU | ✅ | ✅ | ❌ |
-| AMD GPU | ✅ | ❌ | ❌ |
-| Intel GPU | ✅ | ❌ | ❌ |
-| Other sensors (usage, I/O) | ✅ | ✅ | ✅ |
-
-</details>
+WattSeal is licensed under [GPL-3.0](LICENSE).
 
 ---
 
-<br>
-
-## Troubleshooting
-
-**Rendering issues?** If the UI looks broken or fails to launch, try setting the environment variable `ICED_BACKEND=tiny-skia` before running the app. This forces Iced to use a software renderer which is more compatible with older GPUs and VMs.
-
-# 🛠️ Developer Documentation
-<div align="center">
-
-[![Built with Rust](https://img.shields.io/badge/Built%20With-Rust-CE422B?style=flat-square&logo=rust)](https://www.rust-lang.org)
-[![Built with Iced](https://img.shields.io/badge/Built%20With%20Iced-3645FF?logo=iced&logoColor=fff)]()
+If WattSeal is useful to you, a ⭐ helps other people find it.
 
 </div>
-
-The rest of this README is aimed at contributors and developers who want to build WattSeal from source, understand its architecture, or add new features.
-
-> Want to contribute? Check out our [CONTRIBUTING.md](CONTRIBUTING.md) and our [ROADMAP.md](ROADMAP.md) for planned features and areas where help is needed.
-
----
-
-## Architecture Overview
-
-WattSeal is a Rust workspace made up of three crates:
-
-```
-wattseal/               ← Root binary (tray icon, lifecycle management)
-  ├── collector/        ← Background sensor polling, power estimation, DB writes
-  ├── common/           ← Shared types, SQLite layer, utilities
-  └── ui/               ← Iced GUI (dashboard, hardware info, settings, charts)
-```
-
-**How the pieces fit together:**
-
-![Architecture diagram](resources/svg/overall_architecture.svg)
-
-The collector and UI share the same SQLite database file via WAL (Write-Ahead Logging) mode, which allows concurrent reads and writes without locking.
-
----
-
-## Prerequisites
-
-- **Rust** stable toolchain (version pinned in [`rust-toolchain.toml`](rust-toolchain.toml)).
-- On linux, install the build deps for the tray icon, not needed at runtime but required to build the Linux version:
-
-  ```bash
-  sudo apt install libgtk-3-dev pkg-config libxkbcommon-dev libwayland-dev
-  ```
-
----
-
-## Building from Source
-
-Clone the repository:
-```bash
-git clone https://github.com/daminoup88/wattseal.git
-```
-
-```bash
-cd wattseal
-```
-
-Debug build and run:
-```bash
-cargo run
-```
-
-Release build:
-```bash
-cargo build --release
-```
-
-> ⚠️ **Elevated privileges are required** only to install the Windows CPU MSR driver once.
-> Run with administrator rights on Windows (you will be prompted to elevate for driver setup), or use `sudo` on Linux for RAPL access.
-
----
-
-## Project Layout
-
-| Path | What it does |
-|---|---|
-| `src/main.rs` | Entry point: admin elevation, tray icon, collector thread, UI subprocess |
-| `collector/` | All sensor implementations (CPU, GPU, RAM, disk, network, per-process) |
-| `common/` | Shared types (`Event`, `SensorData`, …), SQLite database layer, utilities |
-| `ui/` | Iced application: pages, components, charts, themes, translations |
-
----
-
-## Code Style & Quality
-
-The project enforces the formatting and linting rules defined in `rustfmt.toml`. Compliance is checked in CI. You can run the following command locally to ensure your code meets the project's style guidelines before pushing:
-
-```bash
-cargo +nightly fmt
-```
-
-> The `.vscode/settings.json` and `.zed/settings.json` are configured to format on save, so if you're using VS Code or Zed your code will be formatted automatically when you save a file.
-
----
-
-# License
-
-WattSeal is licensed under [GPL-3.0](LICENSE). See the [LICENSE](LICENSE) file for details.

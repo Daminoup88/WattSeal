@@ -1,8 +1,12 @@
 # Contributing to WattSeal
 
-Thanks for your interest in contributing to WattSeal! This is our first open-source project, so we're learning along with you. Every contribution — big or small — is appreciated.
+Thanks for your interest in contributing to WattSeal! This is our first open-source project, so we're learning along with you. Every contribution – big or small – is appreciated.
 
 ## How to Contribute
+
+### Translating WattSeal
+
+To translate WattSeal into your language, see **[🌏 App translations](https://github.com/Daminoup88/WattSeal/issues/112).
 
 ### Reporting Bugs
 
@@ -20,7 +24,7 @@ Got an idea? [Open a feature request](https://github.com/Daminoup88/WattSeal/iss
 ### Submitting Code
 
 1. **Fork** the repository and create a branch from `main`
-2. **Make your changes** — keep them focused on a single issue or feature
+2. **Make your changes** – keep them focused on a single issue or feature
 3. **Format your code** with `cargo +nightly fmt`
 4. **Test** that the project builds: `cargo build`
 5. **Open a Pull Request** with a clear description of what you changed and why
