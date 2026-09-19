@@ -21,7 +21,7 @@ use crate::{
 };
 
 pub static DATABASE_PATH: &str = "power_monitoring.db";
-pub const DATABASE_TARGET_VERSION: i32 = 2;
+pub const DATABASE_TARGET_VERSION: i32 = 3;
 pub const LIVE_SAMPLING_PERIOD_SECONDS: i64 = 1;
 pub const HOURLY_SAMPLING_PERIOD_SECONDS: i64 = 3600;
 pub const HOUR_MS: i64 = 3_600_000;
@@ -224,8 +224,8 @@ impl Database {
             "CREATE TABLE IF NOT EXISTS ui_settings (
                 id               INTEGER PRIMARY KEY CHECK (id = 1),
                 language         TEXT NOT NULL DEFAULT 'EN',
-                carbon_intensity TEXT NOT NULL DEFAULT 'World average',
-                kwh_cost         TEXT NOT NULL DEFAULT 'World average',
+                carbon_intensity TEXT NOT NULL DEFAULT 'WORLD',
+                kwh_cost         TEXT NOT NULL DEFAULT 'WORLD',
                 theme            TEXT NOT NULL DEFAULT 'Hunting',
                 currency         TEXT NOT NULL DEFAULT 'USD',
                 close_behavior TEXT NOT NULL DEFAULT 'ask'

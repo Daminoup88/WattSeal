@@ -36,7 +36,9 @@ use crate::{
         setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
         theme_name,
     },
-    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
+    types::{
+        AppLanguage, CarbonIntensity, CountryKey, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange,
+    },
 };
 
 const FPS: u64 = 1;
@@ -93,9 +95,9 @@ impl App {
             match database.load_ui_settings() {
                 Ok(Some(s)) => {
                     let lang = AppLanguage::from_code(&s.language);
-                    let ci = CarbonIntensity::from_label(&s.carbon_intensity);
+                    let ci = CarbonIntensity::from_stored(&s.carbon_intensity);
                     let theme = AppTheme::from_name(&s.theme);
-                    let ec = ElectricityCost::from_label_and_currency(&s.kwh_cost, Some(&s.currency));
+                    let ec = ElectricityCost::from_stored(&s.kwh_cost, Some(&s.currency));
                     (lang, ci, theme, ec, false, s.close_behavior)
                 }
                 _ => (
@@ -273,7 +275,7 @@ impl App {
                         .filter(|&v| v > 0.0)
                         .unwrap_or(0.0);
                     self.carbon_intensity = CarbonIntensity {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         g_per_kwh: g,
                     };
                 } else {
@@ -286,13 +288,13 @@ impl App {
                 self.custom_carbon_input = text.clone();
                 if let Some(val) = text.parse::<f64>().ok().filter(|&v| v > 0.0) {
                     self.carbon_intensity = CarbonIntensity {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         g_per_kwh: val,
                     };
                     self.persist_ui_settings();
                 } else {
                     self.carbon_intensity = CarbonIntensity {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         g_per_kwh: 0.0,
                     };
                 }
@@ -326,7 +328,7 @@ impl App {
                         .filter(|&v| v >= 0.0)
                         .unwrap_or(0.0);
                     self.electricity_cost = ElectricityCost {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         price_per_kwh: v,
                         currency_symbol: self.electricity_cost.currency_symbol,
                         currency_code: self.electricity_cost.currency_code,
@@ -343,7 +345,7 @@ impl App {
                 let code = self.electricity_cost.currency_code;
                 if let Some(val) = text.parse::<f64>().ok().filter(|&v| v >= 0.0) {
                     self.electricity_cost = ElectricityCost {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         price_per_kwh: val,
                         currency_symbol: sym,
                         currency_code: code,
@@ -351,7 +353,7 @@ impl App {
                     self.persist_ui_settings();
                 } else {
                     self.electricity_cost = ElectricityCost {
-                        label: "Custom",
+                        country: CountryKey::Custom,
                         price_per_kwh: 0.0,
                         currency_symbol: sym,
                         currency_code: code,
@@ -361,7 +363,7 @@ impl App {
             }
             Message::ChangeCustomCurrency(curr) => {
                 self.electricity_cost = ElectricityCost {
-                    label: "Custom",
+                    country: CountryKey::Custom,
                     price_per_kwh: self.electricity_cost.price_per_kwh,
                     currency_symbol: curr.symbol,
                     currency_code: curr.code,
@@ -903,12 +905,12 @@ impl App {
         let carbon_str = if self.carbon_intensity.is_custom() {
             format!("{}", self.carbon_intensity.g_per_kwh)
         } else {
-            self.carbon_intensity.label.to_string()
+            self.carbon_intensity.country.code().to_string()
         };
         let kwh_str = if self.electricity_cost.is_custom() {
             format!("{}", self.electricity_cost.price_per_kwh)
         } else {
-            self.electricity_cost.label.to_string()
+            self.electricity_cost.country.code().to_string()
         };
         let settings = UiSettings {
             language: self.language.code().to_string(),
