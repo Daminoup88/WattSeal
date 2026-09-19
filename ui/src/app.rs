@@ -1013,7 +1013,12 @@ impl App {
                 .on_input(Message::CustomCarbonInput)
                 .width(Length::Fill)
                 .padding(8);
-            let mut col = Column::new().spacing(SPACING_SMALL).push(ci_picker).push(input);
+            let input_row = Row::new()
+                .spacing(4)
+                .align_y(Alignment::Center)
+                .push(input)
+                .push(Text::new("g/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted));
+            let mut col = Column::new().spacing(SPACING_SMALL).push(ci_picker).push(input_row);
             if !self.custom_carbon_input.is_empty() && !custom_input_valid {
                 col = col.push(
                     Text::new(custom_carbon_invalid(language))

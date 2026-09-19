@@ -159,13 +159,18 @@ fn carbon_intensity_row<'a>(
     let right_col: Element<'_, Message, AppTheme> = if carbon_intensity.is_custom() {
         let input = text_input(custom_carbon_placeholder(language), custom_carbon_input)
             .on_input(Message::CustomCarbonInput)
-            .width(Length::FillPortion(3))
+            .width(Length::Fill)
             .padding(PADDING_MEDIUM);
+        let input_row = Row::new()
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .push(input)
+            .push(Text::new("g/kWh").size(FONT_SIZE_BODY).class(TextStyle::Muted));
         let mut col = Column::new()
             .width(Length::FillPortion(3))
             .spacing(4)
             .push(picker)
-            .push(input);
+            .push(input_row);
         if !custom_carbon_input.is_empty() && !custom_valid {
             col = col.push(
                 Text::new(custom_carbon_invalid(language))
