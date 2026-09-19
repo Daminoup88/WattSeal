@@ -163,9 +163,9 @@ impl Display for TimeRange {
 pub enum AppLanguage {
     #[default]
     English,
-    German,
-    French,
     Chinese,
+    French,
+    German,
     Romanian,
 }
 
@@ -533,24 +533,26 @@ macro_rules! country_registry {
 #[rustfmt::skip]
 country_registry!(
     // CountryKey, ISO code, Display label, Carbon intensity (g/kWh), Electricity price (local currency/kWh), Currency
-    (France, "FR", "France", Some(42.0), Some(0.24), Some(Currency::EUR)),
-    (Germany, "DE", "Germany", Some(332.0), Some(0.35), Some(Currency::EUR)),
-    (Spain, "ES", "Spain", Some(153.6), Some(0.22), Some(Currency::EUR)),
-    (Italy, "IT", "Italy", Some(284.78), Some(0.36), Some(Currency::EUR)),
-    (Netherlands, "NL", "Netherlands", Some(253.56), Some(0.25), Some(Currency::EUR)),
-    (Switzerland, "CH", "Switzerland", Some(39.22), Some(0.3), Some(Currency::CHF)),
-    (Belgium, "BE", "Belgium", Some(149.82), Some(0.36), Some(Currency::EUR)),
-    (Portugal, "PT", "Portugal", Some(127.91), Some(0.21), Some(Currency::EUR)),
-    (Brazil, "BR", "Brazil", Some(109.95), Some(2.37), Some(Currency::BRL)),
-    (UK, "GB", "UK", Some(217.0), Some(0.3), Some(Currency::GBP)),
-    (USA, "US", "USA (average)", Some(384.0), Some(0.19), Some(Currency::USD)),
+    // ORDERED BY POPULATION DESCENDING
     (China, "CN", "China", Some(555.0), Some(0.51), Some(Currency::CNY)),
     (India, "IN", "India", Some(707.0), Some(7.33), Some(Currency::INR)),
     (Indonesia, "ID", "Indonesia", Some(680.25), Some(1_602.0), Some(Currency::IDR)),
+    (USA, "US", "USA (average)", Some(384.0), Some(0.19), Some(Currency::USD)),
+    (Brazil, "BR", "Brazil", Some(109.95), Some(2.37), Some(Currency::BRL)),
     (Philippines, "PH", "Philippines", Some(588.29), Some(12.69), Some(Currency::PHP)),
-    (Australia, "AU", "Australia", Some(525.18), Some(0.36), Some(Currency::AUD)),
-    (Sweden, "SE", "Sweden", Some(35.0), Some(2.3), Some(Currency::SEK)),
+    (Germany, "DE", "Germany", Some(332.0), Some(0.35), Some(Currency::EUR)),
+    (UK, "GB", "UK", Some(217.0), Some(0.3), Some(Currency::GBP)),
+    (France, "FR", "France", Some(42.0), Some(0.24), Some(Currency::EUR)),
+    (Italy, "IT", "Italy", Some(284.78), Some(0.36), Some(Currency::EUR)),
+    (Spain, "ES", "Spain", Some(153.6), Some(0.22), Some(Currency::EUR)),
     (Poland, "PL", "Poland", Some(592.0), Some(0.88), Some(Currency::PLN)),
+    (Australia, "AU", "Australia", Some(525.18), Some(0.36), Some(Currency::AUD)),
+    (Romania, "RO", "Romania", Some(250.75), Some(1.02), Some(Currency::RON)),
+    (Netherlands, "NL", "Netherlands", Some(253.56), Some(0.25), Some(Currency::EUR)),
+    (Belgium, "BE", "Belgium", Some(149.82), Some(0.36), Some(Currency::EUR)),
+    (Sweden, "SE", "Sweden", Some(35.0), Some(2.3), Some(Currency::SEK)),
+    (Portugal, "PT", "Portugal", Some(127.91), Some(0.21), Some(Currency::EUR)),
+    (Switzerland, "CH", "Switzerland", Some(39.22), Some(0.3), Some(Currency::CHF)),
     (World, "WORLD", "World average", Some(399.0), Some(0.18), Some(Currency::USD)),
 );
 
