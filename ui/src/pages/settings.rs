@@ -9,8 +9,8 @@ use crate::{
         button::ButtonStyle,
         container::ContainerStyle,
         style_constants::{
-            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SUBTITLE, PADDING_MEDIUM, PADDING_XLARGE,
-            SPACING_LARGE,
+            FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_MEDIUM,
+            PADDING_XLARGE, SPACING_LARGE, SPACING_SMALL,
         },
         text::TextStyle,
         toggler::TogglerStyle,
@@ -20,13 +20,134 @@ use crate::{
         TranslatedCarbonIntensity, TranslatedCloseBehavior, TranslatedElectricityCost, TranslatedTheme,
         custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
         settings_carbon_intensity, settings_close_behavior, settings_electricity_cost, settings_general,
-        settings_language, settings_launch_on_startup, settings_theme, settings_title,
+        settings_language, settings_launch_on_startup, settings_theme, settings_title, setup_choose_carbon,
+        setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
 
 /// Settings modal for theme, language, carbon intensity, and electricity cost.
 pub struct SettingsPage {}
+
+pub fn setup_view<'a>(
+    language: AppLanguage,
+    carbon_intensity: CarbonIntensity,
+    custom_carbon_input: &'a str,
+    electricity_cost: ElectricityCost,
+    custom_kwh_cost_input: &'a str,
+) -> Element<'a, Message, AppTheme> {
+    let title = Text::new(setup_welcome_title(language))
+        .size(FONT_SIZE_HEADER)
+        .font(FONT_BOLD)
+        .width(Length::Fill);
+
+    let lang_label = Text::new(setup_choose_language(language)).size(FONT_SIZE_BODY);
+    let lang_picker = pick_list(AppLanguage::all(), Some(language), Message::ChangeLanguage)
+        .width(Length::Fill)
+        .padding(8);
+
+    let ci_label = Text::new(setup_choose_carbon(language)).size(FONT_SIZE_BODY);
+    let ci_picker = pick_list(
+        TranslatedCarbonIntensity::all(language),
+        Some(TranslatedCarbonIntensity::new(carbon_intensity, language)),
+        |tci| Message::ChangeCarbonIntensity(tci.intensity),
+    )
+    .width(Length::Fill)
+    .padding(8);
+
+    let custom_input_valid = custom_carbon_input.parse::<f64>().ok().filter(|&v| v > 0.0).is_some();
+    let carbon_section: Element<'_, Message, AppTheme> = if carbon_intensity.is_custom() {
+        let input = text_input(custom_carbon_placeholder(language), custom_carbon_input)
+            .on_input(Message::CustomCarbonInput)
+            .width(Length::Fill)
+            .padding(8);
+        let input_row = Row::new()
+            .spacing(4)
+            .align_y(Alignment::Center)
+            .push(input)
+            .push(Text::new("g/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted));
+        let mut col = Column::new().spacing(SPACING_SMALL).push(ci_picker).push(input_row);
+        if !custom_carbon_input.is_empty() && !custom_input_valid {
+            col = col.push(
+                Text::new(custom_carbon_invalid(language))
+                    .size(FONT_SIZE_SMALL)
+                    .class(TextStyle::Muted),
+            );
+        }
+        col.into()
+    } else {
+        ci_picker.into()
+    };
+
+    let custom_kwh_valid = custom_kwh_cost_input
+        .parse::<f64>()
+        .ok()
+        .filter(|&v| v >= 0.0)
+        .is_some();
+    let ec_label = Text::new(setup_choose_electricity(language)).size(FONT_SIZE_BODY);
+    let ec_picker = pick_list(
+        TranslatedElectricityCost::all(language),
+        Some(TranslatedElectricityCost::new(electricity_cost, language)),
+        |tec| Message::ChangeElectricityCost(tec.cost),
+    )
+    .width(Length::Fill)
+    .padding(8);
+
+    let electricity_section: Element<'_, Message, AppTheme> = if electricity_cost.is_custom() {
+        let input = text_input(custom_kwh_cost_placeholder(language), custom_kwh_cost_input)
+            .on_input(Message::CustomKwhCostInput)
+            .width(Length::Fill)
+            .padding(8);
+        let currency_picker = pick_list(
+            Currency::ALL,
+            Some(electricity_cost.currency()),
+            Message::ChangeCustomCurrency,
+        )
+        .padding(8);
+        let mut col = Column::new().spacing(SPACING_SMALL).push(ec_picker).push(
+            Row::new()
+                .spacing(4)
+                .align_y(Alignment::Center)
+                .push(input.width(Length::FillPortion(2)))
+                .push(currency_picker.width(Length::FillPortion(2)))
+                .push(Text::new("/kWh").size(FONT_SIZE_SMALL).class(TextStyle::Muted)),
+        );
+        if !custom_kwh_cost_input.is_empty() && !custom_kwh_valid {
+            col = col.push(
+                Text::new(kwh_cost_invalid(language, electricity_cost.currency_symbol))
+                    .size(FONT_SIZE_SMALL)
+                    .class(TextStyle::Muted),
+            );
+        }
+        col.into()
+    } else {
+        ec_picker.into()
+    };
+
+    let can_confirm =
+        (!carbon_intensity.is_custom() || custom_input_valid) && (!electricity_cost.is_custom() || custom_kwh_valid);
+    let confirm_btn = button(Text::new(setup_confirm(language)).size(FONT_SIZE_BODY))
+        .class(ButtonStyle::Standard)
+        .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
+
+    let content = Column::new()
+        .spacing(SPACING_LARGE)
+        .align_x(Alignment::Start)
+        .push(title)
+        .push(lang_label)
+        .push(lang_picker)
+        .push(ci_label)
+        .push(carbon_section)
+        .push(ec_label)
+        .push(electricity_section)
+        .push(confirm_btn);
+
+    Container::new(content)
+        .width(Length::Fixed(520.0))
+        .padding(PADDING_XLARGE)
+        .class(ContainerStyle::ModalCard)
+        .into()
+}
 
 impl SettingsPage {
     pub fn new() -> Self {
