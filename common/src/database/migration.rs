@@ -20,6 +20,9 @@ pub fn run_migrations(conn: &mut Connection) -> Result<(), DatabaseError> {
         );
         migrate_v1_to_v2(&tx)?;
     }
+    if version < 3 {
+        migrate_v2_to_v3(&tx)?;
+    }
 
     tx.pragma_update(None, "user_version", DATABASE_TARGET_VERSION)?;
     tx.commit()?;
@@ -244,5 +247,23 @@ fn migrate_v1_to_v2(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
 
     tx.execute_batch(&sql)?;
 
+    Ok(())
+}
+
+fn migrate_v2_to_v3(tx: &rusqlite::Transaction) -> Result<(), DatabaseError> {
+    tx.execute(
+        "WITH country_codes(label, code) AS (VALUES
+            ('France', 'FR'), ('Germany', 'DE'), ('Spain', 'ES'), ('Italy', 'IT'),
+            ('Netherlands', 'NL'), ('Switzerland', 'CH'), ('Belgium', 'BE'),
+            ('Portugal', 'PT'), ('Brazil', 'BR'), ('UK', 'GB'),
+            ('USA (average)', 'US'), ('China', 'CN'), ('India', 'IN'),
+            ('Indonesia', 'ID'), ('Philippines', 'PH'), ('Australia', 'AU'),
+            ('Sweden', 'SE'), ('Poland', 'PL'), ('World average', 'WORLD'))
+         UPDATE ui_settings SET
+            carbon_intensity = COALESCE((SELECT code FROM country_codes WHERE label = carbon_intensity), carbon_intensity),
+            kwh_cost = COALESCE((SELECT code FROM country_codes WHERE label = kwh_cost), kwh_cost)
+         WHERE id = 1",
+        [],
+    )?;
     Ok(())
 }

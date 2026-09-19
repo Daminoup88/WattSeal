@@ -2,7 +2,7 @@ use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData,
 
 use crate::{
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, ElectricityCost, ProcessLimit, TimeRange},
+    types::{AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, TimeRange},
 };
 
 // Window title
@@ -1922,111 +1922,134 @@ pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
     }
 }
 
-pub fn country_preset_name<'a>(language: AppLanguage, label: &'a str) -> &'a str {
-    match label {
-        "France" => match language {
-            AppLanguage::English | AppLanguage::French => label,
+pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str {
+    match country {
+        CountryKey::France => match language {
+            AppLanguage::English | AppLanguage::French => "France",
             AppLanguage::German => "Frankreich",
             AppLanguage::Romanian => "Franța",
             AppLanguage::Chinese => "法国",
         },
-        "Germany" => match language {
-            AppLanguage::English => label,
+        CountryKey::Germany => match language {
+            AppLanguage::English => "Germany",
             AppLanguage::German => "Deutschland",
             AppLanguage::French => "Allemagne",
             AppLanguage::Romanian => "Germania",
             AppLanguage::Chinese => "德国",
         },
-        "Spain" => match language {
-            AppLanguage::English => label,
+        CountryKey::Spain => match language {
+            AppLanguage::English => "Spain",
             AppLanguage::German => "Spanien",
             AppLanguage::French => "Espagne",
             AppLanguage::Romanian => "Spania",
             AppLanguage::Chinese => "西班牙",
         },
-        "Italy" => match language {
-            AppLanguage::English => label,
+        CountryKey::Italy => match language {
+            AppLanguage::English => "Italy",
             AppLanguage::German => "Italien",
             AppLanguage::French => "Italie",
             AppLanguage::Romanian => "Italia",
             AppLanguage::Chinese => "意大利",
         },
-        "Netherlands" => match language {
-            AppLanguage::English => label,
+        CountryKey::Netherlands => match language {
+            AppLanguage::English => "Netherlands",
             AppLanguage::German => "Niederlande",
             AppLanguage::French => "Pays-Bas",
             AppLanguage::Romanian => "Olanda",
             AppLanguage::Chinese => "荷兰",
         },
-        "Switzerland" => match language {
-            AppLanguage::English => label,
+        CountryKey::Switzerland => match language {
+            AppLanguage::English => "Switzerland",
             AppLanguage::German => "Schweiz",
             AppLanguage::French => "Suisse",
             AppLanguage::Romanian => "Elveția",
             AppLanguage::Chinese => "瑞士",
         },
-        "UK" => match language {
-            AppLanguage::English => label,
+        CountryKey::Belgium => match language {
+            AppLanguage::English => "Belgium",
+            AppLanguage::German => "Belgien",
+            AppLanguage::French => "Belgique",
+            AppLanguage::Romanian => "Belgia",
+            AppLanguage::Chinese => "比利时",
+        },
+        CountryKey::Portugal => match language {
+            AppLanguage::English | AppLanguage::German | AppLanguage::French => "Portugal",
+            AppLanguage::Romanian => "Portugalia",
+            AppLanguage::Chinese => "葡萄牙",
+        },
+        CountryKey::Brazil => match language {
+            AppLanguage::English => "Brazil",
+            AppLanguage::German => "Brasilien",
+            AppLanguage::French => "Brésil",
+            AppLanguage::Romanian => "Brazilia",
+            AppLanguage::Chinese => "巴西",
+        },
+        CountryKey::UK => match language {
+            AppLanguage::English => "UK",
             AppLanguage::German => "Vereinigtes Königreich",
             AppLanguage::French => "Royaume-Uni",
             AppLanguage::Romanian => "Regatul Unit",
             AppLanguage::Chinese => "英国",
         },
-        "USA (average)" => match language {
-            AppLanguage::English => label,
+        CountryKey::USA => match language {
+            AppLanguage::English => "USA (average)",
             AppLanguage::German => "USA (Durchschnitt)",
             AppLanguage::French => "États-Unis (moyenne)",
             AppLanguage::Romanian => "SUA (medie)",
             AppLanguage::Chinese => "美国（平均）",
         },
-        "China" => match language {
-            AppLanguage::English | AppLanguage::Romanian => label,
-            AppLanguage::German => "China",
+        CountryKey::China => match language {
+            AppLanguage::English | AppLanguage::German | AppLanguage::Romanian => "China",
             AppLanguage::French => "Chine",
             AppLanguage::Chinese => "中国",
         },
-        "India" => match language {
-            AppLanguage::English | AppLanguage::Romanian => label,
+        CountryKey::India => match language {
+            AppLanguage::English | AppLanguage::Romanian => "India",
             AppLanguage::German => "Indien",
             AppLanguage::French => "Inde",
             AppLanguage::Chinese => "印度",
         },
-        "Indonesia" => match language {
-            AppLanguage::English => label,
+        CountryKey::Indonesia => match language {
+            AppLanguage::English => "Indonesia",
             AppLanguage::German => "Indonesien",
             AppLanguage::French => "Indonésie",
             AppLanguage::Romanian => "Indonezia",
             AppLanguage::Chinese => "印度尼西亚",
         },
-        "Philippines" => match language {
-            AppLanguage::English | AppLanguage::French => label,
+        CountryKey::Philippines => match language {
+            AppLanguage::English | AppLanguage::French => "Philippines",
             AppLanguage::German => "Philippinen",
             AppLanguage::Romanian => "Filipine",
             AppLanguage::Chinese => "菲律宾",
         },
-        "Sweden" => match language {
-            AppLanguage::English => label,
+        CountryKey::Australia => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Australia",
+            AppLanguage::German => "Australien",
+            AppLanguage::French => "Australie",
+            AppLanguage::Chinese => "澳大利亚",
+        },
+        CountryKey::Sweden => match language {
+            AppLanguage::English => "Sweden",
             AppLanguage::German => "Schweden",
             AppLanguage::French => "Suède",
             AppLanguage::Romanian => "Suedia",
             AppLanguage::Chinese => "瑞典",
         },
-        "Poland" => match language {
-            AppLanguage::English => label,
+        CountryKey::Poland => match language {
+            AppLanguage::English => "Poland",
             AppLanguage::German => "Polen",
             AppLanguage::French => "Pologne",
             AppLanguage::Romanian => "Polonia",
             AppLanguage::Chinese => "波兰",
         },
-        "World average" => match language {
-            AppLanguage::English => label,
+        CountryKey::World => match language {
+            AppLanguage::English => "World average",
             AppLanguage::German => "Weltdurchschnitt",
             AppLanguage::French => "Moyenne mondiale",
             AppLanguage::Romanian => "Media mondială",
             AppLanguage::Chinese => "全球平均",
         },
-        "Custom" => custom_preset_name(language),
-        _ => label,
+        CountryKey::Custom => custom_preset_name(language),
     }
 }
 
@@ -2083,7 +2106,7 @@ impl TranslatedCarbonIntensity {
 
 impl std::fmt::Display for TranslatedCarbonIntensity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let country = country_preset_name(self.language, self.intensity.label);
+        let country = country_name(self.language, self.intensity.country);
         if self.intensity.is_custom() {
             write!(f, "{}", country)
         } else {
@@ -2118,7 +2141,7 @@ impl TranslatedElectricityCost {
 
 impl std::fmt::Display for TranslatedElectricityCost {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let country = country_preset_name(self.language, self.cost.label);
+        let country = country_name(self.language, self.cost.country);
         if self.cost.is_custom() {
             write!(f, "{}", country)
         } else {
@@ -2281,7 +2304,7 @@ mod tests {
         assert_eq!(settings_title(AppLanguage::German), "Einstellungen");
         assert_eq!(sensor_name(AppLanguage::German, "Processes"), "Prozesse");
         assert_eq!(sensor_name(AppLanguage::German, "Total"), "Gesamt");
-        assert_eq!(country_preset_name(AppLanguage::German, "Germany"), "Deutschland");
+        assert_eq!(country_name(AppLanguage::German, CountryKey::Germany), "Deutschland");
         assert_eq!(close_everything(AppLanguage::German), "Alles schließen");
     }
 }
