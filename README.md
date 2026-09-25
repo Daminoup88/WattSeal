@@ -22,6 +22,7 @@ Available in English, Chinese, French, German and Romanian.
 Most people have no idea how much electricity their computer actually uses, or which apps are silently draining power in the background. WattSeal gives you that visibility:
 
 - 🔍 **Live dashboard**: watch power draw update every second
+- 📌 **Overlay widget**: keep the numbers on top of any window, including full-screen games
 - 🧩 **Per-component breakdown**: CPU, GPU, RAM, storage, network
 - 📋 **Per-app breakdown**: find out which processes are costing you the most
 - 📈 **Historical charts**: spot trends over time
@@ -108,6 +109,32 @@ Run the app normally, WattSeal will work without admin privileges.
 
 ---
 
+## Overlay widget
+
+WattSeal can also show its live metrics in a compact **always-on-top overlay**, so you can keep an
+eye on power draw without leaving the dashboard open — including on top of a full-screen game.
+
+| | |
+|---|---|
+| **Open it** | `Show overlay` in the dashboard footer, `Toggle Overlay` in the tray menu, or `WattSeal --overlay` |
+| **Move it** | Drag it with the left mouse button |
+| **Menu** | Right-click for `Resume` / `Settings` / `Pin` / `Exit` |
+| **Pin it** | Locks the position, and on Windows also makes the widget ignore the mouse so your clicks reach the app underneath |
+| **Style it** | Vertical or horizontal layout, three densities, three text sizes, light/dark theme, background and text colors, opacity, drop shadow |
+| **Trim it** | Choose which metrics appear and in which order (total, CPU, GPU, RAM, top apps), shorten the labels, set the decimals and the refresh interval |
+| **Language** | Follows the language you pick in the dashboard, with no restart |
+
+The widget hugs its numbers — the height always follows the content, and the width is whatever the
+numbers need, capped by the `Width` setting. It never wraps onto a second line. A pinned widget is
+deliberately not draggable, and with click-through on it does not take the mouse either: release it
+from the tray menu, or by hiding the overlay from the dashboard footer and showing it again. Only
+one overlay runs at a time, so opening it twice leaves the first one alone.
+
+See [doc/overlay.md](doc/overlay.md) for the transparency model, the settings panel and the full
+config file reference.
+
+---
+
 ## Platform Support
 
 With admin privileges, WattSeal provides the most comprehensive power monitoring experience possible on each platform:
@@ -122,6 +149,10 @@ With admin privileges, WattSeal provides the most comprehensive power monitoring
 | Other sensors (usage, I/O)                           |    ✅    |        ✅        |     ✅     |
 | Auto admin elevation                                 |  ✅ UAC  | Manual (`sudo`) |  Manual   |
 | Auto start on login                                  |    ✅    |        ❌        |     ❌     |
+| Overlay widget                                       |    ✅    |        ✅        |     ✅     |
+| Overlay mouse pass-through (pin)                     |    ✅    |        ❌        |     ❌     |
+
+> Overlay transparency uses a layered window on Windows and per-pixel surface alpha elsewhere; mouse pass-through is Windows-only. See [Overlay widget](#overlay-widget).
 
 <details>
 <summary><strong>Support without admin privileges</strong></summary>
@@ -156,6 +187,8 @@ The following languages are supported by WattSeal:
 
 **Rendering issues?** If the UI looks broken or fails to launch, try setting the environment variable `ICED_BACKEND=tiny-skia` before running the app. This forces Iced to use a software renderer which is more compatible with older GPUs and VMs.
 
+**Overlay window stays opaque?** Transparency depends on what the GPU exposes: some surfaces offer only an opaque composite mode, in which case the overlay falls back to a layered window. Run it with `WATTSEAL_OVERLAY_LOG=1` to record the selected adapter and the alpha modes that were available — see [doc/overlay.md](doc/overlay.md).
+
 # 🛠️ Developer Documentation
 <div align="center">
 
@@ -172,13 +205,16 @@ The rest of this README is aimed at contributors and developers who want to buil
 
 ## Architecture Overview
 
-WattSeal is a Rust workspace made up of three crates:
+WattSeal is a Rust workspace. The `wattseal` binary is the entry point, and each of the other
+crates has a single responsibility:
 
 ```
 wattseal/               ← Root binary (tray icon, lifecycle management)
   ├── collector/        ← Background sensor polling, power estimation, DB writes
   ├── common/           ← Shared types, SQLite layer, utilities
-  └── ui/               ← Iced GUI (dashboard, hardware info, settings, charts)
+  ├── ui/               ← Iced GUI (dashboard, hardware info, settings, charts)
+  ├── overlay/          ← Always-on-top metrics widget, run in its own process (--overlay)
+  └── mqtt/             ← Publishes collected data to an MQTT broker
 ```
 
 **How the pieces fit together:**
@@ -234,6 +270,8 @@ cargo build --release
 | `collector/`  | All sensor implementations (CPU, GPU, RAM, disk, network, per-process)    |
 | `common/`     | Shared types (`Event`, `SensorData`, …), SQLite database layer, utilities |
 | `ui/`         | Iced application: pages, components, charts, themes, translations         |
+| `overlay/`    | Always-on-top metrics widget, launched as a separate process by the tray  |
+| `mqtt/`       | MQTT publishing of collected sensor data and hardware info                |
 
 ---
 

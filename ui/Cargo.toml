@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 common = { path = "../common" }
+overlay = { path = "../overlay" }
 open = "5"
 iced = { version = "0.14.0", features = ["advanced", "tokio", "image"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
