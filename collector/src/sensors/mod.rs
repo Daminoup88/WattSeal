@@ -107,6 +107,9 @@ pub fn create_event_from_sensors(
         let sensor_data = sensor.read_full_data();
         match sensor_data {
             Ok(mut d) => {
+                if let (SensorType::GPU(gpu_sensor), SensorData::GPU(gpu_data)) = (sensor, &mut d) {
+                    gpu_data.name = Some(gpu_sensor.name());
+                }
                 if let SensorData::CPU(ref mut cpu) = d {
                     if let Some(pp1) = cpu.pp1_energy.take() {
                         has_pp1_source = true;
@@ -221,7 +224,7 @@ pub fn create_event_from_sensors(
     return Event::new(time, data);
 }
 
-pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
+pub fn to_computed_event_with_cap(sensors_event: &Event, process_cap: Option<usize>) -> Event<ComputedSensorData> {
     let mut data: Vec<ComputedSensorData> = Vec::new();
     let (mut cpu_energy, mut cpu_usage, mut nb_cpus) = (EnergyUj::from_u64(0), 0.0, 0);
     let (mut gpu_energy, mut gpu_usage, mut nb_gpus) = (EnergyUj::from_u64(0), 0.0, 0);
@@ -256,27 +259,36 @@ pub fn to_computed_event(sensors_event: &Event) -> Event<ComputedSensorData> {
 
     cpu_usage /= nb_cpus.max(1) as f64;
     gpu_usage /= nb_gpus.max(1) as f64;
-    let computed_process_data = compute_processes_energy(
-        process_index
-            .and_then(|idx| {
-                if let SensorData::Process(measured_processes) = &sensors_event.data()[idx] {
-                    Some(measured_processes.to_vec())
-                } else {
-                    None
-                }
-            })
-            .unwrap_or_default(),
-        cpu_energy,
-        cpu_usage,
-        gpu_energy,
-        gpu_usage,
-        total_energy,
-    );
-    let top10_processes: Vec<ProcessData> = sort_processes_by_energy(computed_process_data)
-        .into_iter()
-        .take(10)
-        .collect();
-    data.push(ComputedSensorData::Process(top10_processes));
+
+    let process_list: Vec<ProcessData> = match process_cap {
+        Some(0) => Vec::new(),
+        _ => {
+            let computed_process_data = compute_processes_energy(
+                process_index
+                    .and_then(|idx| {
+                        if let SensorData::Process(measured_processes) = &sensors_event.data()[idx] {
+                            Some(measured_processes.to_vec())
+                        } else {
+                            None
+                        }
+                    })
+                    .unwrap_or_default(),
+                cpu_energy,
+                cpu_usage,
+                gpu_energy,
+                gpu_usage,
+                total_energy,
+            );
+            let sorted = sort_processes_by_energy(computed_process_data);
+            if let Some(cap) = process_cap {
+                sorted.into_iter().take(cap).collect()
+            } else {
+                sorted
+            }
+        }
+    };
+
+    data.push(ComputedSensorData::Process(process_list));
 
     Event::new(sensors_event.time(), data)
 }
@@ -309,7 +321,9 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
 
     for sensor in sensors {
         match sensor.read_name() {
-            Ok(name) => crate::clog!("✓ Added sensor {}: {}", sensor.table_name(), name),
+            Ok(name) => {
+                crate::clog!("✓ Added sensor {}: {}", sensor.table_name(), name)
+            }
             Err(SensorError::NotSupported) => {}
             Err(e) => crate::clog!("✗ Failed to read sensor name for {}: {:?}", sensor.table_name(), e),
         }
