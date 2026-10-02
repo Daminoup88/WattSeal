@@ -141,7 +141,7 @@ impl Sensor for GPUSensor {
     }
 
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
-        Ok(InitialInfo::Gpus(get_gpu_list()))
+        Ok(InitialInfo::Gpus(vec![self.name()]))
     }
 
     fn read_name(&self) -> Result<String, SensorError> {

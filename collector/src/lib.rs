@@ -9,46 +9,28 @@ use std::{
     time::{Duration, Instant, SystemTime},
 };
 
-pub use common::clog;
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
 use common::{
-    DatabaseEntry, ProcessData, TotalData, database::purge::averaging_and_purging_data, types::PublishableSensor,
+    ComputedSensorData, DatabaseEntry, ProcessData, TotalData,
+    database::purge::averaging_and_purging_data,
+    types::{EnergyUj, HardwareInfo, PublishableSensor},
 };
+pub use common::{clog, types::ConsumptionUnit};
 use database::Database;
-use mqtt::{
-    MQTTPublisher,
-    topics::{hardware_info_topic, sensor_type_to_topic},
-};
+use mqtt::topics::sensor_type_to_topic;
+pub use mqtt::{MQTTPublisher, MqttConfig, ProcessPublishMode};
 use sensors::{
     DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
     gpu::{GPUVendor, get_gpu_list},
+    to_computed_event_with_cap,
 };
 use sysinfo::System;
 
-use crate::sensors::to_computed_event;
-
-/// Possible units to choose as output
-#[derive(Debug, Default, Clone, Copy)]
-pub enum ConsumptionUnit {
-    WattHour,
-    #[default]
-    UJoul,
-}
-
-#[derive(Debug, Default, PartialEq, Eq)]
-pub enum MqttDataMode {
-    #[default]
-    Computed,
-    Raw,
-}
-
 /// MQTT information to interact with a MQTT client
 pub struct MQTTInfo {
-    id: String,
-    publisher: MQTTPublisher<rumqttc::Client>,
-    unit: Option<ConsumptionUnit>,
-    data_mode: MqttDataMode,
+    pub config: MqttConfig,
+    pub publisher: MQTTPublisher<rumqttc::Client>,
 }
 
 /// Background sensor-collection application.
@@ -64,14 +46,15 @@ pub struct CollectorApp {
 }
 
 impl MQTTInfo {
-    pub fn new(id: &str, addr: &SocketAddr, unit: Option<ConsumptionUnit>, is_raw_mode: bool) -> Self {
-        let publisher = MQTTPublisher::new_from_addr(addr);
-        MQTTInfo {
-            id: id.to_string(),
-            publisher,
-            unit,
-            data_mode: is_raw_mode.then_some(MqttDataMode::Raw).unwrap_or_default(),
-        }
+    pub fn new(id: &str, addr: &SocketAddr, unit: Option<ConsumptionUnit>) -> Self {
+        let mut config = MqttConfig::new(id.to_string(), *addr);
+        config.unit = unit;
+        Self::from_config(config, None)
+    }
+
+    pub fn from_config(config: MqttConfig, hardware_info: Option<&HardwareInfo>) -> Self {
+        let publisher = MQTTPublisher::new_from_config(&config, hardware_info);
+        MQTTInfo { config, publisher }
     }
 }
 
@@ -206,11 +189,10 @@ impl CollectorApp {
                 Err(e) => crate::clog!("✗ Failed to save hardware info: {e}"),
             }
         }
-        if let Some(mqtt_info) = &self.mqtt_info {
-            let topic = hardware_info_topic(&mqtt_info.id);
-            match mqtt_info.publisher.publish(&topic, &info.hardware_info) {
-                Ok(_) => crate::clog!("✓ Hardware info published on broker"),
-                Err(e) => crate::clog!("✗ Failed to publish hardware info: {e}"),
+        if let Some(mqtt_info) = &mut self.mqtt_info {
+            match mqtt_info.publisher.set_hardware_info(&info.hardware_info) {
+                Ok(()) => crate::clog!("✓ MQTT hardware manifest published"),
+                Err(e) => crate::clog!("✗ Failed to publish MQTT hardware manifest: {e}"),
             }
         }
         crate::clog!("Initialization complete");
@@ -246,60 +228,43 @@ impl CollectorApp {
 
             let event = create_event_from_sensors(&self.sensors, self.system.clone(), since_last_update);
 
-            let needs_computed = self.database.is_some()
-                || self
-                    .mqtt_info
-                    .as_ref()
-                    .is_some_and(|m| m.data_mode == MqttDataMode::Computed);
+            let process_cap = self.mqtt_info.as_ref().and_then(|m| match m.config.process_mode {
+                ProcessPublishMode::Disabled => Some(0),
+                ProcessPublishMode::Capped(n) => Some(n),
+            });
 
-            let computed_event = needs_computed.then(|| to_computed_event(&event));
+            let computed_event = to_computed_event_with_cap(&event, process_cap.or(Some(10)));
 
             if let Some(database) = &mut self.database {
-                if let Some(computed_event) = &computed_event {
-                    #[cfg(debug_assertions)]
-                    {
-                        let start = Instant::now();
+                #[cfg(debug_assertions)]
+                {
+                    let start = Instant::now();
 
-                        let result = database.insert_event_and_update_energy(&computed_event, since_last_update);
-                        let duration = start.elapsed();
-                        match result {
-                            Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
-                            Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
-                        }
+                    let result = database.insert_event_and_update_energy(&computed_event, since_last_update);
+                    let duration = start.elapsed();
+                    match result {
+                        Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
+                        Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
                     }
-
-                    #[cfg(not(debug_assertions))]
-                    let _ = database.insert_event_and_update_energy(&computed_event, since_last_update);
                 }
+
+                #[cfg(not(debug_assertions))]
+                let _ = database.insert_event_and_update_energy(&computed_event, since_last_update);
             }
 
-            if let Some(mqtt_info) = &self.mqtt_info {
-                match mqtt_info.data_mode {
-                    MqttDataMode::Raw => {
-                        for sensor_data in event.data() {
-                            publish_sensor(mqtt_info, sensor_data);
-                        }
-                    }
-                    MqttDataMode::Computed => {
-                        if let Some(computed) = &computed_event {
-                            for sensor_data in computed.data() {
-                                publish_sensor(mqtt_info, sensor_data);
-                            }
-                        }
-                    }
-                }
+            let timestamp_ms = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap_or(Duration::ZERO)
+                .as_millis() as i64;
+
+            if let Some(mqtt_info) = &mut self.mqtt_info {
+                publish_mqtt_sensors(mqtt_info, computed_event.data(), timestamp_ms);
             }
 
             #[cfg(debug_assertions)]
             {
-                if let Some(computed) = &computed_event {
-                    for sensor_data in computed.data() {
-                        println!("{sensor_data}");
-                    }
-                } else {
-                    for sensor_data in event.data() {
-                        println!("{sensor_data}");
-                    }
+                for sensor_data in computed_event.data() {
+                    println!("{sensor_data}");
                 }
             }
 
@@ -324,11 +289,44 @@ impl CollectorApp {
     }
 }
 
-fn publish_sensor<T: PublishableSensor>(mqtt_info: &MQTTInfo, sensor_data: &T) {
-    let topic = sensor_type_to_topic(&mqtt_info.id, sensor_data.sensor_type());
-    let _result = match mqtt_info.unit {
-        Some(ConsumptionUnit::WattHour) => mqtt_info.publisher.publish(&topic, &sensor_data.to_wh()),
-        _ => mqtt_info.publisher.publish(&topic, sensor_data),
+fn publish_sensor(mqtt_info: &MQTTInfo, sensor_data: &ComputedSensorData, timestamp_ms: i64) {
+    let sensor_key = match sensor_data {
+        ComputedSensorData::GPU(data) => data.name.as_deref().unwrap_or("GPU"),
+        _ => sensor_data.sensor_type(),
+    };
+    publish_sensor_envelope(
+        mqtt_info,
+        sensor_data,
+        &sensor_key,
+        timestamp_ms,
+        sensor_data.total_energy().map(|energy| energy.as_u64()),
+    );
+}
+
+fn publish_mqtt_sensors(mqtt_info: &MQTTInfo, sensors: &[ComputedSensorData], timestamp_ms: i64) {
+    for sensor_data in sensors {
+        publish_sensor(mqtt_info, sensor_data, timestamp_ms);
+    }
+}
+
+fn publish_sensor_envelope<T: PublishableSensor>(
+    mqtt_info: &MQTTInfo,
+    sensor_data: &T,
+    sensor_type: &str,
+    timestamp_ms: i64,
+    total_energy_uj: Option<u64>,
+) {
+    let topic = sensor_type_to_topic(&mqtt_info.config.id, sensor_type);
+    let _result = match mqtt_info.config.unit {
+        Some(ConsumptionUnit::WattHour) => {
+            let total_energy_wh = total_energy_uj.map(|uj| EnergyUj::from_u64(uj).as_watt_hours());
+            mqtt_info
+                .publisher
+                .publish_envelope(&topic, &sensor_data.to_wh(), timestamp_ms, total_energy_wh)
+        }
+        _ => mqtt_info
+            .publisher
+            .publish_envelope(&topic, sensor_data, timestamp_ms, total_energy_uj),
     };
     #[cfg(debug_assertions)]
     match _result {
