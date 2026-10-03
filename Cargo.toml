@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [workspace]
 resolver = "3"
-members = ["collector", "ui", "common", "mqtt"]
+members = ["collector", "ui", "common", "mqtt", "overlay"]
 
 [workspace.package]
 version = "1.0.5"
@@ -39,6 +39,7 @@ image = { version = "0.25", default-features = false, features = ["png", "ico"] 
 collector = { path = "collector" }
 ui = { path = "ui" }
 common = { path = "common" }
+overlay = { path = "overlay" }
 tray-icon = { version = "0.24.0", default-features = false, features = ["gtk"] }
 chrono = "0.4.44"
 image = { version = "0.25", default-features = false, features = ["png"] }

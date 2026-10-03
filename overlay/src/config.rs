@@ -1,0 +1,565 @@
+//! Persisted configuration for the standalone overlay.
+//!
+//! Stored in its own `overlay_config.json` next to the executable so the
+//! overlay never touches the main application's database schema.
+
+use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
+use crate::theme::ThemeChoice;
+
+const CONFIG_FILENAME: &str = "overlay_config.json";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Metric {
+    Total,
+    Cpu,
+    Gpu,
+    Ram,
+    Disk,
+    Network,
+    /// Top-N most power-hungry processes (count configurable).
+    TopApps,
+}
+
+impl Metric {
+    pub const DEFAULT_ORDER: &[Metric] = &[Metric::Total, Metric::Cpu, Metric::Gpu, Metric::Ram, Metric::TopApps];
+
+    pub const ALL: &[Metric] = &[
+        Metric::Total,
+        Metric::Cpu,
+        Metric::Gpu,
+        Metric::Ram,
+        Metric::Disk,
+        Metric::Network,
+        Metric::TopApps,
+    ];
+
+    pub fn id(self) -> &'static str {
+        match self {
+            Metric::Total => "total",
+            Metric::Cpu => "cpu",
+            Metric::Gpu => "gpu",
+            Metric::Ram => "ram",
+            Metric::Disk => "disk",
+            Metric::Network => "network",
+            Metric::TopApps => "top_apps",
+        }
+    }
+
+    /// Single-letter label used by the abbreviated mode in the Latin-script
+    /// languages; `translations::metric_short_name` owns the Chinese ones.
+    pub fn short_label(self) -> &'static str {
+        match self {
+            Metric::Total => "T",
+            Metric::Cpu => "C",
+            Metric::Gpu => "G",
+            Metric::Ram => "R",
+            Metric::Disk => "D",
+            Metric::Network => "N",
+            Metric::TopApps => "Top",
+        }
+    }
+
+    /// Whether this metric expands into multiple rows (Top-N apps).
+    pub fn is_multi(self) -> bool {
+        self == Metric::TopApps
+    }
+}
+
+/// Widget orientation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Layout {
+    #[default]
+    Vertical,
+    /// All metrics on a single compact line (MSI-Afterburner OSD style).
+    Horizontal,
+}
+
+impl Layout {
+    pub const ALL: &[Layout] = &[Layout::Vertical, Layout::Horizontal];
+}
+
+/// How tall a font's line box is relative to its glyph size.
+///
+/// Generous on purpose, like the width estimate: slack in the height costs a few
+/// pixels, a clipped row costs a reading.
+const LINE_HEIGHT_RATIO: f32 = 1.35;
+
+/// Layout density (padding / spacing).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Density {
+    Ultra,
+    #[default]
+    Compact,
+    Normal,
+}
+
+impl Density {
+    pub const ALL: &[Density] = &[Density::Ultra, Density::Compact, Density::Normal];
+
+    pub fn padding(self) -> f32 {
+        match self {
+            Density::Ultra => 4.0,
+            Density::Compact => 6.0,
+            Density::Normal => 8.0,
+        }
+    }
+
+    pub fn spacing(self) -> f32 {
+        match self {
+            Density::Ultra => 3.0,
+            Density::Compact => 5.0,
+            Density::Normal => 7.0,
+        }
+    }
+
+    /// Height of one row at a given text size.
+    ///
+    /// The density is only a floor: the row still has to hold the value font's line
+    /// box, which is taller than the glyph size. Ignoring that made a tall enough
+    /// stack clip — the shortfall accumulates, so the bottom row is the one cut.
+    pub fn row_height(self, font: FontSize) -> f32 {
+        let floor: f32 = match self {
+            Density::Ultra => 15.0,
+            Density::Compact => 18.0,
+            Density::Normal => 21.0,
+        };
+
+        floor.max((font.value() * LINE_HEIGHT_RATIO).ceil())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum FontSize {
+    #[default]
+    Small,
+    Medium,
+    Large,
+}
+
+impl FontSize {
+    pub const ALL: &[FontSize] = &[FontSize::Small, FontSize::Medium, FontSize::Large];
+
+    pub fn label(self) -> f32 {
+        match self {
+            FontSize::Small => 10.5,
+            FontSize::Medium => 12.0,
+            FontSize::Large => 13.5,
+        }
+    }
+
+    pub fn value(self) -> f32 {
+        match self {
+            FontSize::Small => 12.5,
+            FontSize::Medium => 14.5,
+            FontSize::Large => 16.5,
+        }
+    }
+}
+
+/// Selectable card background color.
+///
+/// Alpha cannot be controlled per-element on Windows (the swapchain only offers
+/// `Opaque`, so translucency is applied to the whole layered window), but the
+/// *hue* is free — this is how you tune the card's look.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum BgColor {
+    #[default]
+    Auto,
+    Slate,
+    Graphite,
+    Navy,
+    Plum,
+    Forest,
+    Sand,
+    White,
+}
+
+impl BgColor {
+    pub const ALL: &[BgColor] = &[
+        BgColor::Auto,
+        BgColor::Slate,
+        BgColor::Graphite,
+        BgColor::Navy,
+        BgColor::Plum,
+        BgColor::Forest,
+        BgColor::Sand,
+        BgColor::White,
+    ];
+
+    /// The RGB triple, or `None` to keep the theme's color.
+    pub fn rgb(self) -> Option<(f32, f32, f32)> {
+        Some(match self {
+            BgColor::Auto => return None,
+            BgColor::Slate => (0.106, 0.118, 0.153),
+            BgColor::Graphite => (0.13, 0.13, 0.14),
+            BgColor::Navy => (0.07, 0.11, 0.22),
+            BgColor::Plum => (0.17, 0.09, 0.20),
+            BgColor::Forest => (0.07, 0.16, 0.12),
+            BgColor::Sand => (0.76, 0.71, 0.60),
+            BgColor::White => (0.96, 0.97, 0.99),
+        })
+    }
+}
+
+/// Selectable text color. Separate from the background so contrast stays
+/// tunable even though alpha cannot be.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum TextColor {
+    #[default]
+    Auto,
+    White,
+    Silver,
+    Cyan,
+    Green,
+    Amber,
+    Red,
+    Ink,
+}
+
+impl TextColor {
+    pub const ALL: &[TextColor] = &[
+        TextColor::Auto,
+        TextColor::White,
+        TextColor::Silver,
+        TextColor::Cyan,
+        TextColor::Green,
+        TextColor::Amber,
+        TextColor::Red,
+        TextColor::Ink,
+    ];
+
+    /// The RGB triple, or `None` to keep the theme's color.
+    pub fn rgb(self) -> Option<(f32, f32, f32)> {
+        Some(match self {
+            TextColor::Auto => return None,
+            TextColor::White => (0.97, 0.98, 1.0),
+            TextColor::Silver => (0.72, 0.76, 0.82),
+            TextColor::Cyan => (0.20, 0.88, 0.95),
+            TextColor::Green => (0.45, 0.92, 0.45),
+            TextColor::Amber => (0.98, 0.76, 0.25),
+            TextColor::Red => (0.98, 0.45, 0.45),
+            TextColor::Ink => (0.06, 0.08, 0.12),
+        })
+    }
+}
+
+/// How the window achieves translucency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Transparency {
+    /// Per-pixel alpha through the window surface (best quality). Needs a
+    /// backend that exposes alpha — Vulkan does, DX12 usually does not.
+    #[default]
+    Auto,
+    /// Win32 layered window with uniform alpha (GPU-independent fallback: the
+    /// whole window, text included, is composited at one alpha).
+    Layered,
+    Off,
+}
+
+impl Transparency {
+    pub const ALL: &[Transparency] = &[Transparency::Auto, Transparency::Layered, Transparency::Off];
+
+    /// Whether to composite through a Win32 layered window. `Auto` picks the
+    /// layered path on Windows because DX12 drops surface alpha, and the
+    /// per-pixel path elsewhere.
+    pub fn uses_layered(self) -> bool {
+        // Kept as an explicit `match` rather than `matches!`: the `Auto` arm is
+        // `cfg`-dependent, so collapsing it would silently become wrong on the
+        // other platform.
+        match self {
+            Transparency::Auto => cfg!(target_os = "windows"),
+            Transparency::Layered => true,
+            Transparency::Off => false,
+        }
+    }
+
+    /// Whether the OS window is created with per-pixel alpha.
+    pub fn transparent_window(self) -> bool {
+        match self {
+            Transparency::Auto => !cfg!(target_os = "windows"),
+            _ => false,
+        }
+    }
+
+    pub fn enabled(self) -> bool {
+        !matches!(self, Transparency::Off)
+    }
+}
+
+/// All persisted overlay preferences.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OverlayConfig {
+    // appearance
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+    /// Card background swatch (`Auto` follows the theme).
+    #[serde(default)]
+    pub bg_color: BgColor,
+    /// Text swatch (`Auto` follows the theme).
+    #[serde(default)]
+    pub text_color: TextColor,
+    #[serde(default)]
+    pub transparency: Transparency,
+    /// Drop shadow under the card. Ignored where the mode cannot blend one —
+    /// see [`Self::draws_shadow`].
+    #[serde(default = "default_true")]
+    pub shadow: bool,
+    #[serde(default)]
+    pub layout: Layout,
+    #[serde(default)]
+    pub density: Density,
+    #[serde(default)]
+    pub font_size: FontSize,
+    #[serde(default)]
+    pub theme: ThemeChoice,
+    #[serde(default = "default_true")]
+    pub show_labels: bool,
+    #[serde(default = "default_true")]
+    pub show_units: bool,
+    /// Collapse metric labels to a single letter (`Total` -> `T`, `CPU` -> `C`).
+    #[serde(default)]
+    pub abbreviated: bool,
+    #[serde(default = "default_decimals")]
+    pub decimals: u8,
+    #[serde(default = "default_refresh")]
+    pub refresh_secs: u32,
+
+    // window
+    #[serde(default = "default_true")]
+    pub always_on_top: bool,
+    /// Widest the widget may get, in logical pixels. The content is measured and
+    /// the window stays at that width when it is narrower.
+    #[serde(default = "default_width")]
+    pub width: f32,
+    /// Whether the overlay should be running. The main window flips this to
+    /// `false` to close the overlay; the overlay only ever reads it, so a
+    /// standalone `--overlay` run is unaffected by a stale value.
+    #[serde(default = "default_true")]
+    pub overlay_requested: bool,
+    /// "Pin mode": the overlay stops responding to the mouse so it cannot be
+    /// moved by accident. See `pin_click_through` for how far that goes.
+    #[serde(default)]
+    pub pin_mode: bool,
+    /// When set, pin mode also makes the window transparent to the mouse, so
+    /// every click lands on whatever is underneath. That is the strict overlay
+    /// behaviour, but it means the right-click menu can no longer be reached and
+    /// the overlay has to be released from the tray. Pinning always locks the
+    /// position, whether or not this is set.
+    #[serde(default = "default_true")]
+    pub pin_click_through: bool,
+    #[serde(default)]
+    pub blur: bool,
+    #[serde(default)]
+    pub position: Option<(f32, f32)>,
+
+    // content
+    #[serde(default = "default_metrics")]
+    pub metrics: Vec<Metric>,
+    #[serde(default = "default_top_apps")]
+    pub top_apps: usize,
+}
+
+fn default_opacity() -> f32 {
+    0.80
+}
+fn default_width() -> f32 {
+    140.0
+}
+fn default_true() -> bool {
+    true
+}
+fn default_decimals() -> u8 {
+    1
+}
+fn default_refresh() -> u32 {
+    1
+}
+fn default_top_apps() -> usize {
+    3
+}
+fn default_metrics() -> Vec<Metric> {
+    Metric::DEFAULT_ORDER.to_vec()
+}
+
+impl Default for OverlayConfig {
+    fn default() -> Self {
+        Self {
+            opacity: default_opacity(),
+            bg_color: BgColor::default(),
+            text_color: TextColor::default(),
+            transparency: Transparency::default(),
+            shadow: true,
+            layout: Layout::default(),
+            density: Density::default(),
+            font_size: FontSize::default(),
+            theme: ThemeChoice::default(),
+            show_labels: true,
+            show_units: true,
+            abbreviated: false,
+            decimals: default_decimals(),
+            refresh_secs: default_refresh(),
+            always_on_top: true,
+            width: default_width(),
+            overlay_requested: true,
+            pin_mode: false,
+            pin_click_through: true,
+            blur: false,
+            position: None,
+            metrics: default_metrics(),
+            top_apps: default_top_apps(),
+        }
+    }
+}
+
+impl OverlayConfig {
+    /// Config file path (next to the executable).
+    pub fn path() -> PathBuf {
+        std::env::current_exe()
+            .ok()
+            .and_then(|p| p.parent().map(|dir| dir.join(CONFIG_FILENAME)))
+            .unwrap_or_else(|| PathBuf::from(CONFIG_FILENAME))
+    }
+
+    /// Path of the single-instance lock, beside the config file.
+    ///
+    /// Next to the executable like the config, so two installations in different
+    /// folders get their own lock instead of excluding one another — and
+    /// `overlay_config.json*` in `.gitignore` already covers this name.
+    pub fn lock_path() -> PathBuf {
+        Self::path().with_file_name(format!("{CONFIG_FILENAME}.lock"))
+    }
+
+    pub fn load() -> Option<Self> {
+        let contents = std::fs::read_to_string(Self::path()).ok()?;
+        serde_json::from_str(&contents).ok()
+    }
+
+    pub fn save(&self) -> bool {
+        let Ok(json) = serde_json::to_string_pretty(self) else {
+            return false;
+        };
+
+        // Written beside the real file and renamed onto it: the other two
+        // processes poll this file, and `fs::write` truncates before it writes,
+        // so a poll landing mid-write would read half a document, parse as
+        // nothing, and fall back to the defaults.
+        let path = Self::path();
+        let staging = path.with_file_name(format!("{CONFIG_FILENAME}.tmp"));
+
+        if std::fs::write(&staging, json).is_err() {
+            return false;
+        }
+
+        std::fs::rename(&staging, &path).is_ok()
+    }
+
+    /// Whether the card actually draws its drop shadow.
+    ///
+    /// A shadow is per-pixel alpha, so it can only be blended where the window
+    /// surface carries some. The layered path composites the whole window at one
+    /// constant alpha, which flattens the soft edge into a dark ring around the
+    /// card; with transparency off there is nothing behind the window to blend
+    /// into either. In both modes the setting is dropped rather than honoured
+    /// badly.
+    pub fn draws_shadow(&self) -> bool {
+        self.shadow && self.transparency.transparent_window()
+    }
+
+    /// Clamps `top_apps` into the supported 1..=8 range.
+    pub fn top_apps(&self) -> usize {
+        self.top_apps.clamp(1, 8)
+    }
+
+    /// Number of rows the vertical layout renders.
+    fn content_rows(&self) -> usize {
+        let mut rows = 0usize;
+        for m in &self.metrics {
+            rows += if m.is_multi() { self.top_apps() } else { 1 };
+        }
+        rows.max(1)
+    }
+
+    /// Window height that fits the metrics currently enabled.
+    pub fn fitted_height(&self) -> f32 {
+        let pad = self.density.padding();
+        let spacing = self.density.spacing();
+        let row = self.density.row_height(self.font_size);
+
+        // No header is drawn in metrics mode, so it must not be counted here —
+        // doing so used to leave a visible empty strip under the text.
+        let content = match self.layout {
+            Layout::Horizontal => row,
+            Layout::Vertical => {
+                let rows = self.content_rows() as f32;
+                rows * row + (rows - 1.0).max(0.0) * spacing
+            }
+        };
+        // A single horizontal line needs far less room than a stacked list.
+        let floor = match self.layout {
+            Layout::Horizontal => 16.0,
+            Layout::Vertical => 32.0,
+        };
+        (pad * 2.0 + content).ceil().max(floor)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn unknown_keys_are_ignored_so_the_file_stays_hand_editable() {
+        let config: OverlayConfig =
+            serde_json::from_str(r#"{"layout":"horizontal","nonsense":1}"#).expect("valid json");
+
+        assert_eq!(config.layout, Layout::Horizontal);
+        assert_eq!(config.decimals, default_decimals());
+    }
+
+    #[test]
+    fn missing_keys_fall_back_to_their_defaults() {
+        let config: OverlayConfig = serde_json::from_str("{}").expect("valid json");
+
+        assert_eq!(config.opacity, default_opacity());
+        assert_eq!(config.width, default_width());
+        assert!(config.always_on_top);
+        assert!(!config.pin_mode);
+    }
+
+    #[test]
+    fn the_shadow_is_dropped_where_no_surface_alpha_can_carry_it() {
+        let mut config = OverlayConfig {
+            shadow: true,
+            ..OverlayConfig::default()
+        };
+
+        // Neither of these composites per pixel: the layered window carries one
+        // alpha for everything, and an opaque window has nothing to fade into.
+        config.transparency = Transparency::Layered;
+        assert!(!config.draws_shadow());
+
+        config.transparency = Transparency::Off;
+        assert!(!config.draws_shadow());
+    }
+
+    #[test]
+    fn the_top_apps_count_is_clamped_to_what_can_be_listed() {
+        let mut config = OverlayConfig::default();
+
+        config.top_apps = 0;
+        assert_eq!(config.top_apps(), 1);
+
+        config.top_apps = 99;
+        assert_eq!(config.top_apps(), 8);
+    }
+}

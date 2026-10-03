@@ -1,4 +1,6 @@
-use std::{collections::HashMap, time::SystemTime};
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+use std::{collections::HashMap, process::Command, time::SystemTime};
 
 use chrono::{DateTime, Local};
 use common::{
@@ -11,6 +13,24 @@ use iced::{
     widget::{Button, Column, Container, Row, Scrollable, Text, button, checkbox, image, stack},
     window,
 };
+
+/// Whether the overlay is currently requested.
+///
+/// It runs in its own process and the two communicate through the overlay's own
+/// config file rather than through IPC, so this asks the overlay crate instead
+/// of reading that file here.
+fn overlay_requested() -> bool {
+    overlay::is_requested()
+}
+
+/// Asks the overlay — a separate process — to close.
+///
+/// Doing this while shutting down covers every exit path at once, including the
+/// ones where this process terminates immediately (`EXIT_CODE_SHUTDOWN_ALL`) and
+/// could otherwise leave the overlay orphaned.
+fn request_overlay_close() {
+    overlay::request_close();
+}
 
 use crate::{
     components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
@@ -64,6 +84,8 @@ pub struct App {
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
     launch_on_startup: bool,
+    /// Whether the overlay is currently requested (mirrors its config file).
+    overlay_on: bool,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -169,6 +191,7 @@ impl App {
                 electricity_cost,
                 custom_kwh_cost_input,
                 launch_on_startup: common::autostart::is_enabled(),
+                overlay_on: overlay_requested(),
                 show_setup,
                 theme,
                 database,
@@ -206,6 +229,7 @@ impl App {
                 electricity_cost: ElectricityCost::from_os(),
                 custom_kwh_cost_input: String::new(),
                 launch_on_startup: common::autostart::is_enabled(),
+                overlay_on: overlay_requested(),
                 show_setup: false,
                 theme,
                 database,
@@ -237,6 +261,14 @@ impl App {
                 }
                 self.refresh_all_time_data();
                 self.tick_count += 1;
+                // Keep the footer's overlay toggle honest: the tray or the
+                // overlay's own right-click menu may have changed it behind our
+                // back, and the two processes only share a config file. Read at
+                // half the tick rate — it is a tiny file, and 2s lag is fine for
+                // a button label.
+                if self.tick_count % 2 == 0 {
+                    self.overlay_on = overlay_requested();
+                }
                 if self.tick_count == 1 || self.tick_count % 10 == 0 {
                     self.refresh_process_data();
                 }
@@ -369,6 +401,36 @@ impl App {
                     currency_code: curr.code,
                 };
                 self.persist_ui_settings();
+                Task::none()
+            }
+            Message::ToggleOverlay(enabled) => {
+                self.overlay_on = enabled;
+                // The overlay polls its config file, so writing the request is
+                // enough; opening also clears pin over there, so the widget comes
+                // back interactive rather than locked.
+                if enabled {
+                    overlay::request_open();
+                } else {
+                    overlay::request_close();
+                }
+
+                if enabled {
+                    match std::env::current_exe() {
+                        Ok(exe) => {
+                            let mut command = Command::new(exe);
+                            command.arg("--overlay");
+                            #[cfg(target_os = "windows")]
+                            command.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+                            match command.spawn() {
+                                Ok(_) => common::clog!("✓ Overlay launched"),
+                                Err(e) => common::clog!("✗ Failed to launch overlay: {e}"),
+                            }
+                        }
+                        Err(e) => common::clog!("✗ Failed to resolve executable path: {e}"),
+                    }
+                } else {
+                    common::clog!("✓ Overlay closing");
+                }
                 Task::none()
             }
             Message::ToggleLaunchOnStartup(enabled) => {
@@ -567,7 +629,7 @@ impl App {
         let content: Element<'_, Message, AppTheme> = Column::new()
             .push(self.header.view(self.language))
             .push(page_content)
-            .push(self.footer.view(self.language))
+            .push(self.footer.view(self.language, self.overlay_on))
             .into();
 
         if self.show_close_dialog {
@@ -905,8 +967,15 @@ impl App {
             }
         }
         match behavior {
+            // Window only: the app keeps running in the tray, so the overlay —
+            // simply another window of this app — stays up as well.
             CloseBehavior::WindowOnly => iced::exit(),
-            CloseBehavior::Everything => std::process::exit(common::EXIT_CODE_SHUTDOWN_ALL),
+            CloseBehavior::Everything => {
+                // Ask the overlay to close *before* this process terminates; it
+                // polls the shared config, so it shuts itself down.
+                request_overlay_close();
+                std::process::exit(common::EXIT_CODE_SHUTDOWN_ALL)
+            }
             CloseBehavior::Ask => Task::none(),
         }
     }
