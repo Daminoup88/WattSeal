@@ -289,6 +289,14 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
     true
 }
 
+fn launch_minimized() -> bool {
+    common::Database::open_without_migrations()
+        .and_then(|db| db.load_ui_settings())
+        .ok()
+        .flatten()
+        .is_some_and(|s| s.launch_minimized)
+}
+
 /// Initializes the collector
 fn start_collector(enable_save_db: bool, mqtt_info: Option<MQTTInfo>) -> Result<CollectorApp, String> {
     let mut app =
@@ -427,7 +435,8 @@ fn main() {
     }
 
     let ui_child: Arc<Mutex<Option<Child>>> = Arc::new(Mutex::new(None));
-    if !options.background_mode {
+    let open_ui_on_launch = !options.background_mode && !launch_minimized();
+    if open_ui_on_launch {
         spawn_ui(&ui_child).ok();
     }
 
@@ -485,6 +494,10 @@ fn main() {
     {
         if !run_linux_tray(&ui_child) {
             common::clog!("⚠ System tray unavailable, running without tray icon");
+            // Without a tray the UI can't be reopened, so ignore the launch-minimised setting
+            if !options.background_mode && !open_ui_on_launch {
+                spawn_ui(&ui_child).ok();
+            }
             loop {
                 thread::sleep(Duration::from_millis(250));
                 let mut guard = match ui_child.lock() {
