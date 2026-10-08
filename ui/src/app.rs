@@ -64,6 +64,7 @@ pub struct App {
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
     launch_on_startup: bool,
+    launch_minimized: bool,
     show_setup: bool,
     header: Header,
     footer: Footer,
@@ -91,14 +92,14 @@ impl App {
     fn ready(mut database: Database) -> (Self, Task<Message>) {
         let current_page = Page::Dashboard;
 
-        let (language, carbon_intensity, theme, electricity_cost, show_setup, close_behavior) =
+        let (language, carbon_intensity, theme, electricity_cost, show_setup, close_behavior, launch_minimized) =
             match database.load_ui_settings() {
                 Ok(Some(s)) => {
                     let lang = AppLanguage::from_code(&s.language);
                     let ci = CarbonIntensity::from_stored(&s.carbon_intensity);
                     let theme = AppTheme::from_name(&s.theme);
                     let ec = ElectricityCost::from_stored(&s.kwh_cost, Some(&s.currency));
-                    (lang, ci, theme, ec, false, s.close_behavior)
+                    (lang, ci, theme, ec, false, s.close_behavior, s.launch_minimized)
                 }
                 _ => (
                     AppLanguage::from_os(),
@@ -107,6 +108,7 @@ impl App {
                     ElectricityCost::from_os(),
                     true,
                     CloseBehavior::default(),
+                    false,
                 ),
             };
         let custom_carbon_input = if carbon_intensity.is_custom() {
@@ -169,6 +171,7 @@ impl App {
                 electricity_cost,
                 custom_kwh_cost_input,
                 launch_on_startup: common::autostart::is_enabled(),
+                launch_minimized,
                 show_setup,
                 theme,
                 database,
@@ -206,6 +209,7 @@ impl App {
                 electricity_cost: ElectricityCost::from_os(),
                 custom_kwh_cost_input: String::new(),
                 launch_on_startup: common::autostart::is_enabled(),
+                launch_minimized: false,
                 show_setup: false,
                 theme,
                 database,
@@ -378,6 +382,13 @@ impl App {
                         common::clog!("✓ Launch-on-startup {}", if enabled { "enabled" } else { "disabled" });
                     }
                     Err(e) => common::clog!("✗ Failed to update launch-on-startup setting: {e}"),
+                }
+                Task::none()
+            }
+            Message::ToggleLaunchMinimized(enabled) => {
+                self.launch_minimized = enabled;
+                if !self.persist_ui_settings() {
+                    self.launch_minimized = !enabled;
                 }
                 Task::none()
             }
@@ -583,6 +594,7 @@ impl App {
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
                     self.launch_on_startup,
+                    self.launch_minimized,
                     self.close_behavior,
                 ),
                 Message::CloseSettings,
@@ -929,6 +941,7 @@ impl App {
             theme: theme_name(AppLanguage::English, self.theme).to_string(),
             currency: self.electricity_cost.currency_code.to_string(),
             close_behavior: self.close_behavior,
+            launch_minimized: self.launch_minimized,
         };
         match self.database.save_ui_settings(&settings) {
             Ok(()) => true,

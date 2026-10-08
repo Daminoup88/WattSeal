@@ -88,6 +88,16 @@ pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn settings_launch_minimized(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Launch minimised",
+        AppLanguage::German => "Minimiert starten",
+        AppLanguage::French => "Lancer en mode réduit",
+        AppLanguage::Chinese => "启动时最小化",
+        AppLanguage::Romanian => "Pornește minimizat",
+    }
+}
+
 pub fn modal_close(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close",
