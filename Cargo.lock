@@ -3071,9 +3071,9 @@ dependencies = [
 
 [[package]]
 name = "msr-driver-rs"
-version = "1.0.1"
+version = "1.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26f0ba8be0db55b8f59c96e9a70e1fae281c6854c3eaae6bc5605424032773d8"
+checksum = "85e27c4619185d54c5eaccb93b5496d6767df368b95016dbd353ce753653cf20"
 dependencies = [
  "windows-sys 0.61.2",
 ]
