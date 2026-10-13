@@ -3071,9 +3071,9 @@ dependencies = [
 
 [[package]]
 name = "msr-driver-rs"
-version = "1.0.1"
+version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "26f0ba8be0db55b8f59c96e9a70e1fae281c6854c3eaae6bc5605424032773d8"
+checksum = "65a30154044b94d872e1b03536adb4a2640ff906a24e0d014edfbf36cee79530"
 dependencies = [
  "windows-sys 0.61.2",
 ]
@@ -5244,7 +5244,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.3.4",
+ "getrandom 0.4.3",
  "once_cell",
  "rustix 1.1.4",
  "windows-sys 0.61.2",

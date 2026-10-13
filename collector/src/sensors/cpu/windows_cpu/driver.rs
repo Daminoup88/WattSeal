@@ -27,7 +27,9 @@ impl MsrDriverReader {
 
     /// Installs the driver (requires Administrator privileges).
     pub fn install() -> Result<(), String> {
-        // 1072 means the service is marked for deletion.
+        // Best-effort: remove any legacy WinRing0 service we previously installed.
+        let _ = msr_driver_rs::legacy_winring0_cleanup();
+
         match MsrDriver::install() {
             Ok(()) => return Ok(()),
             Err(e) => {
@@ -57,7 +59,7 @@ impl MsrDriverReader {
                     Ok(())
                 } else {
                     Err(format!(
-                        "Failed to uninstall MSR driver: {message}. {}",
+                        "Failed to uninstall PawnIO driver: {message}. {}",
                         explain_windows_error_code(code.unwrap_or(0))
                     ))
                 }

@@ -89,18 +89,18 @@ impl Default for CPUValues {
     }
 }
 
-/// Windows CPU energy sensor using MSR (Model-Specific Registers) via Winring0.
+/// Windows CPU energy sensor using MSR (Model-Specific Registers) via an MSR driver.
 pub struct WindowsCPUSensor {
     msr_reader: MSRReader,
     last_energy_measurement: RefCell<CPUValues>,
 }
 
 impl WindowsCPUSensor {
-    /// Initializes the Winring0 driver and MSR reader for the given CPU vendor.
+    /// Initializes the MSR driver and reader for the given CPU vendor.
     pub fn new(vendor_id: &str) -> Result<Self, SensorError> {
         let vendor = CPUVendor::from_str(vendor_id);
-        let msr_driver = MsrDriverReader::new()
-            .map_err(|e| SensorError::ReadError(format!("Winring0 driver init failed: {}", e)))?;
+        let msr_driver =
+            MsrDriverReader::new().map_err(|e| SensorError::ReadError(format!("MSR driver init failed: {}", e)))?;
         let msr_reader = MSRReader::new(msr_driver, vendor);
 
         Ok(WindowsCPUSensor {
@@ -304,11 +304,11 @@ impl MSR for AMDMSR {
 
     fn read_energy_value(msr_reader: &MsrDriverReader) -> Result<CPUValues, String> {
         let pkg_energy = Self::read_msr(msr_reader, Self::ENERGY_PKG_MSR as u32, Self::energy_expression)?;
-        let pp0_energy = Self::read_msr(msr_reader, Self::ENERGY_CORE_MSR as u32, Self::energy_expression)?;
+        let pp0_energy = Self::read_optional_energy_domain(msr_reader, Self::ENERGY_CORE_MSR as u32, "amd_core");
 
         Ok(CPUValues {
             pkg: Some(pkg_energy),
-            pp0: Some(pp0_energy),
+            pp0: pp0_energy,
             pp1: None,
             dram: None,
         })
