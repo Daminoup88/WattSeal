@@ -212,7 +212,7 @@ impl GPUSensor {
 
 #[cfg(target_os = "windows")]
 mod amd_gpu {
-    use std::{cell::RefCell, time::Instant};
+    use std::{cell::Cell, time::Instant};
 
     use adlx::{Gpu, helper::AdlxHelper, performance_monitoring_services::PerformanceMonitoringServices};
     use common::types::EnergyUj;
@@ -224,7 +224,7 @@ mod amd_gpu {
         _helper: AdlxHelper,
         perfo: PerformanceMonitoringServices,
         gpu: Gpu,
-        last_reading: RefCell<Instant>,
+        last_reading: Cell<Instant>,
         vram_supported: bool,
         power_supported: bool,
         usage_supported: bool,
@@ -301,7 +301,7 @@ mod amd_gpu {
                 _helper: helper,
                 perfo,
                 gpu,
-                last_reading: RefCell::new(Instant::now()),
+                last_reading: Cell::new(Instant::now()),
                 vram_supported,
                 power_supported,
                 usage_supported,
@@ -312,7 +312,7 @@ mod amd_gpu {
     impl Sensor for AmdGPUSensor {
         fn read_full_data(&self) -> Result<SensorData, SensorError> {
             let now = Instant::now();
-            let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+            let duration = now.duration_since(self.last_reading.get()).as_secs_f64().max(0.001);
             let gpu_metrics = self
                 .perfo
                 .current_gpu_metrics(&self.gpu)
@@ -347,7 +347,7 @@ mod amd_gpu {
                 name: None,
             };
 
-            *self.last_reading.borrow_mut() = now;
+            self.last_reading.set(now);
 
             Ok(data.into())
         }
@@ -356,7 +356,7 @@ mod amd_gpu {
 
 #[cfg(any(target_os = "windows", target_os = "linux"))]
 mod nvidia_gpu {
-    use std::{cell::RefCell, collections::HashMap, time::Instant};
+    use std::{cell::Cell, collections::HashMap, time::Instant};
 
     use common::types::EnergyUj;
     use nvml_wrapper::{Nvml, enum_wrappers::device::Sampling, enums::device::SampleValue};
@@ -375,10 +375,10 @@ mod nvidia_gpu {
         nvml: Nvml,
         device_index: u32,
         mode: NvidiaReadMode,
-        last_timestamp: RefCell<u64>,
-        last_energy_mj: RefCell<u64>,
-        last_power_instant: RefCell<Option<Instant>>,
-        last_sample_timestamp: RefCell<Option<u64>>,
+        last_timestamp: Cell<u64>,
+        last_energy_mj: Cell<u64>,
+        last_power_instant: Cell<Option<Instant>>,
+        last_sample_timestamp: Cell<Option<u64>>,
     }
 
     impl NvidiaGPUSensor {
@@ -430,28 +430,25 @@ mod nvidia_gpu {
                 nvml,
                 device_index: index,
                 mode,
-                last_timestamp: RefCell::new(0),
-                last_energy_mj: RefCell::new(0),
-                last_power_instant: RefCell::new(None),
-                last_sample_timestamp: RefCell::new(None),
+                last_timestamp: Cell::new(0),
+                last_energy_mj: Cell::new(0),
+                last_power_instant: Cell::new(None),
+                last_sample_timestamp: Cell::new(None),
             })
         }
 
         pub fn get_processes_gpu_usage(&self, current_timestamp: u64) -> Result<HashMap<u32, f64>, SensorError> {
-            let mut last_timestamp = self
-                .last_timestamp
-                .try_borrow_mut()
-                .map_err(|_| SensorError::ReadError("Failed to borrow last_timestamp".to_string()))?;
-            if *last_timestamp == 0 {
-                *last_timestamp = current_timestamp;
+            let last_ts = self.last_timestamp.get();
+            if last_ts == 0 {
+                self.last_timestamp.set(current_timestamp);
                 return Ok(HashMap::new());
             }
             let device = self
                 .nvml
                 .device_by_index(self.device_index)
                 .map_err(|e| SensorError::ReadError(e.to_string()))?;
-            let processes = device.process_utilization_stats(*last_timestamp);
-            *last_timestamp = current_timestamp;
+            let processes = device.process_utilization_stats(last_ts);
+            self.last_timestamp.set(current_timestamp);
             let mut usage_map = HashMap::new();
             match processes {
                 Ok(procs) => {
@@ -488,22 +485,15 @@ mod nvidia_gpu {
                         common::logging::log_component_error("NVML", &format!("Failed to read energy counter: {e}"))
                     })
                     .ok()
-                    .and_then(|current_energy_mj| {
-                        self.last_energy_mj
-                            .try_borrow_mut()
-                            .inspect_err(|_| {
-                                common::logging::log_component_error("NVML", "Failed to borrow last_energy_mj")
-                            })
-                            .ok()
-                            .map(|mut last_energy_mj| {
-                                let energy_mj = if *last_energy_mj == 0 {
-                                    0
-                                } else {
-                                    current_energy_mj.saturating_sub(*last_energy_mj)
-                                };
-                                *last_energy_mj = current_energy_mj;
-                                EnergyUj::from_millijoules(energy_mj)
-                            })
+                    .map(|current_energy_mj| {
+                        let last_mj = self.last_energy_mj.get();
+                        let energy_mj = if last_mj == 0 {
+                            0
+                        } else {
+                            current_energy_mj.saturating_sub(last_mj)
+                        };
+                        self.last_energy_mj.set(current_energy_mj);
+                        EnergyUj::from_millijoules(energy_mj)
                     }),
 
                 NvidiaReadMode::PowerInstant => device
@@ -512,87 +502,52 @@ mod nvidia_gpu {
                         common::logging::log_component_error("NVML", &format!("Failed to read power usage: {e}"))
                     })
                     .ok()
-                    .and_then(|mw| {
-                        self.last_power_instant
-                            .try_borrow_mut()
-                            .inspect_err(|_| {
-                                common::logging::log_component_error("NVML", "Failed to borrow last_power_instant")
-                            })
-                            .ok()
-                            .map(|mut last_instant| {
-                                let energy = match *last_instant {
-                                    None => EnergyUj::from_joules(0.0),
-                                    Some(last) => {
-                                        let dt = now.duration_since(last).as_secs_f64();
-                                        EnergyUj::from_joules(mw as f64 / 1000.0 * dt)
-                                    }
-                                };
-                                *last_instant = Some(now);
-                                energy
-                            })
+                    .map(|mw| {
+                        let last_instant = self.last_power_instant.get();
+                        let energy = match last_instant {
+                            None => EnergyUj::from_joules(0.0),
+                            Some(last) => {
+                                let dt = now.duration_since(last).as_secs_f64();
+                                EnergyUj::from_joules(mw as f64 / 1000.0 * dt)
+                            }
+                        };
+                        self.last_power_instant.set(Some(now));
+                        energy
                     }),
 
-                NvidiaReadMode::PowerSamples => self
-                    .last_sample_timestamp
-                    .try_borrow()
-                    .inspect_err(|_| {
-                        common::logging::log_component_error("NVML", "Failed to borrow last_sample_timestamp")
-                    })
-                    .ok()
-                    .and_then(|last_ts_guard| {
-                        let last_ts = *last_ts_guard;
-                        drop(last_ts_guard);
+                NvidiaReadMode::PowerSamples => {
+                    let last_ts = self.last_sample_timestamp.get();
+                    device
+                        .samples(Sampling::Power, last_ts)
+                        .inspect_err(|e| {
+                            common::logging::log_component_error("NVML", &format!("Failed to fetch power samples: {e}"))
+                        })
+                        .ok()
+                        .and_then(|samples| {
+                            if samples.is_empty() {
+                                Some(EnergyUj::from_joules(0.0))
+                            } else {
+                                let avg_mw: f64 = samples
+                                    .iter()
+                                    .filter_map(|s| match s.value {
+                                        SampleValue::F64(v) => Some(v),
+                                        SampleValue::U32(v) => Some(v as f64),
+                                        SampleValue::U64(v) => Some(v as f64),
+                                        _ => None,
+                                    })
+                                    .sum::<f64>()
+                                    / samples.len().max(1) as f64;
 
-                        device
-                            .samples(Sampling::Power, last_ts)
-                            .inspect_err(|e| {
-                                common::logging::log_component_error(
-                                    "NVML",
-                                    &format!("Failed to fetch power samples: {e}"),
-                                )
-                            })
-                            .ok()
-                            .and_then(|samples| {
-                                if samples.is_empty() {
-                                    Some(EnergyUj::from_joules(0.0))
-                                } else {
-                                    let avg_mw: f64 = samples
-                                        .iter()
-                                        .filter_map(|s| match s.value {
-                                            SampleValue::F64(v) => Some(v),
-                                            SampleValue::U32(v) => Some(v as f64),
-                                            SampleValue::U64(v) => Some(v as f64),
-                                            _ => None,
-                                        })
-                                        .sum::<f64>()
-                                        / samples.len().max(1) as f64;
+                                self.last_sample_timestamp
+                                    .set(samples.last().map(|s| s.timestamp).or(last_ts));
 
-                                    if let Ok(mut last_ts_lock) = self.last_sample_timestamp.try_borrow_mut() {
-                                        *last_ts_lock = samples.last().map(|s| s.timestamp).or(last_ts);
-                                    } else {
-                                        common::logging::log_component_error(
-                                            "NVML",
-                                            "Failed to borrow_mut last_sample_timestamp for update",
-                                        );
-                                    }
-
-                                    self.last_power_instant
-                                        .try_borrow_mut()
-                                        .inspect_err(|_| {
-                                            common::logging::log_component_error(
-                                                "NVML",
-                                                "Failed to borrow_mut last_power_instant",
-                                            )
-                                        })
-                                        .ok()
-                                        .map(|mut last_instant| {
-                                            let dt = now.duration_since(last_instant.unwrap_or(now)).as_secs_f64();
-                                            *last_instant = Some(now);
-                                            EnergyUj::from_joules((avg_mw / 1000.0) * dt)
-                                        })
-                                }
-                            })
-                    }),
+                                let last_instant = self.last_power_instant.get();
+                                let dt = now.duration_since(last_instant.unwrap_or(now)).as_secs_f64();
+                                self.last_power_instant.set(Some(now));
+                                Some(EnergyUj::from_joules((avg_mw / 1000.0) * dt))
+                            }
+                        })
+                }
             };
 
             // NON-CRITICAL: Evaluate utilization rates with logging
@@ -627,7 +582,7 @@ mod nvidia_gpu {
 
 #[cfg(target_os = "windows")]
 mod intel_gpu {
-    use std::slice;
+    use std::{cell::Cell, mem::MaybeUninit, slice};
 
     use windows::{
         Win32::System::Performance::{
@@ -645,20 +600,20 @@ mod intel_gpu {
     pub struct IntelGPUSensor {
         query: PDH_HQUERY,
         counter: PDH_HCOUNTER,
-        initialized: std::cell::Cell<bool>,
+        initialized: Cell<bool>,
     }
 
     impl IntelGPUSensor {
         pub fn new(_index: u32) -> Result<Self, SensorError> {
             unsafe {
-                let mut query = std::mem::MaybeUninit::<PDH_HQUERY>::uninit();
+                let mut query = MaybeUninit::<PDH_HQUERY>::uninit();
                 if PdhOpenQueryW(None, 0, query.as_mut_ptr()) != 0 {
                     return Err(SensorError::ReadError("PdhOpenQuery failed".to_string()));
                 }
                 let query = query.assume_init();
 
                 let path: Vec<u16> = "\\GPU Engine(*)\\Utilization Percentage\0".encode_utf16().collect();
-                let mut counter = std::mem::MaybeUninit::<PDH_HCOUNTER>::uninit();
+                let mut counter = MaybeUninit::<PDH_HCOUNTER>::uninit();
                 if PdhAddEnglishCounterW(query, PCWSTR(path.as_ptr()), 0, counter.as_mut_ptr()) != 0 {
                     let _ = PdhCloseQuery(query);
                     return Err(SensorError::ReadError("PdhAddEnglishCounter failed".to_string()));
@@ -668,7 +623,7 @@ mod intel_gpu {
                 Ok(IntelGPUSensor {
                     query,
                     counter,
-                    initialized: std::cell::Cell::new(false),
+                    initialized: Cell::new(false),
                 })
             }
         }

@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use common::types::EnergyUj;
 
@@ -10,7 +10,7 @@ use crate::database::{CPUData, SensorData};
 pub struct LinuxCPUSensor {
     rapl_path: String,
     max_energy_uj: u64,
-    last_reading: RefCell<Option<u64>>,
+    last_reading: Cell<Option<u64>>,
 }
 
 impl LinuxCPUSensor {
@@ -27,7 +27,7 @@ impl LinuxCPUSensor {
         Ok(LinuxCPUSensor {
             rapl_path,
             max_energy_uj,
-            last_reading: RefCell::new(None),
+            last_reading: Cell::new(None),
         })
     }
 
@@ -45,7 +45,7 @@ impl LinuxCPUSensor {
 impl Sensor for LinuxCPUSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let current_uj = self.read_energy_uj()?;
-        let last = *self.last_reading.borrow();
+        let last = self.last_reading.get();
 
         let delta_uj = match last {
             Some(last_uj) => {
@@ -59,7 +59,7 @@ impl Sensor for LinuxCPUSensor {
             None => None,
         };
 
-        *self.last_reading.borrow_mut() = Some(current_uj);
+        self.last_reading.set(Some(current_uj));
 
         Ok(SensorData::CPU(CPUData {
             total_energy: delta_uj,

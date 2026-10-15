@@ -1,4 +1,7 @@
-use std::{cell::RefCell, time::Instant};
+use std::{
+    cell::{Cell, RefCell},
+    time::Instant,
+};
 
 use common::{
     EnergyUj,
@@ -22,7 +25,7 @@ const UNKNOWN_W_PER_MB: f64 = 0.02;
 /// Disk I/O sensor that estimates power from throughput.
 pub struct DiskSensor {
     disks: RefCell<Disks>,
-    last_reading: RefCell<Instant>,
+    last_reading: Cell<Instant>,
 }
 
 impl DiskSensor {
@@ -30,7 +33,7 @@ impl DiskSensor {
     pub fn new() -> Self {
         Self {
             disks: RefCell::new(Disks::new_with_refreshed_list()),
-            last_reading: RefCell::new(Instant::now()),
+            last_reading: Cell::new(Instant::now()),
         }
     }
 }
@@ -38,7 +41,7 @@ impl DiskSensor {
 impl Sensor for DiskSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let now = Instant::now();
-        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+        let duration = now.duration_since(self.last_reading.get()).as_secs_f64().max(0.001);
 
         let mut read_bytes = 0;
         let mut written_bytes = 0;
@@ -69,7 +72,7 @@ impl Sensor for DiskSensor {
             total_energy_j += power * duration;
         }
 
-        *self.last_reading.borrow_mut() = now;
+        self.last_reading.set(now);
 
         Ok(SensorData::Disk(DiskData {
             total_energy: Some(EnergyUj::from_joules(total_energy_j)),

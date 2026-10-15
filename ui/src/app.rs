@@ -80,11 +80,19 @@ pub struct App {
 impl App {
     /// Initializes the app, opens the database, and loads settings.
     pub fn new() -> (Self, Task<Message>) {
-        let database = Database::open_without_migrations().expect("Failed to open database");
-        if database.is_schema_current().unwrap_or(false) {
-            Self::ready(database)
-        } else {
-            Self::waiting_for_migration(database)
+        match Database::open_without_migrations() {
+            Ok(database) => {
+                if database.is_schema_current().unwrap_or(false) {
+                    Self::ready(database)
+                } else {
+                    Self::waiting_for_migration(database)
+                }
+            }
+            Err(e) => {
+                let err_msg = format!("Failed to open database: {e}");
+                common::clog!("✗ {err_msg}");
+                panic!("{err_msg}");
+            }
         }
     }
 
@@ -882,17 +890,16 @@ impl App {
     }
 
     fn retry_database_migration(&mut self) -> Task<Message> {
-        if !self.database.is_schema_current().unwrap_or(false) {
-            return Task::none();
-        }
-
         if let Ok(database) = Database::open_without_migrations() {
-            let (ready, task) = Self::ready(database);
-            *self = ready;
-            task
-        } else {
-            Task::none()
+            if database.is_schema_current().unwrap_or(false) {
+                let (ready, task) = Self::ready(database);
+                *self = ready;
+                return task;
+            } else {
+                self.database = database;
+            }
         }
+        Task::none()
     }
 
     fn close(&mut self, behavior: CloseBehavior) -> Task<Message> {

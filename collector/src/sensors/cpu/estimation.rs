@@ -1,4 +1,7 @@
-use std::{cell::RefCell, time::Instant};
+use std::{
+    cell::Cell,
+    time::{Duration, Instant},
+};
 
 use common::types::EnergyUj;
 
@@ -92,7 +95,7 @@ fn estimate_power(tdp: f64, usage_percent: f64) -> f64 {
 }
 
 /// Estimates energy in µJ directly from usage and elapsed duration.
-pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Duration) -> EnergyUj {
+pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: Duration) -> EnergyUj {
     let energy_joules = estimate_power(tdp, usage_percent) * duration.as_secs_f64();
     EnergyUj::from_joules(energy_joules)
 }
@@ -100,7 +103,7 @@ pub fn estimate_energy(tdp: f64, usage_percent: f64, duration: std::time::Durati
 /// TDP-based CPU energy consumption estimator.
 pub struct EstimationCPUSensor {
     tdp: f64,
-    last_reading: RefCell<Instant>,
+    last_reading: Cell<Instant>,
 }
 
 impl EstimationCPUSensor {
@@ -108,15 +111,15 @@ impl EstimationCPUSensor {
     pub fn new(tdp: f64) -> Self {
         Self {
             tdp,
-            last_reading: RefCell::new(Instant::now()),
+            last_reading: Cell::new(Instant::now()),
         }
     }
 
     /// Estimates energy comsumption since last call from CPU usage percentage.
     pub fn estimate(&self, usage_percent: f64) -> EnergyUj {
         let now = Instant::now();
-        let duration = now.duration_since(*self.last_reading.borrow());
-        *self.last_reading.borrow_mut() = now;
+        let duration = now.duration_since(self.last_reading.get());
+        self.last_reading.set(now);
         estimate_energy(self.tdp, usage_percent, duration)
     }
 }

@@ -386,27 +386,32 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
     };
 
     let mut battery_names: Vec<String> = Vec::new();
-    let manager = Manager::new().unwrap();
-    let battery_info = match manager.batteries() {
-        Ok(mut batteries) => {
-            if let Some(Ok(battery)) = batteries.next() {
-                let battery_name = battery.vendor().map(|v| v.to_string());
-                if let Some(ref name) = battery_name {
-                    battery_names.push(name.clone());
+    let battery_info = match Manager::new() {
+        Ok(manager) => match manager.batteries() {
+            Ok(mut batteries) => {
+                if let Some(Ok(battery)) = batteries.next() {
+                    let battery_name = battery.vendor().map(|v| v.to_string());
+                    if let Some(ref name) = battery_name {
+                        battery_names.push(name.clone());
+                    }
+                    BatteryInfo {
+                        present: true,
+                        name: battery_name,
+                        design_capacity_wh: Some(battery.energy_full_design().get::<battery::units::energy::watt_hour>()),
+                        full_charge_capacity_wh: Some(battery.energy_full().get::<battery::units::energy::watt_hour>()),
+                        cycle_count: battery.cycle_count(),
+                    }
+                } else {
+                    battery_info
                 }
-                BatteryInfo {
-                    present: true,
-                    name: battery_name,
-                    design_capacity_wh: Some(battery.energy_full_design().get::<battery::units::energy::watt_hour>()),
-                    full_charge_capacity_wh: Some(battery.energy_full().get::<battery::units::energy::watt_hour>()),
-                    cycle_count: battery.cycle_count(),
-                }
-            } else {
+            }
+            Err(e) => {
+                crate::clog!("✗ Failed to read battery info: {:?}", e);
                 battery_info
             }
-        }
+        },
         Err(e) => {
-            crate::clog!("✗ Failed to read battery info: {:?}", e);
+            crate::clog!("✗ Failed to initialize battery manager: {:?}", e);
             battery_info
         }
     };

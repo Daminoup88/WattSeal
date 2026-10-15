@@ -1,4 +1,8 @@
-use std::{cell::RefCell, rc::Rc, time::Instant};
+use std::{
+    cell::{Cell, RefCell},
+    rc::Rc,
+    time::Instant,
+};
 
 use common::{
     EnergyUj,
@@ -13,7 +17,7 @@ use crate::{
 /// RAM usage sensor backed by sysinfo.
 pub struct RamSensor {
     system: Rc<RefCell<System>>,
-    last_reading: RefCell<Instant>,
+    last_reading: Cell<Instant>,
 }
 
 impl RamSensor {
@@ -21,7 +25,7 @@ impl RamSensor {
     pub fn new(system: Rc<RefCell<System>>) -> Self {
         Self {
             system,
-            last_reading: RefCell::new(Instant::now()),
+            last_reading: Cell::new(Instant::now()),
         }
     }
 }
@@ -29,7 +33,7 @@ impl RamSensor {
 impl Sensor for RamSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let now = Instant::now();
-        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+        let duration = now.duration_since(self.last_reading.get()).as_secs_f64().max(0.001);
 
         let mut system = self
             .system
@@ -47,7 +51,7 @@ impl Sensor for RamSensor {
 
         let energy_j = 5.0 * duration;
 
-        *self.last_reading.borrow_mut() = now;
+        self.last_reading.set(now);
 
         Ok(SensorData::Ram(RamData {
             total_energy: Some(EnergyUj::from_joules(energy_j)),

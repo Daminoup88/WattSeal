@@ -4,8 +4,8 @@ pub mod topics;
 
 use std::{
     collections::HashMap,
-    net::SocketAddr,
-    sync::{Arc, Mutex},
+    net::{Ipv4Addr, SocketAddr, SocketAddrV4},
+    sync::{Arc, Mutex, RwLock},
     time::Duration,
 };
 
@@ -50,6 +50,7 @@ fn accumulate_field(topic: &str, envelope: &mut Value, path: &str, totals: &mut 
 
 const DISK_CUMULATIVE_FIELDS: &[&str] = &["Disk.read_bytes", "Disk.written_bytes"];
 const NETWORK_CUMULATIVE_FIELDS: &[&str] = &["Network.downloaded_bytes", "Network.uploaded_bytes"];
+const DEFAULT_MQTT_ID: &str = "wattseal_collector";
 
 fn cumulative_fields_for_topic(topic: &str) -> &'static [&'static str] {
     match topic.rsplit('/').next() {
@@ -74,7 +75,7 @@ impl MQTTClient for Client {
 
 pub struct MQTTPublisher<T: MQTTClient> {
     client: T,
-    hardware_info: std::sync::Arc<std::sync::RwLock<Option<HardwareInfo>>>,
+    hardware_info: Arc<RwLock<Option<HardwareInfo>>>,
     config: MqttConfig,
     cumulative_values: Arc<Mutex<HashMap<String, f64>>>,
 }
@@ -82,10 +83,11 @@ pub struct MQTTPublisher<T: MQTTClient> {
 impl<T: MQTTClient> MQTTPublisher<T> {
     /// Creates a publisher around an MQTT client implementation.
     pub fn new(client: T) -> Self {
+        let default_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));
         Self {
             client,
-            hardware_info: std::sync::Arc::new(std::sync::RwLock::new(None)),
-            config: MqttConfig::new("wattseal_collector".to_string(), "127.0.0.1:1883".parse().unwrap()),
+            hardware_info: Arc::new(RwLock::new(None)),
+            config: MqttConfig::new(DEFAULT_MQTT_ID.to_string(), default_addr),
             cumulative_values: Arc::new(Mutex::new(HashMap::new())),
         }
     }
@@ -194,7 +196,7 @@ impl MQTTPublisher<Client> {
         let is_ha = config.home_assistant;
         let client_clone = client.clone();
         let status_top_clone = status_top.clone();
-        let hw_info_arc = std::sync::Arc::new(std::sync::RwLock::new(hardware_info.cloned()));
+        let hw_info_arc = Arc::new(RwLock::new(hardware_info.cloned()));
         let hw_info_clone = hw_info_arc.clone();
         let cumulative_values = Arc::new(Mutex::new(HashMap::<String, f64>::new()));
 

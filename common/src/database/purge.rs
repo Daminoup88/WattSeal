@@ -211,9 +211,10 @@ fn summing_process_data(database: &mut Database, duration_in_hours: i64) -> Resu
         if buckets.last().map_or(true, |(b, _)| *b != bucket) {
             buckets.push((bucket, Vec::new()));
         }
-        let procs = &mut buckets.last_mut().unwrap().1;
-        if procs.len() < 10 {
-            procs.push((app_id, euj, cpu, gpu, mem, rd, wr, sub));
+        if let Some((_, procs)) = buckets.last_mut() {
+            if procs.len() < 10 {
+                procs.push((app_id, euj, cpu, gpu, mem, rd, wr, sub));
+            }
         }
     }
     drop(stmt);

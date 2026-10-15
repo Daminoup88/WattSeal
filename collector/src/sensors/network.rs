@@ -1,4 +1,7 @@
-use std::{cell::RefCell, time::Instant};
+use std::{
+    cell::{Cell, RefCell},
+    time::Instant,
+};
 
 use common::{EnergyUj, types::Byte};
 use sysinfo::Networks;
@@ -15,7 +18,7 @@ const NIC_MAX_W: f64 = 3.0;
 /// Network interface sensor that estimates energy consumption from throughput.
 pub struct NetworkSensor {
     networks: RefCell<Networks>,
-    last_reading: RefCell<Instant>,
+    last_reading: Cell<Instant>,
 }
 
 impl NetworkSensor {
@@ -23,7 +26,7 @@ impl NetworkSensor {
     pub fn new() -> Self {
         Self {
             networks: RefCell::new(Networks::new()),
-            last_reading: RefCell::new(Instant::now()),
+            last_reading: Cell::new(Instant::now()),
         }
     }
 }
@@ -31,7 +34,7 @@ impl NetworkSensor {
 impl Sensor for NetworkSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
         let now = Instant::now();
-        let duration = now.duration_since(*self.last_reading.borrow()).as_secs_f64().max(0.001);
+        let duration = now.duration_since(self.last_reading.get()).as_secs_f64().max(0.001);
 
         let mut networks = self
             .networks
@@ -56,7 +59,7 @@ impl Sensor for NetworkSensor {
             total_energy_j += nic_power * duration;
         }
 
-        *self.last_reading.borrow_mut() = now;
+        self.last_reading.set(now);
 
         Ok(SensorData::Network(NetworkData {
             total_energy: Some(EnergyUj::from_joules(total_energy_j)),

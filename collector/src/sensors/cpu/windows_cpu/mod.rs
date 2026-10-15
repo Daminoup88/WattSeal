@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::Cell;
 
 use common::types::EnergyUj;
 use driver::MsrDriverReader;
@@ -70,7 +70,7 @@ pub fn setup() {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 struct CPUValues {
     pkg: Option<u64>,
     pp0: Option<u64>,
@@ -92,7 +92,7 @@ impl Default for CPUValues {
 /// Windows CPU energy sensor using MSR (Model-Specific Registers) via an MSR driver.
 pub struct WindowsCPUSensor {
     msr_reader: MSRReader,
-    last_energy_measurement: RefCell<CPUValues>,
+    last_energy_measurement: Cell<CPUValues>,
 }
 
 impl WindowsCPUSensor {
@@ -105,26 +105,17 @@ impl WindowsCPUSensor {
 
         Ok(WindowsCPUSensor {
             msr_reader,
-            last_energy_measurement: RefCell::new(CPUValues::default()),
+            last_energy_measurement: Cell::new(CPUValues::default()),
         })
     }
 
     /// Reads raw energy counters and computes delta since last call.
     fn read_raw_energy_delta(&self) -> Result<CPUData, SensorError> {
         let current_energy = self.msr_reader.read_energy()?;
-        let energy_values = {
-            let last_energy = self
-                .last_energy_measurement
-                .try_borrow()
-                .map_err(|e| SensorError::ReadError(format!("Failed to borrow last energy measurement: {}", e)))?;
-            self.msr_reader.compute_delta_energy(&current_energy, &last_energy)
-        };
+        let last_energy = self.last_energy_measurement.get();
+        let energy_values = self.msr_reader.compute_delta_energy(&current_energy, &last_energy);
 
-        let mut last_energy_mut = self
-            .last_energy_measurement
-            .try_borrow_mut()
-            .map_err(|e| SensorError::ReadError(format!("Failed to update last energy measurement: {}", e)))?;
-        *last_energy_mut = current_energy;
+        self.last_energy_measurement.set(current_energy);
 
         if energy_values.total_energy.is_none() {
             return Err(SensorError::ReadError("Failed to calculate energy".to_string()));
