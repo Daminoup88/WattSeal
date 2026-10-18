@@ -14,32 +14,21 @@ We'll acknowledge your report within 48 hours and work with you to understand an
 
 ## Scope
 
-WattSeal runs with elevated privileges (admin/root) to access hardware energy counters. We take this responsibility seriously.
+WattSeal may request elevated privileges to install a Windows CPU driver or to access Linux RAPL counters. We take this responsibility seriously.
 
 ---
 
-## WinRing0 Kernel Driver (Windows)
+## PawnIO Driver (Windows)
 
-On Windows, WattSeal uses **WinRing0**, a third-party signed kernel-mode driver, to read CPU Model Specific Registers (MSRs). This is currently the only mechanism available to access hardware RAPL energy counters on Windows without building a custom kernel driver (that would be flagged by Windows Defender if not signed). Precise CPU measurements are a core requirement of WattSeal — without them the application cannot fulfil its primary purpose.
+On Windows, WattSeal uses the **PawnIO driver**, a signed kernel driver with only Intel or AMD MSR access, to read CPU Model Specific Registers (MSRs) required for RAPL energy counters. This replaces the previous generic MSR driver and reduces the exposed surface to the read-only operations WattSeal needs.
 
 ### Why it exists
 
-Reading CPU energy registers on Windows requires Ring-0 (kernel) access. WinRing0 is the only widely available signed driver that provides this without requiring test-signing mode. WattSeal uses it in a strictly read-only, targeted manner.
+Reading CPU energy registers on Windows requires Ring-0 (kernel) access. The PawnIO driver provides read-only MSR access focused on RAPL counters, avoiding the generic read/write capabilities of legacy drivers.
 
 ### Security implications
 
-Kernel drivers run at the highest privilege level on the system. WinRing0 exposes generic MSR read/write capability, which goes beyond WattSeal's own read-only needs. This represents an elevated attack surface. While WattSeal constrains its own use of the driver, it cannot fully control what the driver exposes to other processes on the system.
-
-WattSeal does not install WinRing0 as a permanent service. The driver is loaded on demand and its lifecycle is managed by the application. However, driver registration requires writing to the Windows registry and placing the `.sys` file on disk.
-
-### We want to replace it
-
-We found the scaphandre driver as an alternative: a minimal purpose-built signed driver. However, the signed version is not compatible with AMD devices. This is not acceptable for WattSeal's cross-platform goals. The fixed version is not yet signed.
-Until scaphandre can fully replace it, WinRing0 remains a necessary dependency for full measurement accuracy.
-
-### Your responsibility
-
-By running WattSeal as administrator on Windows and accepting the UAC prompt, **you explicitly consent to loading a third-party kernel-mode driver.** You are responsible for this decision. If you are not comfortable with it, you may run WattSeal without administrator privileges — CPU power readings will fall back to estimates, but no kernel driver will be loaded.
+Kernel drivers run at the highest privilege level on the system. While the PawnIO driver is minimal and read-only, it is still privileged code. WattSeal installs it once and then accesses it from user mode; normal operation does not require elevated privileges.
 
 ### Installing and removing the driver
 
@@ -51,6 +40,6 @@ To remove the driver:
 
 1. Run `WattSeal --uninstall-cpu-driver` **as Administrator**.
 
-### Reporting WinRing0-related issues
+### Reporting driver-related issues
 
-If you discover a security vulnerability related to how WattSeal loads or uses WinRing0, or if you know of a safer alternative that could replace it, please report it through the process above or open a GitHub discussion. We treat any such report as high priority.
+If you discover a security vulnerability related to how WattSeal loads or uses the PawnIO driver, please report it through the process above. We treat any such report as high priority.

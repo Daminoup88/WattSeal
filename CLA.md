@@ -5,7 +5,7 @@ By submitting a contribution to WattSeal, you agree to the following terms.
 You retain the copyright to your contribution. You grant the WattSeal
 maintainers a perpetual, worldwide, irrevocable, royalty-free license to
 use, copy, modify, sublicense, and relicense your contribution under any
-license — including proprietary licenses — and to incorporate it into
+license – including proprietary licenses – and to incorporate it into
 WattSeal or any derivative work.
 
 You confirm that you have the right to submit the contribution and that it
