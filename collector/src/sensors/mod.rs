@@ -397,7 +397,9 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
                     BatteryInfo {
                         present: true,
                         name: battery_name,
-                        design_capacity_wh: Some(battery.energy_full_design().get::<battery::units::energy::watt_hour>()),
+                        design_capacity_wh: Some(
+                            battery.energy_full_design().get::<battery::units::energy::watt_hour>(),
+                        ),
                         full_charge_capacity_wh: Some(battery.energy_full().get::<battery::units::energy::watt_hour>()),
                         cycle_count: battery.cycle_count(),
                     }
