@@ -70,6 +70,12 @@ now   = datetime.now(timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 # download_count.txt — single number
 count_file.write_text(str(total))
 
+# download_count.json — for the README badge
+json_file = DATA_DIR / 'download_count.json'
+json_file.write_text(json.dumps({
+    'downloads': f'{total:,}',
+}) + '\n')
+
 # download_daily.txt — one line per day
 daily_file = DATA_DIR / 'download_daily.txt'
 daily_line = f"{today} {total} {windows} {macos} {linux} {diff}\n"
