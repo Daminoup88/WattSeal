@@ -6,7 +6,7 @@ Thanks for your interest in contributing to WattSeal! This is our first open-sou
 
 ### Translating WattSeal
 
-To translate WattSeal into your language, see **[🌏 App translations](https://github.com/Daminoup88/WattSeal/issues/112).
+To translate WattSeal into your language, see **[🌏 App translations](https://github.com/Daminoup88/WattSeal/issues/112)**.
 
 ### Reporting Bugs
 
@@ -42,7 +42,7 @@ cd wattseal
 cargo build
 ```
 
-See the [Developer documentation](README.md#%EF%B8%8F-developer-documentation) for detailed build instructions and architecture overview.
+See the [Developer documentation](https://github.com/Daminoup88/WattSeal/wiki/Architecture) for detailed build instructions and architecture overview.
 
 ## Code Style
 
