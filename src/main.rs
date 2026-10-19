@@ -254,11 +254,37 @@ fn setup_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> Option<tray_icon::TrayIco
         .ok()
 }
 
+/// Linux: `libappindicator-sys` panics if no appindicator shared library is available.
+/// Check for the presence of a known appindicator library before trying to load it.
+#[cfg(target_os = "linux")]
+fn appindicator_available() -> bool {
+    const CANDIDATES: [&str; 4] = [
+        "libayatana-appindicator3.so.1",
+        "libappindicator3.so.1",
+        "libayatana-appindicator3.so",
+        "libappindicator3.so",
+    ];
+    CANDIDATES
+        .iter()
+        .any(|name| match unsafe { libloading::Library::new(name) } {
+            Ok(lib) => true,
+            Err(_) => false,
+        })
+}
+
 /// Linux: try to initialise GTK, create the tray icon and run the GTK event loop.
 /// Returns `true` if the tray was set up and the GTK loop ran (i.e. the app lifecycle
 /// was fully handled). Returns `false` if setup failed so the caller can fall back.
 #[cfg(target_os = "linux")]
 fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
+    if !appindicator_available() {
+        common::clog!(
+            "⚠ No appindicator library found (libayatana-appindicator3 / libappindicator3), \
+             tray icon disabled"
+        );
+        return false;
+    }
+
     if gtk::init().is_err() {
         return false;
     }

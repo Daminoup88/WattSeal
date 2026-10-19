@@ -5834,6 +5834,7 @@ dependencies = [
  "common",
  "gtk",
  "image 0.25.10",
+ "libloading 0.8.9",
  "runas",
  "tray-icon",
  "ui",
