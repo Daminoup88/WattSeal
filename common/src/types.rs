@@ -393,7 +393,14 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
                 InitialInfo::System(sys) => system_info = Some(sys),
                 InitialInfo::CPU(cpu) => cpu_info = Some(cpu),
                 InitialInfo::Memory(mem) => memory_info = Some(mem),
-                InitialInfo::Gpus(gpus) => gpu_list = Some(gpus),
+                InitialInfo::Gpus(gpus) => {
+                    let gpu_list = gpu_list.get_or_insert_with(Vec::new);
+                    for gpu in gpus {
+                        if !gpu_list.contains(&gpu) {
+                            gpu_list.push(gpu);
+                        }
+                    }
+                }
                 InitialInfo::Disks(disks) => disk_info = Some(disks),
                 InitialInfo::Displays(displays) => display_info = Some(displays),
                 InitialInfo::Battery(battery) => battery_info = Some(battery),
@@ -1105,5 +1112,42 @@ impl Default for TotalData {
         TotalData {
             total_energy: EnergyUj(0),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{HardwareInfo, InitialInfo};
+
+    #[test]
+    fn hardware_info_merges_nvidia_and_intel_gpu_entries() {
+        let hardware_info = HardwareInfo::from(vec![
+            InitialInfo::Gpus(vec!["NVIDIA GeForce RTX 5060 Ti (0)".to_string()]),
+            InitialInfo::Gpus(vec!["Intel(R) UHD Graphics 770 (0)".to_string()]),
+        ]);
+
+        assert_eq!(
+            hardware_info.gpus,
+            vec![
+                "NVIDIA GeForce RTX 5060 Ti (0)".to_string(),
+                "Intel(R) UHD Graphics 770 (0)".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn hardware_info_merges_amd_gpu_and_igpu_entries() {
+        let hardware_info = HardwareInfo::from(vec![
+            InitialInfo::Gpus(vec!["AMD Radeon RX 7800 XT (0)".to_string()]),
+            InitialInfo::Gpus(vec!["AMD Radeon(TM) Graphics (0)".to_string()]),
+        ]);
+
+        assert_eq!(
+            hardware_info.gpus,
+            vec![
+                "AMD Radeon RX 7800 XT (0)".to_string(),
+                "AMD Radeon(TM) Graphics (0)".to_string(),
+            ]
+        );
     }
 }
