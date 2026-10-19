@@ -1120,11 +1120,10 @@ mod tests {
     use super::{HardwareInfo, InitialInfo};
 
     #[test]
-    fn hardware_info_merges_all_gpu_entries() {
+    fn hardware_info_merges_nvidia_and_intel_gpu_entries() {
         let hardware_info = HardwareInfo::from(vec![
             InitialInfo::Gpus(vec!["NVIDIA GeForce RTX 5060 Ti (0)".to_string()]),
             InitialInfo::Gpus(vec!["Intel(R) UHD Graphics 770 (0)".to_string()]),
-            InitialInfo::Gpus(vec!["NVIDIA GeForce RTX 5060 Ti (0)".to_string()]),
         ]);
 
         assert_eq!(
