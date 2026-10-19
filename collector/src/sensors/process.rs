@@ -34,10 +34,14 @@ pub fn get_measured_processes(
     let total_memory = sys.total_memory();
 
     for (pid, proc_) in processes {
+        let process_cpu_usage = proc_.cpu_usage() as f64 / nb_cores as f64;
+        let process_gpu_usage = proc_gpu_usage.get(&pid.as_u32()).copied();
+        if process_cpu_usage <= 0.0 && process_gpu_usage.map_or(true, |usage| usage <= 0.0) {
+            continue;
+        }
+
         let name = proc_.name().to_str().unwrap_or("Other").to_string().to_lowercase();
         let exe = proc_.exe().and_then(|path| path.to_str().map(|s| s.to_string()));
-        let process_cpu_usage = proc_.cpu_usage() as f64 / nb_cores as f64;
-        let process_gpu_usage = proc_gpu_usage.get(&pid.as_u32());
         let mem = proc_.memory() as f64 / total_memory as f64 * 100.0;
         let disk = proc_.disk_usage();
 
@@ -46,7 +50,7 @@ pub fn get_measured_processes(
             app_name: name,
             process_exe_path: exe,
             process_cpu_usage,
-            process_gpu_usage: process_gpu_usage.copied(),
+            process_gpu_usage,
             process_mem_usage: mem,
             read_bytes: Byte::from(disk.read_bytes),
             written_bytes: Byte::from(disk.written_bytes),
@@ -124,10 +128,7 @@ pub fn compute_processes_energy(
 
 /// Sorts the processes by estimated energy consumption in descending order.
 pub fn sort_processes_by_energy(mut processes: Vec<ProcessData>) -> Vec<ProcessData> {
-    processes.sort_by(|a, b| {
-        b.process_energy
-            .partial_cmp(&a.process_energy)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    processes.retain(|process| process.process_energy.as_u64() > 0);
+    processes.sort_unstable_by(|a, b| b.process_energy.cmp(&a.process_energy));
     processes
 }
