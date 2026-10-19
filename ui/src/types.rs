@@ -308,6 +308,10 @@ impl Currency {
         code: "DKK",
         symbol: "kr",
     };
+    pub const ISK: Currency = Currency {
+        code: "ISK",
+        symbol: "kr",
+    };
     pub const PLN: Currency = Currency {
         code: "PLN",
         symbol: "zł",
@@ -420,6 +424,7 @@ impl Currency {
         Currency::SEK,
         Currency::NOK,
         Currency::DKK,
+        Currency::ISK,
         Currency::PLN,
         Currency::TRY,
         Currency::ZAR,
@@ -553,6 +558,7 @@ country_registry!(
     (Sweden, "SE", "Sweden", Some(35.0), Some(2.3), Some(Currency::SEK)),
     (Portugal, "PT", "Portugal", Some(127.91), Some(0.21), Some(Currency::EUR)),
     (Switzerland, "CH", "Switzerland", Some(39.22), Some(0.3), Some(Currency::CHF)),
+    (Iceland, "IS", "Iceland", Some(27.68), Some(25.22), Some(Currency::ISK)),
     (World, "WORLD", "World average", Some(399.0), Some(0.18), Some(Currency::USD)),
 );
 
