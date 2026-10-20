@@ -19,6 +19,7 @@ pub enum Message {
     CustomKwhCostInput(String),
     ChangeCustomCurrency(Currency),
     ToggleLaunchOnStartup(bool),
+    ToggleLaunchMinimized(bool),
     ChangeCloseBehavior(common::CloseBehavior),
     ToggleRememberCloseChoice(bool),
     OpenSettings,

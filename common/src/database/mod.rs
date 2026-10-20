@@ -83,6 +83,7 @@ pub struct UiSettings {
     pub theme: String,
     pub currency: String,
     pub close_behavior: CloseBehavior,
+    pub launch_minimized: bool,
 }
 
 /// The remembered action when the user closes the window.
@@ -228,7 +229,8 @@ impl Database {
                 kwh_cost         TEXT NOT NULL DEFAULT 'WORLD',
                 theme            TEXT NOT NULL DEFAULT 'Hunting',
                 currency         TEXT NOT NULL DEFAULT 'USD',
-                close_behavior TEXT NOT NULL DEFAULT 'ask'
+                close_behavior TEXT NOT NULL DEFAULT 'ask',
+                launch_minimized INTEGER NOT NULL DEFAULT 0
             )",
         )?;
         // UI owned migration
@@ -238,6 +240,10 @@ impl Database {
         );
         let _ = conn.execute(
             "ALTER TABLE ui_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'ask'",
+            [],
+        );
+        let _ = conn.execute(
+            "ALTER TABLE ui_settings ADD COLUMN launch_minimized INTEGER NOT NULL DEFAULT 0",
             [],
         );
         Ok(())
@@ -400,7 +406,7 @@ impl Database {
     /// Loads all persisted UI settings.
     pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
         let mut stmt = self.conn.prepare(
-            "SELECT language, carbon_intensity, kwh_cost, theme, currency, close_behavior \
+            "SELECT language, carbon_intensity, kwh_cost, theme, currency, close_behavior, launch_minimized \
              FROM ui_settings WHERE id = 1",
         )?;
         let result = stmt
@@ -412,6 +418,7 @@ impl Database {
                     theme: row.get(3)?,
                     currency: row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "USD".to_string()),
                     close_behavior: CloseBehavior::from_code(&row.get::<_, String>(5)?),
+                    launch_minimized: row.get(6)?,
                 })
             })
             .optional()?;
@@ -421,17 +428,20 @@ impl Database {
     /// Persists all UI settings.
     pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency, close_behavior) \
-             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6) \
+            "INSERT INTO ui_settings \
+               (id, language, carbon_intensity, kwh_cost, theme, currency, close_behavior, launch_minimized) \
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7) \
              ON CONFLICT(id) DO UPDATE SET \
-               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, close_behavior = ?6",
+               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, close_behavior = ?6, \
+               launch_minimized = ?7",
             params![
                 settings.language,
                 settings.carbon_intensity,
                 settings.kwh_cost,
                 settings.theme,
                 settings.currency,
-                settings.close_behavior.code()
+                settings.close_behavior.code(),
+                settings.launch_minimized
             ],
         )?;
         Ok(())
@@ -1118,6 +1128,7 @@ mod settings_tests {
         assert_eq!(settings.kwh_cost, "0.35");
         assert_eq!(settings.theme, "Hunting");
         assert_eq!(settings.currency, "USD");
+        assert!(!settings.launch_minimized);
     }
 
     #[test]
@@ -1144,8 +1155,10 @@ mod settings_tests {
                 .unwrap();
             let mut settings = database.load_ui_settings().unwrap().unwrap();
             assert_eq!(settings.close_behavior, CloseBehavior::Ask);
+            assert!(!settings.launch_minimized);
             settings.close_behavior = CloseBehavior::WindowOnly;
             settings.currency = "EUR".into();
+            settings.launch_minimized = true;
             database.save_ui_settings(&settings).unwrap();
         }
         {
@@ -1153,13 +1166,16 @@ mod settings_tests {
             let mut settings = database.load_ui_settings().unwrap().unwrap();
             assert_eq!(settings.close_behavior, CloseBehavior::WindowOnly);
             assert_eq!(settings.currency, "EUR");
+            assert!(settings.launch_minimized);
             settings.close_behavior = CloseBehavior::Everything;
+            settings.launch_minimized = false;
             database.save_ui_settings(&settings).unwrap();
         }
         {
             let mut database = open();
             let mut settings = database.load_ui_settings().unwrap().unwrap();
             assert_eq!(settings.close_behavior, CloseBehavior::Everything);
+            assert!(!settings.launch_minimized);
             settings.close_behavior = CloseBehavior::Ask;
             database.save_ui_settings(&settings).unwrap();
         }

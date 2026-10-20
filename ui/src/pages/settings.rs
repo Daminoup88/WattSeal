@@ -20,8 +20,8 @@ use crate::{
         TranslatedCarbonIntensity, TranslatedCloseBehavior, TranslatedElectricityCost, TranslatedTheme,
         custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
         settings_carbon_intensity, settings_close_behavior, settings_electricity_cost, settings_general,
-        settings_language, settings_launch_on_startup, settings_theme, settings_title, setup_choose_carbon,
-        setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
+        settings_language, settings_launch_minimized, settings_launch_on_startup, settings_theme, settings_title,
+        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
 };
@@ -163,6 +163,7 @@ impl SettingsPage {
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
         launch_on_startup: bool,
+        launch_minimized: bool,
         close_behavior: common::CloseBehavior,
     ) -> Element<'a, Message, AppTheme> {
         let title = Text::new(settings_title(language))
@@ -220,6 +221,13 @@ impl SettingsPage {
         }
 
         let content = content
+            .push(settings_row(
+                settings_launch_minimized(language),
+                toggler(launch_minimized)
+                    .on_toggle(Message::ToggleLaunchMinimized)
+                    .class(TogglerStyle::Standard)
+                    .into(),
+            ))
             .push(settings_row(
                 settings_close_behavior(language),
                 pick_list(
