@@ -6,13 +6,10 @@ use std::{
 
 use common::{
     EnergyUj,
-    types::{InitialInfo, MemoryInfo},
+    types::{InitialInfo, MemoryInfo, RamData, SensorData},
 };
 
-use crate::{
-    database::{RamData, SensorData},
-    sensors::{Sensor, SensorError, System},
-};
+use crate::sensors::{Sensor, SensorError, System};
 
 /// RAM usage sensor backed by sysinfo.
 pub struct RamSensor {

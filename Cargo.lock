@@ -777,10 +777,8 @@ dependencies = [
  "chrono",
  "common",
  "display-info",
- "mqtt",
  "msr-driver-rs",
  "nvml-wrapper",
- "rumqttc",
  "runas",
  "sysinfo",
  "windows 0.62.2",
@@ -824,6 +822,20 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4ca0197aee26d1ae37445ee532fefce43251d24cc7c166799f4d46817f1d3973"
 dependencies = [
  "crossbeam-utils",
+]
+
+[[package]]
+name = "connectors"
+version = "1.0.6"
+dependencies = [
+ "chrono",
+ "common",
+ "machine-uid",
+ "mockall",
+ "rumqttc",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -3054,19 +3066,6 @@ checksum = "bb85c154ba489f01b25c0d36ae69a87e4a1c73a72631fc6c0eb6dde34a73e44b"
 dependencies = [
  "num-traits",
  "pxfm",
-]
-
-[[package]]
-name = "mqtt"
-version = "1.0.6"
-dependencies = [
- "common",
- "machine-uid",
- "mockall",
- "rumqttc",
- "serde",
- "serde_json",
- "thiserror 2.0.21",
 ]
 
 [[package]]
@@ -5832,6 +5831,7 @@ dependencies = [
  "chrono",
  "collector",
  "common",
+ "connectors",
  "gtk",
  "image 0.25.10",
  "libloading 0.8.9",

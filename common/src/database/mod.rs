@@ -13,10 +13,10 @@ pub use purge::averaging_and_purging_data;
 use rusqlite::{Connection, OptionalExtension, Transaction, params};
 
 use crate::{
-    AllTimeData,
+    AllTimeData, MetricSample,
     types::{
-        CPUData, ComputedSensorData, DiskData, EnergyUj, Event, GPUData, GeneralData, HardwareInfo, NetworkData,
-        ProcessData, RamData, TotalData,
+        CPUData, ComputedSensorData, DiskData, EnergyUj, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData,
+        RamData, TotalData,
     },
 };
 
@@ -272,12 +272,12 @@ impl Database {
     }
 
     /// Creates sensor tables that don't already exist.
-    pub fn create_tables_if_not_exists(&mut self, table_names: &Vec<String>) -> Result<(), DatabaseError> {
+    pub fn create_tables_if_not_exists(&mut self, hardware: &HardwareInfo) -> Result<(), DatabaseError> {
         let tx = self.conn.transaction()?;
 
         let mut current_tables = self.tables.clone().unwrap_or_default();
         let mut has_changed = false;
-        for name in table_names {
+        for name in hardware.sensor_table_names() {
             if !current_tables.contains(&name.to_string()) {
                 if let Some(create_sql) = dispatch_entry!(name, create_table_sql()) {
                     tx.execute_batch(&create_sql)?;
@@ -299,21 +299,17 @@ impl Database {
     }
 
     /// Insert an event and update component energy totals in a single transaction.
-    pub fn insert_event_and_update_energy(
-        &mut self,
-        event: &Event<ComputedSensorData>,
-        real_duration: Duration,
-    ) -> Result<(), DatabaseError> {
-        let timestamp_ms = event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
-        let duration_ms = real_duration.as_millis().max(1) as i64;
+    pub fn insert_sample_and_update_energy(&mut self, sample: &MetricSample) -> Result<(), DatabaseError> {
+        let timestamp_ms = sample.timestamp_ms();
+        let duration_ms = sample.duration.as_millis().max(1) as i64;
 
         let tx = self.conn.transaction()?;
-        for sensor_data in event.data() {
+        for sensor_data in sample.data() {
             Self::insert_sensor_data(&tx, timestamp_ms, duration_ms, sensor_data)?;
         }
 
         // Batch energy updates in the same transaction
-        for sensor_data in event.data() {
+        for sensor_data in sample.data() {
             if let Some(energy) = sensor_data.total_energy() {
                 tx.execute(
                     "INSERT INTO component_all_time_data (component_name, total_energy_uj) VALUES (?1, ?2) \
@@ -327,16 +323,12 @@ impl Database {
     }
 
     /// Inserts a sensor event with all its readings.
-    pub fn insert_event(
-        &mut self,
-        event: &Event<ComputedSensorData>,
-        real_duration: Duration,
-    ) -> Result<(), DatabaseError> {
-        let timestamp_ms = event.time().duration_since(SystemTime::UNIX_EPOCH)?.as_millis() as i64;
-        let duration_ms = real_duration.as_millis().max(1) as i64;
+    pub fn insert_sample(&mut self, sample: &MetricSample) -> Result<(), DatabaseError> {
+        let timestamp_ms = sample.timestamp_ms();
+        let duration_ms = sample.duration.as_millis().max(1) as i64;
 
         let tx = self.conn.transaction()?;
-        for sensor_data in event.data() {
+        for sensor_data in sample.data() {
             Self::insert_sensor_data(&tx, timestamp_ms, duration_ms, sensor_data)?;
         }
         tx.commit()?;
@@ -344,7 +336,11 @@ impl Database {
     }
 
     /// Insert hardware info if line with id=1 doesn't exist, otherwise update it
-    pub fn insert_hardware_info(&mut self, data: &GeneralData) -> Result<(), DatabaseError> {
+    pub fn insert_hardware_info(&mut self, hardware: &HardwareInfo) -> Result<(), DatabaseError> {
+        let data = GeneralData {
+            tables: hardware.sensor_table_names().join(","),
+            hardware_info: hardware.clone(),
+        };
         let tx = self.conn.transaction()?;
 
         let existing: Option<i64> = tx

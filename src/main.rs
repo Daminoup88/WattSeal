@@ -5,12 +5,13 @@ use std::{
     process::{Child, Command},
     sync::{Arc, Mutex, mpsc},
     thread,
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use bpaf::{OptionParser, Parser, construct, long, short};
-use collector::{CollectorApp, ConsumptionUnit, MQTTInfo};
+use collector::{Collector, ConsumptionUnit};
 use common::WINDOW_ICON_BYTES;
+use connectors::{Connectors, DatabaseConnector, MqttConfig, MqttConnector};
 use tray_icon::{
     TrayIconBuilder, TrayIconEvent,
     menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem},
@@ -33,7 +34,7 @@ struct Options {
     mqtt_addr: Option<SocketAddr>,
     mqtt_unit: Option<ConsumptionUnit>,
     home_assistant: bool,
-    mqtt_processes: Option<String>,
+    process_limit: Option<usize>,
     mqtt_user: Option<String>,
     mqtt_pass: Option<String>,
     mqtt_tls: bool,
@@ -91,9 +92,9 @@ fn options() -> OptionParser<Options> {
         .help("Simple mode for Home Assistant integration: disables process metrics, enables MQTT discovery and publishes Wh data.")
         .switch();
 
-    let mqtt_processes = long("mqtt-processes")
-        .help("Process publishing mode: off, capped:N. Defaults to capped:10 (or off if --home-assistant).")
-        .argument::<String>("MODE")
+    let process_limit = long("process-limit")
+        .help("Maximum number of processes to collect. Defaults to 10, or 0 with --home-assistant.")
+        .argument::<usize>("LIMIT")
         .optional();
 
     let mqtt_user = long("mqtt-user")
@@ -132,7 +133,7 @@ fn options() -> OptionParser<Options> {
             mqtt_addr,
             mqtt_unit,
             home_assistant,
-            mqtt_processes,
+            process_limit,
             mqtt_user,
             mqtt_pass,
             mqtt_tls,
@@ -154,7 +155,7 @@ fn options() -> OptionParser<Options> {
             mqtt_addr,
             mqtt_unit,
             home_assistant,
-            mqtt_processes,
+            process_limit,
             mqtt_user,
             mqtt_pass,
             mqtt_tls,
@@ -315,13 +316,91 @@ fn run_linux_tray(ui_child: &Arc<Mutex<Option<Child>>>) -> bool {
     true
 }
 
-/// Initializes the collector
-fn start_collector(enable_save_db: bool, mqtt_info: Option<MQTTInfo>) -> Result<CollectorApp, String> {
-    let mut app =
-        CollectorApp::new(enable_save_db, mqtt_info).map_err(|e| format!("Failed to create CollectorApp: {e}"))?;
-    app.initialize()
-        .map_err(|e| format!("Failed to initialize CollectorApp: {e}"))?;
-    Ok(app)
+const DEFAULT_SAMPLING_INTERVAL: Duration = Duration::from_secs(1);
+
+/// Initializes the collector and configured output connectors.
+fn init_collector_and_connectors(options: &Options) -> Result<(Collector, Connectors), String> {
+    let mut collector = Collector::new().map_err(|e| format!("Failed to create Collector: {e}"))?;
+    let process_limit = options
+        .process_limit
+        .unwrap_or(if options.home_assistant { 0 } else { 10 });
+    collector.set_process_limit(process_limit);
+
+    let database = if options.db_mode {
+        Some(DatabaseConnector::new(collector.hardware_info())?)
+    } else {
+        None
+    };
+
+    let mqtt = if let Some(mqtt_addr) = options.mqtt_addr {
+        let id = options.mqtt_id.clone().unwrap_or_else(|| {
+            std::env::var("COMPUTERNAME")
+                .or_else(|_| std::env::var("HOSTNAME"))
+                .unwrap_or_else(|_| "wattseal_collector".to_string())
+        });
+        let mut config = MqttConfig::new(id, mqtt_addr);
+        config.home_assistant = options.home_assistant;
+        config.user = options.mqtt_user.clone();
+        config.pass = options.mqtt_pass.clone();
+        config.tls = options.mqtt_tls;
+
+        if options.home_assistant {
+            config.unit = Some(ConsumptionUnit::WattHour);
+        } else {
+            config.unit = options.mqtt_unit;
+        }
+
+        Some(MqttConnector::new(config, collector.hardware_info())?)
+    } else {
+        None
+    };
+
+    let connectors = Connectors::new(database, mqtt);
+    Ok((collector, connectors))
+}
+
+fn run_collector_loop(mut collector: Collector, mut connectors: Connectors) {
+    let interval = DEFAULT_SAMPLING_INTERVAL;
+    #[cfg(debug_assertions)]
+    let mut iteration = 0u64;
+
+    // Wait at least one interval before first collection to avoid skewed delta readings
+    thread::sleep(interval);
+
+    #[cfg(debug_assertions)]
+    println!(
+        "\n========== POWER CONSUMPTION MONITORING ==========\nLogging to configured outputs every {:?}. Press Ctrl+C to stop.\n",
+        interval
+    );
+
+    loop {
+        let start = Instant::now();
+        let sample = collector.sample();
+        #[cfg(debug_assertions)]
+        {
+            println!("\n--- Iteration {} ---", iteration);
+            for sensor_data in &sample.data {
+                println!("{sensor_data}");
+            }
+        }
+        connectors.handle_sample(&sample);
+
+        #[cfg(debug_assertions)]
+        {
+            iteration += 1;
+            if start.elapsed() > interval {
+                eprintln!(
+                    "WARNING: Iteration {} took longer than {:?} s.",
+                    iteration,
+                    interval.as_secs()
+                );
+            }
+        }
+        let elapsed = start.elapsed();
+        if elapsed < interval {
+            thread::sleep(interval - elapsed);
+        }
+    }
 }
 
 fn main() {
@@ -383,41 +462,9 @@ fn main() {
         }
     };
 
-    let mqtt_info = if let Some(mqtt_addr) = options.mqtt_addr {
-        let id = options.mqtt_id.unwrap_or_else(|| {
-            std::env::var("COMPUTERNAME")
-                .or_else(|_| std::env::var("HOSTNAME"))
-                .unwrap_or_else(|_| "wattseal_collector".to_string())
-        });
-        let mut config = collector::MqttConfig::new(id, mqtt_addr);
-        config.home_assistant = options.home_assistant;
-        config.user = options.mqtt_user;
-        config.pass = options.mqtt_pass;
-        config.tls = options.mqtt_tls;
-
-        if options.home_assistant {
-            config.unit = Some(ConsumptionUnit::WattHour);
-            config.process_mode = collector::ProcessPublishMode::Disabled;
-        } else {
-            config.unit = options.mqtt_unit;
-            config.process_mode = match options.mqtt_processes.as_deref() {
-                Some("off") => collector::ProcessPublishMode::Disabled,
-                Some(s) if s.starts_with("capped:") => {
-                    let n = s.trim_start_matches("capped:").parse::<usize>().unwrap_or(10);
-                    collector::ProcessPublishMode::Capped(n)
-                }
-                _ => collector::ProcessPublishMode::Capped(10),
-            };
-        }
-
-        Some(MQTTInfo::from_config(config, None))
-    } else {
-        None
-    };
-
     if options.headless_mode {
-        match start_collector(options.db_mode, mqtt_info) {
-            Ok(mut app) => app.run(),
+        match init_collector_and_connectors(&options) {
+            Ok((collector, connectors)) => run_collector_loop(collector, connectors),
             Err(e) => common::clog!("✗ {e}"),
         }
         return;
@@ -426,9 +473,10 @@ fn main() {
     // Doesn't run in headless mode
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
+    let options_clone = options.clone();
     thread::spawn(move || {
-        let mut app = match start_collector(options.db_mode, mqtt_info) {
-            Ok(app) => app,
+        let (collector, connectors) = match init_collector_and_connectors(&options_clone) {
+            Ok(res) => res,
             Err(e) => {
                 common::clog!("✗ {e}");
                 let _ = tx.send(Err(e));
@@ -436,7 +484,7 @@ fn main() {
             }
         };
         let _ = tx.send(Ok(()));
-        app.run();
+        run_collector_loop(collector, connectors);
     });
 
     // Wait for collector to finish initializing

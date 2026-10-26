@@ -5,14 +5,11 @@ use std::{
 
 use common::{
     EnergyUj,
-    types::{Byte, DiskInfo, InitialInfo},
+    types::{Byte, DiskData, DiskInfo, InitialInfo, SensorData},
 };
 use sysinfo::Disks;
 
-use crate::{
-    database::{DiskData, SensorData},
-    sensors::{Sensor, SensorError},
-};
+use crate::sensors::{Sensor, SensorError};
 
 const SSD_IDLE_W: f64 = 0.05;
 const HDD_IDLE_W: f64 = 3.0;

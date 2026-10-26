@@ -15,7 +15,7 @@ use std::{
 use battery::Manager;
 use common::types::EnergyUj;
 pub use common::{
-    AllTimeData, ComputedSensorData, Event, GPUData, GeneralData, ProcessData, SensorData, TotalData,
+    AllTimeData, ComputedSensorData, GPUData, GeneralData, ProcessData, SensorData, TotalData,
     types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
 pub use cpu::CPUSensor;
@@ -35,6 +35,19 @@ pub enum SensorType {
     RAM(RamSensor),
     Disk(DiskSensor),
     Network(NetworkSensor),
+}
+
+impl SensorType {
+    /// Returns the sensor category/kind name.
+    pub fn sensor_kind(&self) -> &'static str {
+        match self {
+            SensorType::CPU(_) => "CPU",
+            SensorType::GPU(_) => "GPU",
+            SensorType::RAM(_) => "RAM",
+            SensorType::Disk(_) => "Disk",
+            SensorType::Network(_) => "Network",
+        }
+    }
 }
 
 impl Sensor for SensorType {
@@ -89,12 +102,12 @@ pub enum SensorError {
 }
 
 /// Aggregates readings from all sensors into a single timestamped event.
-pub fn create_event_from_sensors(
+pub fn measure_sensors(
     sensors: &Vec<SensorType>,
     system: Rc<RefCell<System>>,
     since_last_update: Duration,
-) -> Event {
-    let time = SystemTime::now();
+    process_limit: usize,
+) -> Vec<SensorData> {
     let mut data: Vec<SensorData> = Vec::new();
 
     let mut integrated_gpu_energy: Option<EnergyUj> = None;
@@ -142,7 +155,7 @@ pub fn create_event_from_sensors(
                 data.push(d);
             }
             Err(e) => common::logging::log_component_error(
-                sensor.table_name(),
+                sensor.sensor_kind(),
                 &format!("Failed to read sensor data: {:?}", e),
             ),
         }
@@ -217,14 +230,16 @@ pub fn create_event_from_sensors(
         }
     }
 
-    let proc_gpu_usage = get_process_gpu_usage(sensors);
-    let measured_processes = get_measured_processes(system, proc_gpu_usage);
-    data.push(SensorData::Process(measured_processes));
+    if process_limit > 0 {
+        let proc_gpu_usage = get_process_gpu_usage(sensors);
+        let measured_processes = get_measured_processes(system, proc_gpu_usage);
+        data.push(SensorData::Process(measured_processes));
+    }
 
-    return Event::new(time, data);
+    return data;
 }
 
-pub fn to_computed_event_with_cap(sensors_event: &Event, process_cap: Option<usize>) -> Event<ComputedSensorData> {
+pub fn compute_sensors(sensors_data: &Vec<SensorData>, process_limit: usize) -> Vec<ComputedSensorData> {
     let mut data: Vec<ComputedSensorData> = Vec::new();
     let (mut cpu_energy, mut cpu_usage, mut nb_cpus) = (EnergyUj::from_u64(0), 0.0, 0);
     let (mut gpu_energy, mut gpu_usage, mut nb_gpus) = (EnergyUj::from_u64(0), 0.0, 0);
@@ -232,7 +247,7 @@ pub fn to_computed_event_with_cap(sensors_event: &Event, process_cap: Option<usi
     let mut total_energy = EnergyUj::from_u64(0);
     let mut process_index = None;
 
-    for sensor_data in sensors_event.data().iter() {
+    for sensor_data in sensors_data.iter() {
         if let Some(energy) = sensor_data.total_energy() {
             total_energy += energy;
 
@@ -260,37 +275,31 @@ pub fn to_computed_event_with_cap(sensors_event: &Event, process_cap: Option<usi
     cpu_usage /= nb_cpus.max(1) as f64;
     gpu_usage /= nb_gpus.max(1) as f64;
 
-    let process_list: Vec<ProcessData> = match process_cap {
-        Some(0) => Vec::new(),
-        _ => {
-            let computed_process_data = compute_processes_energy(
-                process_index
-                    .and_then(|idx| {
-                        if let SensorData::Process(measured_processes) = &sensors_event.data()[idx] {
-                            Some(measured_processes.to_vec())
-                        } else {
-                            None
-                        }
-                    })
-                    .unwrap_or_default(),
-                cpu_energy,
-                cpu_usage,
-                gpu_energy,
-                gpu_usage,
-                total_energy,
-            );
-            let sorted = sort_processes_by_energy(computed_process_data);
-            if let Some(cap) = process_cap {
-                sorted.into_iter().take(cap).collect()
-            } else {
-                sorted
-            }
-        }
-    };
+    if process_limit > 0 {
+        let computed_process_data = compute_processes_energy(
+            process_index
+                .and_then(|idx| {
+                    if let SensorData::Process(measured_processes) = &sensors_data[idx] {
+                        Some(measured_processes.to_vec())
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or_default(),
+            cpu_energy,
+            cpu_usage,
+            gpu_energy,
+            gpu_usage,
+            total_energy,
+        );
+        let process_list = sort_processes_by_energy(computed_process_data)
+            .into_iter()
+            .take(process_limit)
+            .collect();
+        data.push(ComputedSensorData::Process(process_list));
+    }
 
-    data.push(ComputedSensorData::Process(process_list));
-
-    Event::new(sensors_event.time(), data)
+    return data;
 }
 
 pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
@@ -316,16 +325,16 @@ pub fn get_process_gpu_usage(sensors: &Vec<SensorType>) -> HashMap<u32, f64> {
 }
 
 /// Collects hardware info (names + initial specs) from all sensors.
-pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -> GeneralData {
+pub fn gather_hardware_info(sensors: &[SensorType]) -> HardwareInfo {
     let mut sensors_info: Vec<InitialInfo> = Vec::new();
 
     for sensor in sensors {
         match sensor.read_name() {
             Ok(name) => {
-                crate::clog!("✓ Added sensor {}: {}", sensor.table_name(), name)
+                crate::clog!("✓ Added sensor {}: {}", sensor.sensor_kind(), name)
             }
             Err(SensorError::NotSupported) => {}
-            Err(e) => crate::clog!("✗ Failed to read sensor name for {}: {:?}", sensor.table_name(), e),
+            Err(e) => crate::clog!("✗ Failed to read sensor name for {}: {:?}", sensor.sensor_kind(), e),
         }
 
         match sensor.read_initial_info() {
@@ -333,7 +342,7 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
             Err(SensorError::NotSupported) => {}
             Err(e) => crate::clog!(
                 "✗ Failed to read initial info for sensor {}: {:?}",
-                sensor.table_name(),
+                sensor.sensor_kind(),
                 e
             ),
         }
@@ -426,12 +435,22 @@ pub fn get_hardware_info(sensors: &Vec<SensorType>, table_names: &Vec<String>) -
         battery_info.cycle_count
     );
     sensors_info.push(InitialInfo::Battery(battery_info));
-    let hardware_info: HardwareInfo = sensors_info.into();
+    sensors_info.into()
+}
 
-    let data = GeneralData {
-        tables: table_names.join(","),
-        hardware_info: hardware_info,
-    };
+#[cfg(test)]
+mod tests {
+    use common::ComputedSensorData;
 
-    return data;
+    use super::compute_sensors;
+
+    #[test]
+    fn process_limit_zero_omits_process_metric() {
+        let data = compute_sensors(&Vec::new(), 0);
+
+        assert!(
+            data.iter()
+                .all(|sensor| !matches!(sensor, ComputedSensorData::Process(_)))
+        );
+    }
 }

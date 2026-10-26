@@ -1,120 +1,64 @@
-pub mod database;
 pub mod sensors;
 
 use std::{
     cell::RefCell,
-    net::SocketAddr,
     rc::Rc,
-    thread,
-    time::{Duration, Instant, SystemTime},
+    time::{Instant, SystemTime},
 };
 
 #[cfg(not(debug_assertions))]
 use common::logging::start_log_session;
-use common::{
-    ComputedSensorData, DatabaseEntry, ProcessData, TotalData,
-    database::purge::averaging_and_purging_data,
-    types::{EnergyUj, HardwareInfo, PublishableSensor},
-};
-pub use common::{clog, types::ConsumptionUnit};
-use database::Database;
-use mqtt::topics::sensor_type_to_topic;
-pub use mqtt::{MQTTPublisher, MqttConfig, ProcessPublishMode};
+pub use common::types::ConsumptionUnit;
+use common::{MetricSample, clog, types::HardwareInfo};
 use sensors::{
-    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
+    DiskSensor, NetworkSensor, RamSensor, SensorType, compute_sensors, gather_hardware_info,
     gpu::{GPUVendor, get_gpu_list},
-    to_computed_event_with_cap,
 };
 use sysinfo::System;
 
-/// MQTT information to interact with a MQTT client
-pub struct MQTTInfo {
-    pub config: MqttConfig,
-    pub publisher: MQTTPublisher<rumqttc::Client>,
-}
+use crate::sensors::measure_sensors;
 
-/// Background sensor-collection application.
-pub struct CollectorApp {
-    database: Option<Database>,
-    mqtt_info: Option<MQTTInfo>,
+/// Hardware sensor metrics collector.
+/// Samples CPU, GPU, RAM, Disk, Network and process energy/power.
+pub struct Collector {
     sensors: Vec<SensorType>,
     system: Rc<RefCell<System>>,
+    hardware_info: HardwareInfo,
     last_update: Instant,
-    last_purge: Instant,
-    #[cfg(debug_assertions)]
-    iteration: u64,
+    process_limit: usize,
 }
 
-impl MQTTInfo {
-    pub fn new(id: &str, addr: &SocketAddr, unit: Option<ConsumptionUnit>) -> Self {
-        let mut config = MqttConfig::new(id.to_string(), *addr);
-        config.unit = unit;
-        Self::from_config(config, None)
-    }
-
-    pub fn from_config(config: MqttConfig, hardware_info: Option<&HardwareInfo>) -> Self {
-        let publisher = MQTTPublisher::new_from_config(&config, hardware_info);
-        MQTTInfo { config, publisher }
-    }
-}
-
-impl CollectorApp {
-    /// Creates a new collector with a database connection.
-    pub fn new(enable_save_db: bool, mqtt_info: Option<MQTTInfo>) -> Result<Self, String> {
-        let database;
-        if enable_save_db {
-            database = Some(Database::new().map_err(|e| format!("Failed to create database: {e}"))?);
-        } else {
-            database = None
-        }
-        let s = System::new_all();
-        Ok(CollectorApp {
-            database,
-            mqtt_info,
-            sensors: Vec::new(),
-            system: Rc::new(RefCell::new(s)),
-            last_update: Instant::now(),
-            last_purge: Instant::now(),
-            #[cfg(debug_assertions)]
-            iteration: 0,
-        })
-    }
-
-    fn purge_and_average(&mut self) {
-        thread::spawn(|| {
-            if let Ok(mut db) = Database::new() {
-                let _ = averaging_and_purging_data(&mut db, 24, 24);
-            }
-        });
-        self.last_purge = Instant::now();
-    }
-
-    /// Detects hardware sensors, creates database tables, and saves hardware info.
-    pub fn initialize(&mut self) -> Result<(), String> {
+impl Collector {
+    /// Detects hardware sensors, loads drivers, and gathers hardware specifications.
+    pub fn new() -> Result<Self, String> {
         #[cfg(not(debug_assertions))]
         start_log_session();
 
-        crate::clog!("\n========== INITIALIZING SYSTEM ==========\n");
+        clog!("\n========== INITIALIZING SYSTEM ==========\n");
+
+        let s = System::new_all();
+        let system = Rc::new(RefCell::new(s));
+        let mut sensors = Vec::new();
 
         // CPU sensor
-        crate::clog!("Initializing sensors...");
-        match sensors::cpu::get_cpu_power_sensor(self.system.clone(), 0) {
+        clog!("Initializing sensors...");
+        match sensors::cpu::get_cpu_power_sensor(system.clone(), 0) {
             Ok(sensor) => {
                 if let SensorType::CPU(cpu_sensor) = &sensor {
                     let (os_label, mode_label) = cpu_sensor.power_mode_labels();
-                    crate::clog!("CPU power mode: {os_label}/{mode_label}");
+                    clog!("CPU power mode: {os_label}/{mode_label}");
                 }
-                crate::clog!("✓ CPU Power Sensor initialized successfully");
-                self.sensors.push(sensor);
+                clog!("✓ CPU Power Sensor initialized successfully");
+                sensors.push(sensor);
             }
-            Err(e) => crate::clog!("✗ Failed to initialize CPU Power Sensor: {:?}", e),
+            Err(e) => clog!("✗ Failed to initialize CPU Power Sensor: {:?}", e),
         }
 
         // GPU sensors
         let gpu_list = get_gpu_list();
-        crate::clog!("\nDetected GPUs: {gpu_list:#?}");
+        clog!("\nDetected GPUs: {gpu_list:#?}");
         if gpu_list.is_empty() {
-            crate::clog!("⚠ No supported GPU adapters detected.");
+            clog!("⚠ No supported GPU adapters detected.");
         }
 
         let (mut nvidia_index, mut amd_index, mut intel_index) = (0u32, 0u32, 0u32);
@@ -141,16 +85,16 @@ impl CollectorApp {
 
             match sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index) {
                 Ok(sensor) => {
-                    crate::clog!(
+                    clog!(
                         "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
                         gpu_name,
                         vendor,
                         vendor_index
                     );
-                    self.sensors.push(sensor);
+                    sensors.push(sensor);
                 }
                 Err(e) => {
-                    crate::clog!(
+                    clog!(
                         "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, vendor_index={}): {:?}",
                         gpu_name,
                         vendor,
@@ -162,175 +106,49 @@ impl CollectorApp {
         }
 
         // RAM, Disk, Network sensors
-        self.sensors.push(SensorType::RAM(RamSensor::new(self.system.clone())));
-        self.sensors.push(SensorType::Disk(DiskSensor::new()));
-        self.sensors.push(SensorType::Network(NetworkSensor::new()));
-
-        let mut table_names: Vec<String> = self.sensors.iter().map(|s| s.table_name().into()).collect();
-        table_names.push(ProcessData::table_name_static().into());
-        table_names.push(TotalData::table_name_static().into());
-
-        if let Some(database) = &mut self.database {
-            // Database
-            crate::clog!("\n========== SETTING UP DATABASE ==========");
-            database
-                .create_tables_if_not_exists(&table_names)
-                .map_err(|e| format!("Failed to create database tables: {e}"))?;
-            crate::clog!("✓ Database initialized");
-        }
+        sensors.push(SensorType::RAM(RamSensor::new(system.clone())));
+        sensors.push(SensorType::Disk(DiskSensor::new()));
+        sensors.push(SensorType::Network(NetworkSensor::new()));
 
         // Hardware info
-        crate::clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
-        let info = get_hardware_info(&self.sensors, &table_names);
+        clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");
+        let hardware_info = gather_hardware_info(&sensors);
+        clog!("Initialization complete");
 
-        if let Some(database) = &mut self.database {
-            match database.insert_hardware_info(&info) {
-                Ok(_) => crate::clog!("✓ Hardware info saved"),
-                Err(e) => crate::clog!("✗ Failed to save hardware info: {e}"),
-            }
-        }
-        if let Some(mqtt_info) = &mut self.mqtt_info {
-            match mqtt_info.publisher.set_hardware_info(&info.hardware_info) {
-                Ok(()) => crate::clog!("✓ MQTT hardware manifest published"),
-                Err(e) => crate::clog!("✗ Failed to publish MQTT hardware manifest: {e}"),
-            }
-        }
-        crate::clog!("Initialization complete");
-        Ok(())
+        Ok(Collector {
+            sensors,
+            system,
+            hardware_info,
+            last_update: Instant::now(),
+            process_limit: 10,
+        })
     }
 
-    /// Runs the collection loop, sampling sensors every second.
-    pub fn run(&mut self) {
-        let start = Instant::now();
-        // Purge/averaging runs in a separate thread so collection starts immediately.
-        self.purge_and_average();
-        // Wait at least 1 second before first collection to avoid skewed readings
-        let duration = start.elapsed();
-        if duration < Duration::from_secs(1) {
-            thread::sleep(Duration::from_secs(1) - duration);
-        }
+    /// Returns a reference to the detected static hardware specifications.
+    pub fn hardware_info(&self) -> &HardwareInfo {
+        &self.hardware_info
+    }
 
-        #[cfg(debug_assertions)]
-        println!(
-            "\n========== POWER CONSUMPTION MONITORING ==========\nLogging to database every second. Press Ctrl+C to stop.\n"
+    /// Sets the maximum number of processes included in collected samples.
+    pub fn set_process_limit(&mut self, process_limit: usize) {
+        self.process_limit = process_limit;
+    }
+
+    /// Performs one sampling tick across all hardware sensors and returns the computed sample.
+    pub fn sample(&mut self) -> MetricSample {
+        let now = Instant::now();
+        let since_last_update = self.last_update.elapsed();
+        self.last_update = now;
+
+        let time = SystemTime::now();
+        let raw_data = measure_sensors(
+            &self.sensors,
+            self.system.clone(),
+            since_last_update,
+            self.process_limit,
         );
+        let computed_data = compute_sensors(&raw_data, self.process_limit);
 
-        loop {
-            if self.last_purge.elapsed() > Duration::from_secs(24 * 3600) {
-                self.purge_and_average();
-            }
-            let start_time = Instant::now();
-            let since_last_update = self.last_update.elapsed();
-            self.last_update = start_time;
-
-            #[cfg(debug_assertions)]
-            println!("\n--- Iteration {} ---", self.iteration);
-
-            let event = create_event_from_sensors(&self.sensors, self.system.clone(), since_last_update);
-
-            let process_cap = self.mqtt_info.as_ref().and_then(|m| match m.config.process_mode {
-                ProcessPublishMode::Disabled => Some(0),
-                ProcessPublishMode::Capped(n) => Some(n),
-            });
-
-            let computed_event = to_computed_event_with_cap(&event, process_cap.or(Some(10)));
-
-            if let Some(database) = &mut self.database {
-                #[cfg(debug_assertions)]
-                {
-                    let start = Instant::now();
-
-                    let result = database.insert_event_and_update_energy(&computed_event, since_last_update);
-                    let duration = start.elapsed();
-                    match result {
-                        Ok(_) => println!("✓ Event data saved to database (took {:.2?})", duration),
-                        Err(e) => eprintln!("✗ Failed to save event data: {:?}", e),
-                    }
-                }
-
-                #[cfg(not(debug_assertions))]
-                let _ = database.insert_event_and_update_energy(&computed_event, since_last_update);
-            }
-
-            let timestamp_ms = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or(Duration::ZERO)
-                .as_millis() as i64;
-
-            if let Some(mqtt_info) = &mut self.mqtt_info {
-                publish_mqtt_sensors(mqtt_info, computed_event.data(), timestamp_ms);
-            }
-
-            #[cfg(debug_assertions)]
-            {
-                for sensor_data in computed_event.data() {
-                    println!("{sensor_data}");
-                }
-            }
-
-            #[cfg(debug_assertions)]
-            {
-                self.iteration += 1;
-                if start_time.elapsed() > Duration::from_millis(1000) {
-                    eprintln!("WARNING: Iteration {} took longer than 1 second.", self.iteration);
-                }
-            }
-
-            // Adjust sleep duration to maintain 1 second interval
-            let now_sub_ms = SystemTime::now()
-                .duration_since(SystemTime::UNIX_EPOCH)
-                .unwrap_or(Duration::ZERO)
-                .as_millis()
-                % 1000;
-            if now_sub_ms < 1000 {
-                thread::sleep(Duration::from_millis(1000 - now_sub_ms as u64));
-            }
-        }
-    }
-}
-
-fn publish_sensor(mqtt_info: &MQTTInfo, sensor_data: &ComputedSensorData, timestamp_ms: i64) {
-    let sensor_key = match sensor_data {
-        ComputedSensorData::GPU(data) => data.name.as_deref().unwrap_or("GPU"),
-        _ => sensor_data.sensor_type(),
-    };
-    publish_sensor_envelope(
-        mqtt_info,
-        sensor_data,
-        &sensor_key,
-        timestamp_ms,
-        sensor_data.total_energy().map(|energy| energy.as_u64()),
-    );
-}
-
-fn publish_mqtt_sensors(mqtt_info: &MQTTInfo, sensors: &[ComputedSensorData], timestamp_ms: i64) {
-    for sensor_data in sensors {
-        publish_sensor(mqtt_info, sensor_data, timestamp_ms);
-    }
-}
-
-fn publish_sensor_envelope<T: PublishableSensor>(
-    mqtt_info: &MQTTInfo,
-    sensor_data: &T,
-    sensor_type: &str,
-    timestamp_ms: i64,
-    total_energy_uj: Option<u64>,
-) {
-    let topic = sensor_type_to_topic(&mqtt_info.config.id, sensor_type);
-    let _result = match mqtt_info.config.unit {
-        Some(ConsumptionUnit::WattHour) => {
-            let total_energy_wh = total_energy_uj.map(|uj| EnergyUj::from_u64(uj).as_watt_hours());
-            mqtt_info
-                .publisher
-                .publish_envelope(&topic, &sensor_data.to_wh(), timestamp_ms, total_energy_wh)
-        }
-        _ => mqtt_info
-            .publisher
-            .publish_envelope(&topic, sensor_data, timestamp_ms, total_energy_uj),
-    };
-    #[cfg(debug_assertions)]
-    match _result {
-        Ok(_) => println!("✓ Sensor data published on topic {}", topic),
-        Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e),
+        MetricSample::new(time, since_last_update, computed_data)
     }
 }

@@ -9,13 +9,19 @@ use std::{
     time::Duration,
 };
 
-use common::types::HardwareInfo;
-pub use config::{MqttConfig, ProcessPublishMode};
+use common::{
+    MetricSample, clog,
+    logging::log_component_error,
+    types::{ComputedSensorData, ConsumptionUnit, EnergyUj, HardwareInfo, PublishableSensor},
+};
+pub use config::MqttConfig;
+#[cfg(test)]
 use mockall::automock;
 use rumqttc::{Client, MqttOptions, QoS};
 use serde::Serialize;
 use serde_json::Value;
 use thiserror::Error;
+use topics::sensor_type_to_topic;
 
 #[derive(Debug, Error)]
 pub enum MQTTError {
@@ -27,9 +33,7 @@ pub enum MQTTError {
 
 #[derive(Debug, Serialize)]
 pub struct Envelope<'a, T: Serialize, E: Serialize = u64> {
-    /// Timestamp of the measurement represented by the envelope.
     pub timestamp_ms: i64,
-    /// Process-lifetime cumulative energy, when the source provides energy.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total_energy: Option<E>,
     #[serde(flatten)]
@@ -51,6 +55,7 @@ fn accumulate_field(topic: &str, envelope: &mut Value, path: &str, totals: &mut 
 const DISK_CUMULATIVE_FIELDS: &[&str] = &["Disk.read_bytes", "Disk.written_bytes"];
 const NETWORK_CUMULATIVE_FIELDS: &[&str] = &["Network.downloaded_bytes", "Network.uploaded_bytes"];
 const DEFAULT_MQTT_ID: &str = "wattseal_collector";
+const MQTT_REQUEST_CAPACITY: usize = 100;
 
 fn cumulative_fields_for_topic(topic: &str) -> &'static [&'static str] {
     match topic.rsplit('/').next() {
@@ -60,9 +65,8 @@ fn cumulative_fields_for_topic(topic: &str) -> &'static [&'static str] {
     }
 }
 
-#[automock]
+#[cfg_attr(test, automock)]
 pub trait MQTTClient {
-    /// Non-blocking publish of `payload` to the MQTT topic
     fn try_publish_bytes(&self, topic: &str, qos: QoS, retain: bool, payload: Vec<u8>) -> Result<(), MQTTError>;
 }
 
@@ -81,7 +85,6 @@ pub struct MQTTPublisher<T: MQTTClient> {
 }
 
 impl<T: MQTTClient> MQTTPublisher<T> {
-    /// Creates a publisher around an MQTT client implementation.
     pub fn new(client: T) -> Self {
         let default_addr = SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(127, 0, 0, 1), 1883));
         Self {
@@ -92,19 +95,16 @@ impl<T: MQTTClient> MQTTPublisher<T> {
         }
     }
 
-    /// Publishes a non-retained JSON message at QoS 1.
     pub fn publish(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTError> {
         let payload = serde_json::to_vec(data)?;
         self.client.try_publish_bytes(topic, QoS::AtLeastOnce, false, payload)
     }
 
-    /// Publishes a retained JSON message at QoS 1.
     pub fn publish_retained(&self, topic: &str, data: &impl Serialize) -> Result<(), MQTTError> {
         let payload = serde_json::to_vec(data)?;
         self.client.try_publish_bytes(topic, QoS::AtLeastOnce, true, payload)
     }
 
-    /// Publishes a non-retained QoS 0 envelope with process-lifetime totals.
     pub fn publish_envelope<TData: Serialize, E: Serialize>(
         &self,
         topic: &str,
@@ -130,7 +130,6 @@ impl<T: MQTTClient> MQTTPublisher<T> {
         self.client.try_publish_bytes(topic, QoS::AtMostOnce, false, payload)
     }
 
-    /// Stores hardware metadata and publishes its retained MQTT representations.
     pub fn set_hardware_info(&self, info: &HardwareInfo) -> Result<(), MQTTError> {
         if let Ok(mut lock) = self.hardware_info.write() {
             *lock = Some(info.clone());
@@ -144,7 +143,6 @@ impl<T: MQTTClient> MQTTPublisher<T> {
         Ok(())
     }
 
-    /// Publishes retained Home Assistant MQTT Discovery configurations.
     pub fn publish_ha_discovery(&self, hw_info: &HardwareInfo) -> Result<(), MQTTError> {
         let ha_configs = discovery::build_ha_discovery_configs(&self.config.id, &self.config.instance_id, hw_info);
         for (top, cfg) in ha_configs {
@@ -154,7 +152,6 @@ impl<T: MQTTClient> MQTTPublisher<T> {
         Ok(())
     }
 
-    /// Publishes the retained offline availability state.
     pub fn publish_offline(&self, node_id: &str) -> Result<(), MQTTError> {
         let topic = topics::status_topic(node_id);
         self.client
@@ -163,13 +160,11 @@ impl<T: MQTTClient> MQTTPublisher<T> {
 }
 
 impl MQTTPublisher<Client> {
-    /// Creates a publisher using default MQTT settings for a broker address.
     pub fn new_from_addr(addr: &SocketAddr) -> Self {
         let config = MqttConfig::new("wattseal_collector".to_string(), *addr);
         Self::new_from_config(&config, None)
     }
 
-    /// Creates a publisher and starts its reconnecting MQTT event loop.
     pub fn new_from_config(config: &MqttConfig, hardware_info: Option<&HardwareInfo>) -> Self {
         let host = config.addr.ip().to_string();
         let port = config.addr.port();
@@ -189,7 +184,7 @@ impl MQTTPublisher<Client> {
         let status_top = topics::status_topic(&config.id);
         options.set_last_will(rumqttc::LastWill::new(&status_top, "offline", QoS::AtLeastOnce, true));
 
-        let (client, mut connection) = Client::new(options, 10);
+        let (client, mut connection) = Client::new(options, MQTT_REQUEST_CAPACITY);
 
         let node_id = config.id.clone();
         let instance_id = config.instance_id.clone();
@@ -207,21 +202,38 @@ impl MQTTPublisher<Client> {
                     Ok(rumqttc::Event::Incoming(rumqttc::Packet::ConnAck(_))) => {
                         if !is_connected {
                             is_connected = true;
-                            // Publish retained birth message
                             let _ = client_clone.try_publish(&status_top_clone, QoS::AtLeastOnce, true, "online");
 
                             if let Ok(hw_info_guard) = hw_info_clone.read() {
                                 if let Some(info) = hw_info_guard.as_ref() {
                                     let manifest = discovery::build_mqtt_manifest(&node_id, info);
-                                    if let Ok(payload) = serde_json::to_vec(&manifest) {
-                                        let manifest_topic = topics::hardware_info_topic(&node_id);
-                                        let _ =
-                                            client_clone.try_publish(&manifest_topic, QoS::AtLeastOnce, true, payload);
+                                    let manifest_topic = topics::hardware_info_topic(&node_id);
+                                    match serde_json::to_vec(&manifest) {
+                                        Ok(payload) => match client_clone.try_publish(
+                                            &manifest_topic,
+                                            QoS::AtLeastOnce,
+                                            true,
+                                            payload,
+                                        ) {
+                                            Ok(()) => {
+                                                clog!("✓ MQTT hardware manifest published on topic {}", manifest_topic)
+                                            }
+                                            Err(e) => log_component_error(
+                                                "mqtt",
+                                                &format!(
+                                                    "Failed to publish MQTT hardware manifest on topic {}: {}",
+                                                    manifest_topic, e
+                                                ),
+                                            ),
+                                        },
+                                        Err(e) => log_component_error(
+                                            "mqtt",
+                                            &format!("Failed to serialize MQTT hardware manifest: {}", e),
+                                        ),
                                     }
                                 }
                             }
 
-                            // Publish Home Assistant discovery configs if enabled
                             if is_ha {
                                 let hw_info_guard = hw_info_clone.read().ok();
                                 let hw_info = hw_info_guard.as_ref().and_then(|g| g.as_ref());
@@ -229,8 +241,28 @@ impl MQTTPublisher<Client> {
                                     let ha_configs =
                                         discovery::build_ha_discovery_configs(&node_id, &instance_id, info);
                                     for (top, cfg) in ha_configs {
-                                        if let Ok(payload) = serde_json::to_vec(&cfg) {
-                                            let _ = client_clone.try_publish(&top, QoS::AtLeastOnce, true, payload);
+                                        match serde_json::to_vec(&cfg) {
+                                            Ok(payload) => {
+                                                match client_clone.try_publish(&top, QoS::AtLeastOnce, true, payload) {
+                                                    Ok(()) => {
+                                                        clog!("✓ Home Assistant discovery published on topic {}", top)
+                                                    }
+                                                    Err(e) => log_component_error(
+                                                        "mqtt",
+                                                        &format!(
+                                                            "Failed to publish Home Assistant discovery on topic {}: {}",
+                                                            top, e
+                                                        ),
+                                                    ),
+                                                }
+                                            }
+                                            Err(e) => log_component_error(
+                                                "mqtt",
+                                                &format!(
+                                                    "Failed to serialize Home Assistant discovery for topic {}: {}",
+                                                    top, e
+                                                ),
+                                            ),
                                         }
                                     }
                                 }
@@ -253,6 +285,72 @@ impl MQTTPublisher<Client> {
             config: config.clone(),
             cumulative_values,
         }
+    }
+}
+
+/// Connector that publishes collected sensor metrics to an MQTT broker.
+pub struct MqttConnector {
+    pub config: MqttConfig,
+    pub publisher: MQTTPublisher<rumqttc::Client>,
+}
+
+impl MqttConnector {
+    pub fn new(config: MqttConfig, hardware: &HardwareInfo) -> Result<Self, String> {
+        let publisher = MQTTPublisher::new_from_config(&config, Some(hardware));
+        Ok(Self { config, publisher })
+    }
+
+    pub fn handle_sample(&mut self, sample: &MetricSample) -> Result<(), String> {
+        let timestamp_ms = sample.timestamp_ms();
+
+        for sensor_data in sample.data() {
+            publish_sensor(&self.publisher, &self.config, sensor_data, timestamp_ms);
+        }
+
+        Ok(())
+    }
+}
+
+fn publish_sensor(
+    publisher: &MQTTPublisher<rumqttc::Client>,
+    config: &MqttConfig,
+    sensor_data: &ComputedSensorData,
+    timestamp_ms: i64,
+) {
+    let sensor_key = match sensor_data {
+        ComputedSensorData::GPU(data) => data.name.as_deref().unwrap_or("GPU"),
+        _ => sensor_data.sensor_type(),
+    };
+    publish_sensor_envelope(
+        publisher,
+        config,
+        sensor_data,
+        sensor_key,
+        timestamp_ms,
+        sensor_data.total_energy().map(|energy| energy.as_u64()),
+    );
+}
+
+fn publish_sensor_envelope<T: PublishableSensor>(
+    publisher: &MQTTPublisher<rumqttc::Client>,
+    config: &MqttConfig,
+    sensor_data: &T,
+    sensor_type: &str,
+    timestamp_ms: i64,
+    total_energy_uj: Option<u64>,
+) {
+    let topic = sensor_type_to_topic(&config.id, sensor_type);
+    let _result = match config.unit {
+        Some(ConsumptionUnit::WattHour) => {
+            let total_energy_wh = total_energy_uj.map(|uj| EnergyUj::from_u64(uj).as_watt_hours());
+            publisher.publish_envelope(&topic, &sensor_data.to_wh(), timestamp_ms, total_energy_wh)
+        }
+        _ => publisher.publish_envelope(&topic, sensor_data, timestamp_ms, total_energy_uj),
+    };
+    #[cfg(debug_assertions)]
+    match _result {
+        Ok(_) => println!("✓ Sensor data published on topic {}", topic),
+        Err(e) => eprintln!("✗ Failed to publish sensor data on topic {}: {:?}", topic, e),
     }
 }
 
@@ -398,5 +496,26 @@ mod tests {
         assert_eq!(gpu_topics.len(), 6);
         assert_ne!(gpu_topics[0].0, gpu_topics[3].0);
         assert_ne!(gpu_topics[0].1, gpu_topics[3].1);
+    }
+
+    #[test]
+    fn test_manifest_lists_each_sensor_topic_once() {
+        let mut info = HardwareInfo::default();
+        info.gpus.push("NVIDIA GeForce RTX 3070 (0)".to_string());
+
+        let manifest = discovery::build_mqtt_manifest("node", &info);
+
+        assert_eq!(
+            manifest.sensor_topics,
+            vec![
+                "node/sensor_data/cpu",
+                "node/sensor_data/ram",
+                "node/sensor_data/disk",
+                "node/sensor_data/network",
+                "node/sensor_data/total",
+                "node/sensor_data/processes",
+                "node/sensor_data/nvidia_geforce_rtx_3070__0",
+            ]
+        );
     }
 }
