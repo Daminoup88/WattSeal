@@ -1,7 +1,7 @@
 use common::types::HardwareInfo;
 use serde::Serialize;
 
-use crate::topics::{ha_discovery_topic, sensor_type_to_topic, status_topic, topic_segment};
+use crate::mqtt::topics::{ha_discovery_topic, sensor_type_to_topic, status_topic, topic_segment};
 
 #[derive(Debug, Serialize, Clone)]
 pub struct HaDevice {
@@ -67,9 +67,9 @@ pub struct MqttManifest<'a> {
 
 /// Builds retained metadata describing the node and all state topics.
 pub fn build_mqtt_manifest<'a>(node_id: &str, info: &'a HardwareInfo) -> MqttManifest<'a> {
-    let mut sensor_topics = BASE_METRIC_DESCRIPTORS
+    let mut sensor_topics = BASE_SENSOR_TYPES
         .iter()
-        .map(|descriptor| sensor_type_to_topic(node_id, descriptor.sensor_type))
+        .map(|sensor_type| sensor_type_to_topic(node_id, sensor_type))
         .collect::<Vec<_>>();
     sensor_topics.extend(info.gpus.iter().map(|name| sensor_type_to_topic(node_id, name)));
 
@@ -80,6 +80,8 @@ pub fn build_mqtt_manifest<'a>(node_id: &str, info: &'a HardwareInfo) -> MqttMan
         sensor_topics,
     }
 }
+
+const BASE_SENSOR_TYPES: &[&str] = &["CPU", "RAM", "Disk", "Network", "Total", "Processes"];
 
 #[derive(Debug, Clone)]
 pub struct MetricDescriptor {

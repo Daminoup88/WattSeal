@@ -1,4 +1,8 @@
-use std::{collections::HashMap, fmt::Display, time::SystemTime};
+use std::{
+    collections::HashMap,
+    fmt::Display,
+    time::{Duration, SystemTime},
+};
 
 use rusqlite::{
     ToSql,
@@ -11,32 +15,32 @@ use crate::DatabaseEntry;
 pub const MICROJOULES_PER_JOULE: f64 = 1_000_000.0;
 pub const SECONDS_PER_HOUR: f64 = 3600.0;
 
-/// Timestamped collection of sensor readings.
+/// Single collection sample holding timestamped computed sensor readings and elapsed duration.
 #[derive(Debug, Clone)]
-pub struct Event<T = SensorData> {
-    time: SystemTime,
-    data: Vec<T>,
+pub struct MetricSample {
+    pub timestamp: SystemTime,
+    pub duration: Duration,
+    pub data: Vec<ComputedSensorData>,
 }
 
-impl<T> Event<T> {
-    /// Creates an event with the given timestamp and sensor data.
-    pub fn new(time: SystemTime, data: Vec<T>) -> Self {
-        Event { time, data }
+impl MetricSample {
+    pub fn new(timestamp: SystemTime, duration: Duration, data: Vec<ComputedSensorData>) -> Self {
+        Self {
+            timestamp,
+            duration,
+            data,
+        }
     }
 
-    /// Returns the event timestamp.
-    pub fn time(&self) -> SystemTime {
-        self.time
+    pub fn timestamp_ms(&self) -> i64 {
+        self.timestamp
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .unwrap_or(Duration::ZERO)
+            .as_millis() as i64
     }
 
-    /// Returns the list of sensor readings.
-    pub fn data(&self) -> &Vec<T> {
+    pub fn data(&self) -> &[ComputedSensorData] {
         &self.data
-    }
-
-    /// Appends a sensor reading to this event.
-    pub fn push_data(&mut self, data: T) {
-        self.data.push(data);
     }
 }
 
@@ -375,6 +379,25 @@ impl HardwareInfo {
                 "{}".to_string()
             }
         }
+    }
+
+    /// Returns the list of database table names that should exist for this hardware configuration.
+    /// Process and Total are always created. Others depend on detected hardware.
+    pub fn sensor_table_names(&self) -> Vec<String> {
+        let mut tables: Vec<String> = Vec::new();
+        tables.push(CPUData::table_name_static().to_string());
+        tables.push(RamData::table_name_static().to_string());
+        if !self.gpus.is_empty() {
+            tables.push(GPUData::table_name_static().to_string());
+        }
+        if !self.disks.is_empty() {
+            tables.push(DiskData::table_name_static().to_string());
+        }
+        tables.push(NetworkData::table_name_static().to_string());
+        tables.push(TotalData::table_name_static().to_string());
+        tables.push(ProcessData::table_name_static().to_string());
+
+        tables
     }
 }
 

@@ -1,9 +1,8 @@
 use std::collections::HashMap;
 
-use common::types::InitialInfo;
+use common::types::{InitialInfo, SensorData};
 
 use super::{Sensor, SensorError, SensorType};
-use crate::database::SensorData;
 pub mod estimation;
 
 /// GPU hardware vendor identifier.
@@ -215,10 +214,9 @@ mod amd_gpu {
     use std::{cell::Cell, time::Instant};
 
     use adlx::{Gpu, helper::AdlxHelper, performance_monitoring_services::PerformanceMonitoringServices};
-    use common::types::EnergyUj;
+    use common::types::{EnergyUj, GPUData, SensorData};
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     pub struct AmdGPUSensor {
         _helper: AdlxHelper,
@@ -358,11 +356,10 @@ mod amd_gpu {
 mod nvidia_gpu {
     use std::{cell::Cell, collections::HashMap, time::Instant};
 
-    use common::types::EnergyUj;
+    use common::types::{EnergyUj, GPUData, SensorData};
     use nvml_wrapper::{Nvml, enum_wrappers::device::Sampling, enums::device::SampleValue};
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     enum NvidiaReadMode {
         EnergyCounter,
@@ -584,6 +581,7 @@ mod nvidia_gpu {
 mod intel_gpu {
     use std::{cell::Cell, mem::MaybeUninit, slice};
 
+    use common::types::{GPUData, SensorData};
     use windows::{
         Win32::System::Performance::{
             PDH_FMT_COUNTERVALUE_ITEM_W, PDH_FMT_DOUBLE, PDH_HCOUNTER, PDH_HQUERY, PdhAddEnglishCounterW,
@@ -593,7 +591,6 @@ mod intel_gpu {
     };
 
     use super::{Sensor, SensorError};
-    use crate::database::{GPUData, SensorData};
 
     const PDH_MORE_DATA: u32 = 0x800007D2;
 

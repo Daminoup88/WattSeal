@@ -1,9 +1,8 @@
 use std::cell::Cell;
 
-use common::types::EnergyUj;
+use common::types::{CPUData, EnergyUj, SensorData};
 
 use super::{Sensor, SensorError};
-use crate::database::{CPUData, SensorData};
 
 /// Linux CPU energy consumption sensor using Intel RAPL (Running Average Power Limit)
 /// via sysfs at `/sys/class/powercap/intel-rapl:0/`.

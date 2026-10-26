@@ -1,10 +1,9 @@
 use std::cell::Cell;
 
-use common::types::EnergyUj;
+use common::types::{CPUData, EnergyUj, SensorData};
 use driver::MsrDriverReader;
 
 use super::{CPUVendor, Sensor, SensorError};
-use crate::database::{CPUData, SensorData};
 
 mod driver;
 

@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [workspace]
 resolver = "3"
-members = ["collector", "ui", "common", "mqtt"]
+members = ["collector", "connectors", "ui", "common"]
 
 [workspace.package]
 version = "1.0.6"
@@ -37,6 +37,7 @@ image = { version = "0.25", default-features = false, features = ["png", "ico"] 
 
 [dependencies]
 collector = { path = "collector" }
+connectors = { path = "connectors" }
 ui = { path = "ui" }
 common = { path = "common" }
 tray-icon = { version = "0.24.0", default-features = false, features = ["gtk"] }

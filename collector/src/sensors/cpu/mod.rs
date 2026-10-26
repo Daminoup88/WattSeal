@@ -1,10 +1,9 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
-use common::types::{CpuInfo, InitialInfo};
+use common::types::{CPUData, CpuInfo, InitialInfo, SensorData};
 use sysinfo::System;
 
 use super::{Sensor, SensorError, SensorType};
-use crate::database::{CPUData, SensorData};
 
 mod estimation;
 #[cfg(target_os = "linux")]

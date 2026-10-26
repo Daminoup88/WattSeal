@@ -1,0 +1,16 @@
+[package]
+name = "connectors"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+common = { path = "../common" }
+rumqttc = { version = "0.25.1", features = ["use-rustls"] }
+machine-uid = "0.6"
+chrono = "0.4.44"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2.0"
+
+[dev-dependencies]
+mockall = "0.15.0"

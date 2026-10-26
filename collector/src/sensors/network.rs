@@ -3,13 +3,13 @@ use std::{
     time::Instant,
 };
 
-use common::{EnergyUj, types::Byte};
+use common::{
+    EnergyUj,
+    types::{Byte, NetworkData, SensorData},
+};
 use sysinfo::Networks;
 
-use crate::{
-    database::{NetworkData, SensorData},
-    sensors::{Sensor, SensorError},
-};
+use crate::sensors::{Sensor, SensorError};
 
 const NIC_IDLE_W: f64 = 0.2;
 const NIC_W_PER_MB: f64 = 0.01;
