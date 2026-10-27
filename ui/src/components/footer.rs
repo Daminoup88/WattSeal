@@ -13,7 +13,7 @@ use crate::{
         text::TextStyle,
     },
     themes::AppTheme,
-    translations::app_name,
+    translations::{app_name, report_issue, star_on_github},
     types::AppLanguage,
 };
 
@@ -36,7 +36,7 @@ impl Footer {
                 .spacing(SPACING_SMALL)
                 .align_y(Alignment::Center)
                 .push(github_icon)
-                .push(Text::new("Star on GitHub").size(FONT_SIZE_SMALL)),
+                .push(Text::new(star_on_github(language)).size(FONT_SIZE_SMALL)),
         )
         .padding(Padding::from([4.0, 12.0]))
         .class(ButtonStyle::FooterPrimary)
@@ -46,7 +46,7 @@ impl Footer {
             Row::new()
                 .spacing(SPACING_SMALL)
                 .align_y(Alignment::Center)
-                .push(Text::new("Report Issue").size(FONT_SIZE_SMALL)),
+                .push(Text::new(report_issue(language)).size(FONT_SIZE_SMALL)),
         )
         .padding(Padding::from([4.0, 12.0]))
         .class(ButtonStyle::Footer)
