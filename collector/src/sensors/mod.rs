@@ -15,7 +15,7 @@ use std::{
 use battery::Manager;
 use common::types::EnergyUj;
 pub use common::{
-    AllTimeData, ComputedSensorData, GPUData, GeneralData, ProcessData, SensorData, TotalData,
+    AllTimeData, ComputedSensorData, GPUData, ProcessData, SensorData, TotalData,
     types::{BatteryInfo, CpuInfo, DiskInfo, HardwareInfo, InitialInfo, MemoryInfo, ScreenInfo, SystemInfo},
 };
 pub use cpu::CPUSensor;
