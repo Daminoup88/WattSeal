@@ -604,6 +604,7 @@ impl App {
                     &self.custom_carbon_input,
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
+                    self.launch_on_startup,
                 ),
                 Message::ConfirmSetup,
             )
@@ -977,15 +978,13 @@ impl App {
             .push(title)
             .push(description);
 
-        if !self.show_setup {
-            content = content.push(
-                checkbox(self.remember_close_choice)
-                    .label(close_remember_choice(language))
-                    .text_size(FONT_SIZE_BODY)
-                    .on_toggle(Message::ToggleRememberCloseChoice)
-                    .size(18),
-            );
-        }
+        content = content.push(
+            checkbox(self.remember_close_choice)
+                .label(close_remember_choice(language))
+                .text_size(FONT_SIZE_BODY)
+                .on_toggle(Message::ToggleRememberCloseChoice)
+                .size(18),
+        );
 
         let content = content.align_x(Alignment::Center).push(buttons);
 

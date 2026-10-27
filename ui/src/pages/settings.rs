@@ -35,6 +35,7 @@ pub fn setup_view<'a>(
     custom_carbon_input: &'a str,
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: &'a str,
+    launch_on_startup: bool,
 ) -> Element<'a, Message, AppTheme> {
     let title = Text::new(setup_welcome_title(language))
         .size(FONT_SIZE_HEADER)
@@ -45,6 +46,12 @@ pub fn setup_view<'a>(
     let lang_picker = pick_list(AppLanguage::all(), Some(language), Message::ChangeLanguage)
         .width(Length::Fill)
         .padding(8);
+
+    let launch_row_inline: Option<Element<'a, Message, AppTheme>> = if common::autostart::is_supported() {
+        Some(launch_on_startup_row(language, launch_on_startup))
+    } else {
+        None
+    };
 
     let ci_label = Text::new(setup_choose_carbon(language)).size(FONT_SIZE_BODY);
     let ci_picker = pick_list(
@@ -130,12 +137,25 @@ pub fn setup_view<'a>(
         .class(ButtonStyle::Standard)
         .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
 
-    let content = Column::new()
+    fn separator<'a>() -> Element<'a, Message, AppTheme> {
+        Container::new(iced::widget::rule::horizontal(1).class(crate::styles::rule::RuleStyle::Subtle))
+            .width(Length::Fill)
+            .into()
+    }
+
+    let mut content = Column::new()
         .spacing(SPACING_LARGE)
         .align_x(Alignment::Start)
         .push(title)
         .push(lang_label)
         .push(lang_picker)
+        .push(separator());
+
+    if let Some(launch_row_inline) = launch_row_inline {
+        content = content.push(launch_row_inline).push(separator());
+    }
+
+    let content = content
         .push(ci_label)
         .push(carbon_section)
         .push(ec_label)
