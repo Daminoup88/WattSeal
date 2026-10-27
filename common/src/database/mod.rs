@@ -15,8 +15,8 @@ use rusqlite::{Connection, OptionalExtension, Transaction, params};
 use crate::{
     AllTimeData, MetricSample,
     types::{
-        CPUData, ComputedSensorData, DiskData, EnergyUj, GPUData, GeneralData, HardwareInfo, NetworkData, ProcessData,
-        RamData, TotalData,
+        CPUData, ComputedSensorData, DiskData, EnergyUj, GPUData, HardwareInfo, NetworkData, ProcessData, RamData,
+        TotalData,
     },
 };
 
@@ -337,10 +337,7 @@ impl Database {
 
     /// Insert hardware info if line with id=1 doesn't exist, otherwise update it
     pub fn insert_hardware_info(&mut self, hardware: &HardwareInfo) -> Result<(), DatabaseError> {
-        let data = GeneralData {
-            tables: hardware.sensor_table_names().join(","),
-            hardware_info: hardware.clone(),
-        };
+        let tables = hardware.sensor_table_names().join(",");
         let tx = self.conn.transaction()?;
 
         let existing: Option<i64> = tx
@@ -350,12 +347,12 @@ impl Database {
         if existing.is_some() {
             tx.execute(
                 "UPDATE hardware_info SET tables = ?1, hardware_data = ?2 WHERE id = 1",
-                params![data.tables, data.hardware_info.serialized()],
+                params![tables, hardware.serialized()],
             )?;
         } else {
             tx.execute(
                 "INSERT INTO hardware_info (id, tables, hardware_data) VALUES (1, ?1, ?2)",
-                params![data.tables, data.hardware_info.serialized()],
+                params![tables, hardware.serialized()],
             )?;
         }
 

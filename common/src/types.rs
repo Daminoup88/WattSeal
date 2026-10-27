@@ -350,13 +350,6 @@ pub enum InitialInfo {
     Battery(BatteryInfo),
 }
 
-/// Database metadata pairing table list with serialized hardware info.
-#[derive(Debug)]
-pub struct GeneralData {
-    pub tables: String,
-    pub hardware_info: HardwareInfo,
-}
-
 /// Complete hardware inventory of the system.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HardwareInfo {

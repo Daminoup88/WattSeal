@@ -21,9 +21,9 @@ pub use database::{
 };
 pub use singleton::SingletonGuard;
 pub use types::{
-    AllTimeData, CPUData, ComputedSensorData, ConsumptionUnit, DiskData, EnergyUj, GPUData, GeneralData, HardwareInfo,
-    IconData, LabeledValue, MICROJOULES_PER_JOULE, MetricKind, MetricSample, NetworkData, ProcessData, RamData,
-    SECONDS_PER_HOUR, SecondaryValues, SensorData, TotalData,
+    AllTimeData, CPUData, ComputedSensorData, ConsumptionUnit, DiskData, EnergyUj, GPUData, HardwareInfo, IconData,
+    LabeledValue, MICROJOULES_PER_JOULE, MetricKind, MetricSample, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR,
+    SecondaryValues, SensorData, TotalData,
 };
 pub use utils::set_current_dir_to_exe_dir;
 
