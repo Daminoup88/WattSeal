@@ -174,9 +174,9 @@ impl AppLanguage {
     pub const fn all() -> &'static [AppLanguage] {
         &[
             AppLanguage::English,
-            AppLanguage::German,
             AppLanguage::French,
             AppLanguage::Chinese,
+            AppLanguage::German,
             AppLanguage::Romanian,
         ]
     }
