@@ -98,6 +98,26 @@ pub fn modal_close(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn star_on_github(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Star on GitHub",
+        AppLanguage::German => "GitHub-Stern vergeben",
+        AppLanguage::French => "Étoiler sur GitHub",
+        AppLanguage::Chinese => "在 GitHub 上加星",
+        AppLanguage::Romanian => "Acordă o stea pe GitHub",
+    }
+}
+
+pub fn report_issue(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Report Issue",
+        AppLanguage::German => "Problem melden",
+        AppLanguage::French => "Signaler un bug",
+        AppLanguage::Chinese => "报告问题",
+        AppLanguage::Romanian => "Raportează o problemă",
+    }
+}
+
 // Dashboard
 
 pub fn current_power_consumption(language: AppLanguage) -> &'static str {
