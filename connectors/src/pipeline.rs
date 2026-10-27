@@ -1,4 +1,4 @@
-use common::{MetricSample, clog};
+use common::{MetricSample, logging::log_component_error};
 
 use crate::{db::DatabaseConnector, mqtt::MqttConnector};
 
@@ -20,12 +20,12 @@ impl Connectors {
     pub fn handle_sample(&mut self, sample: &MetricSample) {
         if let Some(db) = &mut self.database {
             if let Err(e) = db.handle_sample(sample) {
-                clog!("⚠ [Database] Sample handling error: {e}");
+                log_component_error("DatabaseConnector", &e);
             }
         }
         if let Some(mqtt) = &mut self.mqtt {
             if let Err(e) = mqtt.handle_sample(sample) {
-                clog!("⚠ [MQTT] Sample handling error: {e}");
+                log_component_error("MqttConnector", &e);
             }
         }
     }
