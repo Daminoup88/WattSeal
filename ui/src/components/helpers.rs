@@ -1,7 +1,11 @@
 use iced::{
     Element, Length,
     widget::{
-        Text, center, mouse_area, opaque, stack,
+        Text, center,
+        container::Container,
+        mouse_area, opaque,
+        rule::horizontal,
+        stack,
         text::{self},
     },
 };
@@ -10,6 +14,7 @@ use crate::{
     message::Message,
     styles::{
         container::ContainerStyle,
+        rule::RuleStyle,
         style_constants::{FONT_BOLD, FONT_SIZE_BODY},
         text::TextStyle,
     },
@@ -51,4 +56,10 @@ pub fn modal<'a>(
         mouse_area(center(opaque(content)).class(ContainerStyle::ModalBackdrop)).on_press(on_click_outside);
 
     stack![background, opaque(mouse_area)].into()
+}
+
+pub fn separator<'a>() -> Element<'a, Message, AppTheme> {
+    Container::new(horizontal(1).class(RuleStyle::Subtle))
+        .width(Length::Fill)
+        .into()
 }

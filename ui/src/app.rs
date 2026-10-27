@@ -15,12 +15,7 @@ use iced::{
 use crate::{
     components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
     message::Message,
-    pages::{
-        Page,
-        dashboard::DashboardPage,
-        info::InfoPage,
-        settings::{SettingsPage, setup_view},
-    },
+    pages::{Page, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
     styles::{
         button::ButtonStyle,
         container::ContainerStyle,
@@ -598,7 +593,7 @@ impl App {
         } else if self.show_setup {
             modal(
                 content,
-                setup_view(
+                self.settings_page.setup_view(
                     self.language,
                     self.carbon_intensity,
                     &self.custom_carbon_input,
