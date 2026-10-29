@@ -30,11 +30,14 @@ pub struct DiskSensor {
 
 impl DiskSensor {
     /// Creates a sensor with a refreshed list of disks.
-    pub fn new() -> Self {
-        Self {
-            disks: RefCell::new(Disks::new_with_refreshed_list()),
+    pub fn new() -> Result<Self, SensorError> {
+        let disks = Disks::new_with_refreshed_list()
+            .map_err(|e| SensorError::ReadError(format!("Failed to initialize disks: {e:?}")))?;
+
+        Ok(Self {
+            disks: RefCell::new(disks),
             last_reading: Cell::new(Instant::now()),
-        }
+        })
     }
 }
 
@@ -88,7 +91,7 @@ impl Sensor for DiskSensor {
             .map_err(|e| SensorError::ReadError(format!("Failed to borrow disks: {}", e)))?;
 
         let mut disk_info = Vec::new();
-        for disk in disks.list() {
+        for disk in disks.iter() {
             let name = disk.name().to_string_lossy().to_string();
             let mount = disk.mount_point().display().to_string();
             let kind = disk_kind_label(disk);
@@ -116,7 +119,6 @@ impl Sensor for DiskSensor {
             .map_err(|e| SensorError::ReadError(format!("Failed to borrow disks: {}", e)))?;
 
         let names: Vec<String> = disks
-            .list()
             .iter()
             .map(|disk| disk.name().to_string_lossy().to_string())
             .collect();

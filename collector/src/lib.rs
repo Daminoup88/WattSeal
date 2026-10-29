@@ -1,5 +1,5 @@
-#[cfg(target_os = "linux")]
-pub mod amdgpu_name;
+#[cfg(not(target_os = "linux"))]
+use crate::sensors::gpu::GPUVendor;
 pub mod database;
 #[cfg(target_os = "linux")]
 pub mod linux_amd_gpu;
@@ -29,7 +29,7 @@ pub use mqtt::{MQTTPublisher, MqttConfig, ProcessPublishMode};
 #[cfg(not(target_os = "linux"))]
 use sensors::gpu::get_gpu_list;
 use sensors::{
-    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info, gpu::GPUVendor,
+    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
     to_computed_event_with_cap,
 };
 use sysinfo::System;
@@ -74,7 +74,7 @@ impl CollectorApp {
         } else {
             database = None
         }
-        let s = System::new_all();
+        let s = System::new_all().map_err(|e| format!("Failed to initialize system: {e:?}"))?;
         Ok(CollectorApp {
             database,
             mqtt_info,
@@ -136,69 +136,104 @@ impl CollectorApp {
             crate::clog!("⚠ No supported GPU adapters detected.");
         }
 
-        let (mut nvidia_index, mut amd_index, mut intel_index) = (0u32, 0u32, 0u32);
-        for gpu_name in &gpu_list {
-            let vendor = GPUVendor::from_str(gpu_name);
-            let vendor_index = match vendor {
-                GPUVendor::Nvidia => {
-                    let idx = nvidia_index;
-                    nvidia_index += 1;
-                    idx
+        #[cfg(target_os = "linux")]
+        {
+            // NVIDIA devices continue to use their NVML indices.
+            for (index, gpu_name) in sensors::gpu::get_nvidia_gpu_list().iter().enumerate() {
+                match sensors::gpu::get_gpu_energy_sensor(gpu_name, index as u32) {
+                    Ok(sensor) => {
+                        crate::clog!("✓ NVIDIA GPU sensor initialized: '{gpu_name}'");
+                        self.sensors.push(sensor);
+                    }
+                    Err(e) => {
+                        crate::clog!("✗ Failed to initialize NVIDIA GPU sensor for '{gpu_name}': {e:?}");
+                    }
                 }
-                GPUVendor::Amd => {
-                    let idx = amd_index;
-                    amd_index += 1;
-                    idx
-                }
-                GPUVendor::Intel => {
-                    let idx = intel_index;
-                    intel_index += 1;
-                    idx
-                }
-                GPUVendor::Other => 0,
-            };
+            }
 
-            #[cfg(target_os = "linux")]
-            let sensor_result = if vendor == GPUVendor::Amd {
-                amd_devices
-                    .get(vendor_index as usize)
-                    .ok_or(sensors::SensorError::NotSupported)
-                    .and_then(|device| {
-                        sensors::gpu::get_amd_gpu_energy_sensor(gpu_name.clone(), device.device_path.clone())
-                    })
-            } else {
-                sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index)
-            };
-
-            #[cfg(not(target_os = "linux"))]
-            let sensor_result = sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index);
-
-            match sensor_result {
-                Ok(sensor) => {
-                    crate::clog!(
-                        "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
-                        gpu_name,
-                        vendor,
-                        vendor_index
-                    );
-                    self.sensors.push(sensor);
+            // AMD devices are identified by PCI address, not enumeration index.
+            for device in &amd_devices {
+                match sensors::gpu::get_amd_gpu_energy_sensor(
+                    device.name.clone(),
+                    device.device_path.clone(),
+                    device.pci_address.clone(),
+                ) {
+                    Ok(sensor) => {
+                        crate::clog!(
+                            "✓ AMD GPU sensor initialized: '{}' (PCI={})",
+                            device.name,
+                            device.pci_address
+                        );
+                        self.sensors.push(sensor);
+                    }
+                    Err(e) => {
+                        crate::clog!(
+                            "✗ Failed to initialize AMD GPU sensor for '{}' (PCI={}): {:?}",
+                            device.name,
+                            device.pci_address,
+                            e
+                        );
+                    }
                 }
-                Err(e) => {
-                    crate::clog!(
-                        "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, vendor_index={}): {:?}",
-                        gpu_name,
-                        vendor,
-                        vendor_index,
-                        e
-                    );
+            }
+        }
+
+        #[cfg(not(target_os = "linux"))]
+        {
+            let (mut nvidia_index, mut amd_index, mut intel_index) = (0u32, 0u32, 0u32);
+
+            for gpu_name in &gpu_list {
+                let vendor = GPUVendor::from_str(gpu_name);
+                let vendor_index = match vendor {
+                    GPUVendor::Nvidia => {
+                        let idx = nvidia_index;
+                        nvidia_index += 1;
+                        idx
+                    }
+                    GPUVendor::Amd => {
+                        let idx = amd_index;
+                        amd_index += 1;
+                        idx
+                    }
+                    GPUVendor::Intel => {
+                        let idx = intel_index;
+                        intel_index += 1;
+                        idx
+                    }
+                    GPUVendor::Other => 0,
+                };
+
+                match sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index) {
+                    Ok(sensor) => {
+                        crate::clog!(
+                            "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
+                            gpu_name,
+                            vendor,
+                            vendor_index
+                        );
+                        self.sensors.push(sensor);
+                    }
+                    Err(e) => {
+                        crate::clog!(
+                            "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, vendor_index={}): {:?}",
+                            gpu_name,
+                            vendor,
+                            vendor_index,
+                            e
+                        );
+                    }
                 }
             }
         }
 
         // RAM, Disk, Network sensors
         self.sensors.push(SensorType::RAM(RamSensor::new(self.system.clone())));
-        self.sensors.push(SensorType::Disk(DiskSensor::new()));
-        self.sensors.push(SensorType::Network(NetworkSensor::new()));
+        self.sensors.push(SensorType::Disk(
+            DiskSensor::new().map_err(|e| format!("Failed to initialize disk sensor: {e:?}"))?,
+        ));
+        self.sensors.push(SensorType::Network(
+            NetworkSensor::new().map_err(|e| format!("Failed to initialize network sensor: {e:?}"))?,
+        ));
 
         let mut table_names: Vec<String> = self.sensors.iter().map(|s| s.table_name().into()).collect();
         table_names.push(ProcessData::table_name_static().into());

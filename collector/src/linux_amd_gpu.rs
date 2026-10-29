@@ -7,12 +7,14 @@ use std::{
 pub struct AmdGpuDevice {
     pub name: String,
     pub device_path: PathBuf,
+    pub pci_address: String,
 }
 
 /// Discovers AMD GPUs using the Linux DRM sysfs interface.
 pub fn discover() -> Vec<AmdGpuDevice> {
     let mut devices = Vec::new();
     let mut seen = HashSet::new();
+    let gpus = sysinfo::Gpus::new_with_refreshed_list().ok();
 
     let Ok(entries) = fs::read_dir("/sys/class/drm") else {
         return devices;
@@ -53,9 +55,31 @@ pub fn discover() -> Vec<AmdGpuDevice> {
             continue;
         }
 
-        let name = crate::amdgpu_name::gpu_name(&device_path).unwrap_or_else(|| fallback_name(&device_path));
+        let Some(pci_address) = device_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .and_then(|name| name.parse::<sysinfo::PCI>().ok())
+            .map(|pci| pci.to_string())
+        else {
+            continue;
+        };
 
-        devices.push(AmdGpuDevice { name, device_path });
+        let name = gpus
+            .as_ref()
+            .and_then(|gpus| {
+                gpus.iter()
+                    .find(|gpu| gpu.pci().to_string() == pci_address)
+                    .and_then(|gpu| gpu.model())
+                    .filter(|model| !model.is_empty())
+                    .map(str::to_owned)
+            })
+            .unwrap_or_else(|| fallback_name(&device_path));
+
+        devices.push(AmdGpuDevice {
+            name,
+            device_path,
+            pci_address,
+        });
     }
 
     // Keep GPU indices stable regardless of filesystem enumeration order.

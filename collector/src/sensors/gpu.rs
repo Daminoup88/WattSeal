@@ -193,7 +193,7 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
                     .nth(index as usize)
                     .ok_or(SensorError::NotSupported)?;
 
-                crate::linux_amd_sensor::AmdGPUSensor::new(device.device_path).map(GPUSensorInner::AmdLinux)
+                return get_amd_gpu_energy_sensor(device.name, device.device_path, device.pci_address);
             }
             _ => Err(SensorError::NotSupported),
         }?;
@@ -209,11 +209,16 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
 
 /// Creates a Linux AMD GPU sensor for a specific PCI device.
 #[cfg(target_os = "linux")]
-pub fn get_amd_gpu_energy_sensor(name: String, device_path: std::path::PathBuf) -> Result<SensorType, SensorError> {
-    let sensor = crate::linux_amd_sensor::AmdGPUSensor::new(device_path)?;
+pub fn get_amd_gpu_energy_sensor(
+    name: String,
+    device_path: std::path::PathBuf,
+    pci_address: String,
+) -> Result<SensorType, SensorError> {
+    let unique_name = format!("{name} ({pci_address})");
+    let sensor = crate::linux_amd_sensor::AmdGPUSensor::new(device_path, pci_address)?;
 
     Ok(SensorType::GPU(GPUSensor {
-        name,
+        name: unique_name,
         inner: GPUSensorInner::AmdLinux(sensor),
     }))
 }
