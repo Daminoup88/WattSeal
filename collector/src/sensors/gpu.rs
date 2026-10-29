@@ -87,18 +87,30 @@ pub fn get_gpu_list() -> Vec<String> {
     list
 }
 
-/// Returns the list of NVIDIA GPU names via NVML.
+/// Returns NVIDIA GPU names detected through NVML on Linux.
 #[cfg(target_os = "linux")]
-pub fn get_gpu_list() -> Vec<String> {
+pub fn get_nvidia_gpu_list() -> Vec<String> {
     nvml_wrapper::Nvml::init()
         .and_then(|nvml| {
             let count = nvml.device_count()?;
             Ok((0..count)
                 .filter_map(|i| nvml.device_by_index(i).ok())
-                .filter_map(|d| d.name().ok())
+                .filter_map(|device| device.name().ok())
                 .collect())
         })
         .unwrap_or_default()
+}
+
+/// Returns the list of NVIDIA and AMD GPU names on Linux.
+#[cfg(target_os = "linux")]
+pub fn get_gpu_list() -> Vec<String> {
+    let mut list = get_nvidia_gpu_list();
+
+    for device in crate::linux_amd_gpu::discover() {
+        list.push(device.name);
+    }
+
+    list
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
@@ -112,6 +124,8 @@ pub enum GPUSensorInner {
     Nvidia(nvidia_gpu::NvidiaGPUSensor),
     #[cfg(target_os = "windows")]
     Amd(amd_gpu::AmdGPUSensor),
+    #[cfg(target_os = "linux")]
+    AmdLinux(crate::linux_amd_sensor::AmdGPUSensor),
     #[cfg(target_os = "windows")]
     Intel { sensor: intel_gpu::IntelGPUSensor },
 }
@@ -129,6 +143,8 @@ impl Sensor for GPUSensor {
             GPUSensorInner::Nvidia(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "windows")]
             GPUSensorInner::Amd(sensor) => sensor.read_full_data()?,
+            #[cfg(target_os = "linux")]
+            GPUSensorInner::AmdLinux(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "windows")]
             GPUSensorInner::Intel { sensor } => sensor.read_full_data()?,
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
@@ -152,7 +168,7 @@ impl Sensor for GPUSensor {
 /// Creates a GPU energy sensor appropriate for the given vendor.
 pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, SensorError> {
     let vendor = GPUVendor::from_str(vendor_id);
-    let name = format!("{} ({})", vendor_id, index);
+    let name = vendor_id.to_string();
 
     #[cfg(target_os = "windows")]
     {
@@ -171,6 +187,14 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
     {
         let inner = match vendor {
             GPUVendor::Nvidia => nvidia_gpu::NvidiaGPUSensor::new(index).map(GPUSensorInner::Nvidia),
+            GPUVendor::Amd => {
+                let device = crate::linux_amd_gpu::discover()
+                    .into_iter()
+                    .nth(index as usize)
+                    .ok_or(SensorError::NotSupported)?;
+
+                crate::linux_amd_sensor::AmdGPUSensor::new(device.device_path).map(GPUSensorInner::AmdLinux)
+            }
             _ => Err(SensorError::NotSupported),
         }?;
         return Ok(SensorType::GPU(GPUSensor { name, inner }));
@@ -183,6 +207,17 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
     }
 }
 
+/// Creates a Linux AMD GPU sensor for a specific PCI device.
+#[cfg(target_os = "linux")]
+pub fn get_amd_gpu_energy_sensor(name: String, device_path: std::path::PathBuf) -> Result<SensorType, SensorError> {
+    let sensor = crate::linux_amd_sensor::AmdGPUSensor::new(device_path)?;
+
+    Ok(SensorType::GPU(GPUSensor {
+        name,
+        inner: GPUSensorInner::AmdLinux(sensor),
+    }))
+}
+
 impl GPUSensor {
     /// Returns per-process GPU utilization percentages.
     pub fn get_process_gpu_usage(&self, current_timestamp: u64) -> Result<HashMap<u32, f64>, SensorError> {
@@ -191,6 +226,8 @@ impl GPUSensor {
             GPUSensorInner::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
             #[cfg(target_os = "windows")]
             GPUSensorInner::Amd(_) | GPUSensorInner::Intel { .. } => Err(SensorError::NotSupported),
+            #[cfg(target_os = "linux")]
+            GPUSensorInner::AmdLinux(_) => Err(SensorError::NotSupported),
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
             _ => Err(SensorError::NotSupported),
         }

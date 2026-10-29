@@ -777,6 +777,7 @@ dependencies = [
  "chrono",
  "common",
  "display-info",
+ "libloading 0.8.9",
  "mqtt",
  "msr-driver-rs",
  "nvml-wrapper",

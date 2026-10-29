@@ -1,4 +1,10 @@
+#[cfg(target_os = "linux")]
+pub mod amdgpu_name;
 pub mod database;
+#[cfg(target_os = "linux")]
+pub mod linux_amd_gpu;
+#[cfg(target_os = "linux")]
+pub mod linux_amd_sensor;
 pub mod sensors;
 
 use std::{
@@ -20,9 +26,10 @@ pub use common::{clog, types::ConsumptionUnit};
 use database::Database;
 use mqtt::topics::sensor_type_to_topic;
 pub use mqtt::{MQTTPublisher, MqttConfig, ProcessPublishMode};
+#[cfg(not(target_os = "linux"))]
+use sensors::gpu::get_gpu_list;
 use sensors::{
-    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info,
-    gpu::{GPUVendor, get_gpu_list},
+    DiskSensor, NetworkSensor, RamSensor, SensorType, create_event_from_sensors, get_hardware_info, gpu::GPUVendor,
     to_computed_event_with_cap,
 };
 use sysinfo::System;
@@ -111,6 +118,18 @@ impl CollectorApp {
         }
 
         // GPU sensors
+        #[cfg(target_os = "linux")]
+        let amd_devices = crate::linux_amd_gpu::discover();
+
+        #[cfg(target_os = "linux")]
+        let gpu_list = {
+            let mut list = sensors::gpu::get_nvidia_gpu_list();
+
+            list.extend(amd_devices.iter().map(|device| device.name.clone()));
+            list
+        };
+
+        #[cfg(not(target_os = "linux"))]
         let gpu_list = get_gpu_list();
         crate::clog!("\nDetected GPUs: {gpu_list:#?}");
         if gpu_list.is_empty() {
@@ -139,7 +158,22 @@ impl CollectorApp {
                 GPUVendor::Other => 0,
             };
 
-            match sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index) {
+            #[cfg(target_os = "linux")]
+            let sensor_result = if vendor == GPUVendor::Amd {
+                amd_devices
+                    .get(vendor_index as usize)
+                    .ok_or(sensors::SensorError::NotSupported)
+                    .and_then(|device| {
+                        sensors::gpu::get_amd_gpu_energy_sensor(gpu_name.clone(), device.device_path.clone())
+                    })
+            } else {
+                sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index)
+            };
+
+            #[cfg(not(target_os = "linux"))]
+            let sensor_result = sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index);
+
+            match sensor_result {
                 Ok(sensor) => {
                     crate::clog!(
                         "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",

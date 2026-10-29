@@ -20,6 +20,9 @@ windows = { version = "0.62.2", features = [
 [target.'cfg(any(windows, target_os = "linux"))'.dependencies]
 nvml-wrapper = "0.13.0"
 
+[target.'cfg(target_os = "linux")'.dependencies]
+libloading = "0.8"
+
 [dependencies]
 common = { path = "../common" }
 mqtt = { path = "../mqtt" }
