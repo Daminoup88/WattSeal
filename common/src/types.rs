@@ -1155,6 +1155,33 @@ mod tests {
     }
 
     #[test]
+    fn hardware_info_keeps_gpu_display_names_and_topic_ids_separate() {
+        let hardware_info = HardwareInfo::from(vec![
+            InitialInfo::Gpu {
+                name: "AMD Radeon RX 7800 XT".to_string(),
+                topic_id: "AMD Radeon RX 7800 XT (0000:2f:00.0)".to_string(),
+            },
+            InitialInfo::Gpu {
+                name: "AMD Radeon RX 7800 XT".to_string(),
+                topic_id: "AMD Radeon RX 7800 XT (0000:30:00.0)".to_string(),
+            },
+        ]);
+
+        assert_eq!(
+            hardware_info.gpus,
+            vec!["AMD Radeon RX 7800 XT".to_string(), "AMD Radeon RX 7800 XT".to_string(),]
+        );
+
+        assert_eq!(
+            hardware_info.gpu_topic_ids,
+            vec![
+                "AMD Radeon RX 7800 XT (0000:2f:00.0)".to_string(),
+                "AMD Radeon RX 7800 XT (0000:30:00.0)".to_string(),
+            ]
+        );
+    }
+
+    #[test]
     fn hardware_info_merges_amd_gpu_and_igpu_entries() {
         let hardware_info = HardwareInfo::from(vec![
             InitialInfo::Gpus(vec!["AMD Radeon RX 7800 XT (0)".to_string()]),
