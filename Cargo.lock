@@ -1114,11 +1114,10 @@ dependencies = [
 
 [[package]]
 name = "display-info"
-version = "0.5.9"
+version = "0.5.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e0aca670967c2528799e316f9f97913efcc034867614d55681dd41a1c2f7830"
+checksum = "9a69fa7908855a7f1d1a242aac1c5d60f2f3e15fc1ad69dbec067e39206d4f5d"
 dependencies = [
- "fxhash",
  "log",
  "objc2 0.6.4",
  "objc2-app-kit 0.3.2",
@@ -1675,15 +1674,6 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
-]
-
-[[package]]
-name = "fxhash"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c31b6d751ae2c7f11320402d34e41349dd1016f8d5d45e48c4312bc8625af50c"
-dependencies = [
- "byteorder",
 ]
 
 [[package]]
