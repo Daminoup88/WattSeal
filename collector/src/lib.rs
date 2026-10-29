@@ -360,7 +360,7 @@ impl CollectorApp {
 
 fn publish_sensor(mqtt_info: &MQTTInfo, sensor_data: &ComputedSensorData, timestamp_ms: i64) {
     let sensor_key = match sensor_data {
-        ComputedSensorData::GPU(data) => data.name.as_deref().unwrap_or("GPU"),
+        ComputedSensorData::GPU(data) => data.topic_id.as_deref().unwrap_or("GPU"),
         _ => sensor_data.sensor_type(),
     };
     publish_sensor_envelope(

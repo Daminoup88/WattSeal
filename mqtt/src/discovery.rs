@@ -71,7 +71,10 @@ pub fn build_mqtt_manifest<'a>(node_id: &str, info: &'a HardwareInfo) -> MqttMan
         .iter()
         .map(|descriptor| sensor_type_to_topic(node_id, descriptor.sensor_type))
         .collect::<Vec<_>>();
-    sensor_topics.extend(info.gpus.iter().map(|name| sensor_type_to_topic(node_id, name)));
+    sensor_topics.extend(info.gpus.iter().enumerate().map(|(index, name)| {
+        let topic_id = info.gpu_topic_ids.get(index).unwrap_or(name);
+        sensor_type_to_topic(node_id, topic_id)
+    }));
 
     MqttManifest {
         hardware_info: info,
@@ -247,8 +250,9 @@ fn discovery_metrics(node_id: &str, info: &HardwareInfo) -> Vec<DiscoveryMetric>
         .collect::<Vec<_>>();
 
     for (index, gpu_name) in info.gpus.iter().enumerate() {
-        let key = topic_segment(gpu_name);
-        let state_topic = sensor_type_to_topic(node_id, gpu_name);
+        let topic_id = info.gpu_topic_ids.get(index).unwrap_or(gpu_name);
+        let key = topic_segment(topic_id);
+        let state_topic = sensor_type_to_topic(node_id, topic_id);
         for (suffix, label, template, unit, device_class, state_class, icon) in [
             (
                 "usage",

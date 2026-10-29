@@ -133,6 +133,7 @@ pub enum GPUSensorInner {
 /// Global GPU energy sensor wrapper.
 pub struct GPUSensor {
     name: String,
+    display_name: String,
     inner: GPUSensorInner,
 }
 
@@ -151,17 +152,21 @@ impl Sensor for GPUSensor {
             _ => return Err(SensorError::NotSupported),
         };
         if let SensorData::GPU(ref mut gpu) = data {
-            gpu.name = Some(self.name());
+            gpu.name = Some(self.display_name.clone());
+            gpu.topic_id = Some(self.name.clone());
         }
         Ok(data)
     }
 
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
-        Ok(InitialInfo::Gpus(vec![self.name()]))
+        Ok(InitialInfo::Gpu {
+            name: self.display_name(),
+            topic_id: self.name(),
+        })
     }
 
     fn read_name(&self) -> Result<String, SensorError> {
-        Ok(self.name.clone())
+        Ok(self.display_name.clone())
     }
 }
 
@@ -180,7 +185,11 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
             }),
             GPUVendor::Other => Err(SensorError::NotSupported),
         }?;
-        return Ok(SensorType::GPU(GPUSensor { name, inner }));
+        return Ok(SensorType::GPU(GPUSensor {
+            display_name: name.clone(),
+            name,
+            inner,
+        }));
     }
 
     #[cfg(target_os = "linux")]
@@ -197,7 +206,11 @@ pub fn get_gpu_energy_sensor(vendor_id: &str, index: u32) -> Result<SensorType, 
             }
             _ => Err(SensorError::NotSupported),
         }?;
-        return Ok(SensorType::GPU(GPUSensor { name, inner }));
+        return Ok(SensorType::GPU(GPUSensor {
+            display_name: name.clone(),
+            name,
+            inner,
+        }));
     }
 
     #[cfg(not(any(target_os = "windows", target_os = "linux")))]
@@ -219,6 +232,7 @@ pub fn get_amd_gpu_energy_sensor(
 
     Ok(SensorType::GPU(GPUSensor {
         name: unique_name,
+        display_name: name,
         inner: GPUSensorInner::AmdLinux(sensor),
     }))
 }
@@ -248,7 +262,12 @@ impl GPUSensor {
     }
 
     pub fn name(&self) -> String {
-        self.name.to_string()
+        self.name.clone()
+    }
+
+    /// Returns the user-facing GPU model name.
+    pub fn display_name(&self) -> String {
+        self.display_name.clone()
     }
 }
 
@@ -387,6 +406,8 @@ mod amd_gpu {
                 usage_percent: usage,
                 vram_usage_percent: memory,
                 name: None,
+
+                topic_id: None,
             };
 
             self.last_reading.set(now);
@@ -616,6 +637,8 @@ mod nvidia_gpu {
                 usage_percent,
                 vram_usage_percent,
                 name: None,
+
+                topic_id: None,
             }
             .into())
         }
@@ -696,6 +719,8 @@ mod intel_gpu {
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                         name: None,
+
+                        topic_id: None,
                     }
                     .into());
                 }
@@ -707,6 +732,8 @@ mod intel_gpu {
                         usage_percent: Some(0.0),
                         vram_usage_percent: None,
                         name: None,
+
+                        topic_id: None,
                     }
                     .into());
                 }
@@ -723,6 +750,8 @@ mod intel_gpu {
                     usage_percent: Some(max.clamp(0.0, 100.0)),
                     vram_usage_percent: None,
                     name: None,
+
+                    topic_id: None,
                 }
                 .into())
             }

@@ -240,6 +240,7 @@ impl DatabaseEntry for GPUData {
             usage_percent: row.get("usage_percent")?,
             vram_usage_percent: row.get("vram_usage_percent")?,
             name: None, // resolved from devices table when needed
+            topic_id: None,
         })
     }
 

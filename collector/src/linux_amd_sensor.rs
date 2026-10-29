@@ -129,6 +129,8 @@ impl Sensor for AmdGPUSensor {
             usage_percent,
             vram_usage_percent,
             name: None,
+
+            topic_id: None,
         }
         .into())
     }
