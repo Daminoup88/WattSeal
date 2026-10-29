@@ -1,10 +1,11 @@
-use libloading::{Library, Symbol};
 use std::{
     ffi::{CStr, c_char, c_int, c_void},
     fs,
     os::fd::AsRawFd,
     path::{Path, PathBuf},
 };
+
+use libloading::{Library, Symbol};
 
 type AmdgpuDeviceHandle = *mut c_void;
 

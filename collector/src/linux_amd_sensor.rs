@@ -109,12 +109,13 @@ fn find_power_sensor(device_path: &Path) -> Option<PathBuf> {
 
 #[cfg(test)]
 mod tests {
-    use super::read_number;
     use std::{
         fs,
         path::PathBuf,
         sync::atomic::{AtomicU64, Ordering},
     };
+
+    use super::read_number;
 
     static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
