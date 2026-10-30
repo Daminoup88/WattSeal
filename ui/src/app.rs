@@ -33,7 +33,10 @@ use crate::{
         info_modal_current_power, info_modal_current_top_consumer, info_modal_description, info_modal_title,
         info_modal_top_process, modal_close, na, theme_name,
     },
-    types::{AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
+    types::{
+        AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, PsuClass, PsuEfficiency, SensorRecord,
+        TimeRange,
+    },
 };
 
 const FPS: u64 = 1;
@@ -58,6 +61,8 @@ pub struct App {
     custom_carbon_input: String,
     electricity_cost: ElectricityCost,
     custom_kwh_cost_input: String,
+    psu_efficiency: PsuEfficiency,
+    custom_psu_efficiency_input: String,
     launch_on_startup: bool,
     show_setup: bool,
     header: Header,
@@ -91,17 +96,18 @@ impl App {
         }
     }
 
-    fn ready(mut database: Database) -> (Self, Task<Message>) {
+    fn ready(database: Database) -> (Self, Task<Message>) {
         let current_page = Page::Dashboard;
 
-        let (language, carbon_intensity, theme, electricity_cost, show_setup, close_behavior) =
+        let (language, carbon_intensity, theme, electricity_cost, show_setup, close_behavior, psu_efficiency) =
             match database.load_ui_settings() {
                 Ok(Some(s)) => {
                     let lang = AppLanguage::from_code(&s.language);
                     let ci = CarbonIntensity::from_stored(&s.carbon_intensity);
                     let theme = AppTheme::from_name(&s.theme);
                     let ec = ElectricityCost::from_stored(&s.kwh_cost, Some(&s.currency));
-                    (lang, ci, theme, ec, false, s.close_behavior)
+                    let psu = PsuEfficiency::from_stored(s.psu_efficiency);
+                    (lang, ci, theme, ec, false, s.close_behavior, psu)
                 }
                 _ => (
                     AppLanguage::from_os(),
@@ -110,6 +116,7 @@ impl App {
                     ElectricityCost::from_os(),
                     true,
                     CloseBehavior::default(),
+                    PsuEfficiency::default(),
                 ),
             };
         let custom_carbon_input = if carbon_intensity.is_custom() {
@@ -119,6 +126,11 @@ impl App {
         };
         let custom_kwh_cost_input = if electricity_cost.is_custom() {
             format!("{:.4}", electricity_cost.price_per_kwh)
+        } else {
+            String::new()
+        };
+        let custom_psu_efficiency_input = if psu_efficiency.is_custom() {
+            format!("{}", psu_efficiency.eta)
         } else {
             String::new()
         };
@@ -152,39 +164,39 @@ impl App {
             })
             .collect();
         let dashboard_page = DashboardPage;
-        let all_time_data = database.get_all_time_data().unwrap_or_default();
+        let mut app = Self {
+            current_page,
+            sensors,
+            dashboard_page,
+            header: Header::new(Page::all(), current_page),
+            footer: Footer,
+            info_page: InfoPage::new(),
+            settings_page: SettingsPage::new(),
+            settings_open: false,
+            info_modal_open: None,
+            language,
+            carbon_intensity,
+            custom_carbon_input,
+            electricity_cost,
+            custom_kwh_cost_input,
+            psu_efficiency,
+            custom_psu_efficiency_input,
+            launch_on_startup: common::autostart::is_enabled(),
+            show_setup,
+            theme,
+            database,
+            hardware_info,
+            all_time_data: AllTimeData::default(),
+            tick_count: 0,
+            show_close_dialog: false,
+            close_behavior,
+            remember_close_choice: false,
+            database_migration_pending: false,
+        };
+        app.refresh_all_time_data();
         let task = Task::done(Message::FetchAllChartsData(TimeRange::default()));
 
-        (
-            Self {
-                current_page,
-                sensors,
-                dashboard_page,
-                header: Header::new(Page::all(), current_page),
-                footer: Footer,
-                info_page: InfoPage::new(),
-                settings_page: SettingsPage::new(),
-                settings_open: false,
-                info_modal_open: None,
-                language,
-                carbon_intensity,
-                custom_carbon_input,
-                electricity_cost,
-                custom_kwh_cost_input,
-                launch_on_startup: common::autostart::is_enabled(),
-                show_setup,
-                theme,
-                database,
-                hardware_info,
-                all_time_data,
-                tick_count: 0,
-                show_close_dialog: false,
-                close_behavior,
-                remember_close_choice: false,
-                database_migration_pending: false,
-            },
-            task,
-        )
+        (app, task)
     }
 
     fn waiting_for_migration(database: Database) -> (Self, Task<Message>) {
@@ -208,6 +220,8 @@ impl App {
                 custom_carbon_input: String::new(),
                 electricity_cost: ElectricityCost::from_os(),
                 custom_kwh_cost_input: String::new(),
+                psu_efficiency: PsuEfficiency::default(),
+                custom_psu_efficiency_input: String::new(),
                 launch_on_startup: common::autostart::is_enabled(),
                 show_setup: false,
                 theme,
@@ -374,6 +388,45 @@ impl App {
                 self.persist_ui_settings();
                 Task::none()
             }
+            Message::ChangePsuEfficiency(psu) => {
+                if psu.is_custom() {
+                    if !self.psu_efficiency.is_custom() {
+                        self.custom_psu_efficiency_input = String::new();
+                    }
+                    let eta = self
+                        .custom_psu_efficiency_input
+                        .parse::<f64>()
+                        .ok()
+                        .filter(|&v| v > 0.0 && v <= 1.0)
+                        .unwrap_or(1.0);
+                    self.psu_efficiency = PsuEfficiency {
+                        class: PsuClass::Custom,
+                        eta,
+                        wall_power_factor: 1.0 / eta,
+                    };
+                } else {
+                    self.psu_efficiency = psu;
+                    self.persist_ui_settings();
+                }
+                self.refresh_all_time_data();
+                self.reload_all_charts();
+                Task::none()
+            }
+            Message::CustomPsuEfficiencyInput(text) => {
+                self.custom_psu_efficiency_input = text.clone();
+                let eta = text.parse::<f64>().ok().filter(|&v| v > 0.0 && v <= 1.0).unwrap_or(1.0);
+                self.psu_efficiency = PsuEfficiency {
+                    class: PsuClass::Custom,
+                    eta,
+                    wall_power_factor: 1.0 / eta,
+                };
+                if text.parse::<f64>().ok().filter(|&v| v > 0.0 && v <= 1.0).is_some() {
+                    self.persist_ui_settings();
+                }
+                self.refresh_all_time_data();
+                self.reload_all_charts();
+                Task::none()
+            }
             Message::ToggleLaunchOnStartup(enabled) => {
                 match common::autostart::set_enabled(enabled) {
                     Ok(()) => {
@@ -487,7 +540,8 @@ impl App {
     }
 
     fn load_latest_data(&mut self, n: i64) -> Vec<SensorRecord> {
-        self.database
+        let records = self
+            .database
             .select_last_n_records(n)
             .unwrap_or_default()
             .into_iter()
@@ -496,7 +550,8 @@ impl App {
                 duration_ms,
                 data,
             })
-            .collect()
+            .collect();
+        self.with_psu_correction(records)
     }
 
     fn load_history(&mut self, table_name: &str, time_range: TimeRange) -> Vec<SensorRecord> {
@@ -515,7 +570,7 @@ impl App {
                     .select_last_n_seconds_average(time_range.seconds(), table_name, window)
             }
         };
-        from_db_with_duration(result)
+        self.with_psu_correction(from_db_with_duration(result))
     }
 
     fn load_process_data(&mut self, time_range: TimeRange) -> Vec<SensorRecord> {
@@ -524,7 +579,7 @@ impl App {
             .get(ProcessData::table_name_static())
             .map(SensorState::process_limit)
             .unwrap_or_else(|| ProcessLimit::default().resolve(None));
-        from_db(
+        let records = from_db(
             self.database
                 .select_top_processes_average(time_range.seconds(), process_limit),
         )
@@ -534,7 +589,8 @@ impl App {
             duration_ms: 0,
             data,
         })
-        .collect()
+        .collect();
+        self.with_psu_correction(records)
     }
 
     fn refresh_process_data(&mut self) {
@@ -547,6 +603,20 @@ impl App {
         let process_data = self.load_process_data(time_range);
         if let Some(sensor) = self.sensors.get_mut(table_name) {
             sensor.load_history_batch(&process_data);
+        }
+    }
+
+    fn reload_all_charts(&mut self) {
+        let queries: Vec<(String, TimeRange)> = self
+            .sensors
+            .iter()
+            .map(|(name, sensor)| (name.clone(), sensor.current_time_range().clone()))
+            .collect();
+        for (table_name, time_range) in queries {
+            let data = self.load_history(&table_name, time_range);
+            if let Some(sensor) = self.sensors.get_mut(&table_name) {
+                sensor.load_history_batch(&data);
+            }
         }
     }
 
@@ -585,6 +655,8 @@ impl App {
                     &self.custom_carbon_input,
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
+                    self.psu_efficiency,
+                    &self.custom_psu_efficiency_input,
                     self.launch_on_startup,
                     self.close_behavior,
                 ),
@@ -599,6 +671,8 @@ impl App {
                     &self.custom_carbon_input,
                     self.electricity_cost,
                     &self.custom_kwh_cost_input,
+                    self.psu_efficiency,
+                    &self.custom_psu_efficiency_input,
                     self.launch_on_startup,
                 ),
                 Message::ConfirmSetup,
@@ -881,7 +955,18 @@ impl App {
 
     fn refresh_all_time_data(&mut self) {
         if let Ok(all_time_data) = self.database.get_all_time_data() {
-            self.all_time_data = all_time_data;
+            let factor = self.psu_factor();
+            if (factor - 1.0).abs() < 1e-9 {
+                self.all_time_data = all_time_data;
+            } else {
+                self.all_time_data = AllTimeData {
+                    components: all_time_data
+                        .components
+                        .into_iter()
+                        .map(|(k, v)| (k, v * factor))
+                        .collect(),
+                };
+            }
         }
     }
 
@@ -914,6 +999,20 @@ impl App {
         }
     }
 
+    fn psu_factor(&self) -> f64 {
+        self.psu_efficiency.wall_power_factor()
+    }
+
+    fn with_psu_correction(&self, mut records: Vec<SensorRecord>) -> Vec<SensorRecord> {
+        let factor = self.psu_factor();
+        if (factor - 1.0).abs() > 1e-9 {
+            for record in &mut records {
+                record.data.scale_energy(factor);
+            }
+        }
+        records
+    }
+
     fn persist_ui_settings(&mut self) -> bool {
         let carbon_str = if self.carbon_intensity.is_custom() {
             format!("{}", self.carbon_intensity.g_per_kwh)
@@ -932,6 +1031,7 @@ impl App {
             theme: theme_name(AppLanguage::English, self.theme).to_string(),
             currency: self.electricity_cost.currency_code.to_string(),
             close_behavior: self.close_behavior,
+            psu_efficiency: self.psu_efficiency.to_stored(),
         };
         match self.database.save_ui_settings(&settings) {
             Ok(()) => true,

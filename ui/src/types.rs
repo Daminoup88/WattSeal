@@ -784,6 +784,157 @@ impl Display for ElectricityCost {
     }
 }
 
+/// Standard 80 PLUS certification tiers, plus `None` (no correction) and `Custom`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum PsuClass {
+    None,
+    Basic80,
+    Bronze80,
+    Silver80,
+    Gold80,
+    Platinum80,
+    Titanium80,
+    Custom,
+}
+
+impl PsuClass {
+    pub const ALL_PRESETS: &[Self] = &[
+        Self::None,
+        Self::Basic80,
+        Self::Bronze80,
+        Self::Silver80,
+        Self::Gold80,
+        Self::Platinum80,
+        Self::Titanium80,
+    ];
+
+    /// Efficiency factor at ~50% load for each certification tier.
+    pub const fn eta(self) -> f64 {
+        match self {
+            Self::None => 1.0,
+            Self::Basic80 => 0.82,
+            Self::Bronze80 => 0.85,
+            Self::Silver80 => 0.88,
+            Self::Gold80 => 0.92,
+            Self::Platinum80 => 0.94,
+            Self::Titanium80 => 0.96,
+            Self::Custom => 1.0,
+        }
+    }
+
+    pub const fn label(self) -> &'static str {
+        match self {
+            Self::None => "None",
+            Self::Basic80 => "80+",
+            Self::Bronze80 => "80+ Bronze",
+            Self::Silver80 => "80+ Silver",
+            Self::Gold80 => "80+ Gold",
+            Self::Platinum80 => "80+ Platinum",
+            Self::Titanium80 => "80+ Titanium",
+            Self::Custom => "Custom",
+        }
+    }
+
+    /// Finds matching standard class by eta (within floating point precision).
+    pub fn from_eta(eta: f64) -> Self {
+        for &class in Self::ALL_PRESETS {
+            if (class.eta() - eta).abs() < 1e-4 {
+                return class;
+            }
+        }
+        Self::Custom
+    }
+}
+
+/// PSU efficiency setting: the certification class, actual η value, and precomputed wall power factor (1 / η).
+#[derive(Debug, Clone, Copy)]
+pub struct PsuEfficiency {
+    pub class: PsuClass,
+    pub eta: f64,
+    pub wall_power_factor: f64,
+}
+
+impl PsuEfficiency {
+    pub const NONE: Self = Self {
+        class: PsuClass::None,
+        eta: 1.0,
+        wall_power_factor: 1.0,
+    };
+
+    /// Creates a `PsuEfficiency` from an efficiency factor, mapping to a preset class if matched.
+    pub fn from_eta(eta: f64) -> Self {
+        let eta = eta.clamp(0.01, 1.0);
+        let class = PsuClass::from_eta(eta);
+        let wall_power_factor = 1.0 / eta;
+        Self {
+            class,
+            eta,
+            wall_power_factor,
+        }
+    }
+
+    /// Creates a `PsuEfficiency` for a preset class.
+    pub const fn from_class(class: PsuClass) -> Self {
+        let eta = class.eta();
+        let wall_power_factor = if eta > 0.0 { 1.0 / eta } else { 1.0 };
+        Self {
+            class,
+            eta,
+            wall_power_factor,
+        }
+    }
+
+    /// Presets shown in the picklist: all standard tiers, ending with Custom.
+    pub fn presets() -> Vec<Self> {
+        let mut list: Vec<Self> = PsuClass::ALL_PRESETS.iter().copied().map(Self::from_class).collect();
+        list.push(Self {
+            class: PsuClass::Custom,
+            eta: 1.0,
+            wall_power_factor: 1.0,
+        });
+        list
+    }
+
+    pub fn is_custom(self) -> bool {
+        self.class == PsuClass::Custom
+    }
+
+    /// Returns the precomputed multiplicative factor: 1 / η.
+    pub fn wall_power_factor(self) -> f64 {
+        self.wall_power_factor
+    }
+
+    pub fn from_stored(eta: f64) -> Self {
+        Self::from_eta(eta)
+    }
+
+    pub fn to_stored(self) -> f64 {
+        self.eta
+    }
+}
+
+impl Default for PsuEfficiency {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl PartialEq for PsuEfficiency {
+    fn eq(&self, other: &Self) -> bool {
+        self.class == other.class
+    }
+}
+
+impl Display for PsuEfficiency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_custom() {
+            write!(f, "Custom")
+        } else {
+            write!(f, "{} ({:.0}%)", self.class.label(), self.eta * 100.0)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -825,5 +976,40 @@ mod tests {
     #[test]
     fn test_country_lookup_defaults_to_world() {
         assert_eq!(CountryPreset::by_key(CountryKey::Custom).key, CountryKey::World);
+    }
+
+    #[test]
+    fn test_psu_efficiency_defaults_and_wall_factor() {
+        let none = PsuEfficiency::default();
+        assert_eq!(none.class, PsuClass::None);
+        assert!((none.wall_power_factor() - 1.0).abs() < 1e-9);
+
+        let gold = PsuEfficiency::from_class(PsuClass::Gold80);
+        assert!((gold.wall_power_factor() - (1.0 / 0.92)).abs() < 1e-9);
+
+        let custom = PsuEfficiency::from_eta(0.80);
+        assert_eq!(custom.class, PsuClass::Custom);
+        assert!((custom.wall_power_factor() - 1.25).abs() < 1e-9);
+    }
+
+    #[test]
+    fn test_psu_efficiency_stored_and_matching() {
+        // Preset matching
+        for preset in PsuEfficiency::presets() {
+            if !preset.is_custom() {
+                let matched = PsuEfficiency::from_eta(preset.eta);
+                assert_eq!(matched.class, preset.class);
+            }
+        }
+
+        // Custom value matching a known standard class maps to that class
+        assert_eq!(PsuEfficiency::from_eta(0.92).class, PsuClass::Gold80);
+        assert_eq!(PsuEfficiency::from_eta(1.0).class, PsuClass::None);
+        assert_eq!(PsuEfficiency::from_eta(0.85).class, PsuClass::Bronze80);
+
+        // Custom value not matching a preset stays Custom
+        let custom = PsuEfficiency::from_eta(0.77);
+        assert_eq!(custom.class, PsuClass::Custom);
+        assert!((custom.to_stored() - 0.77).abs() < 1e-6);
     }
 }

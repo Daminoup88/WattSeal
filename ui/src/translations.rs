@@ -2,7 +2,9 @@ use common::{CPUData, DatabaseEntry, DiskData, GPUData, MetricKind, NetworkData,
 
 use crate::{
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, TimeRange},
+    types::{
+        AppLanguage, CarbonIntensity, CountryKey, ElectricityCost, ProcessLimit, PsuClass, PsuEfficiency, TimeRange,
+    },
 };
 
 // Window title
@@ -1042,6 +1044,46 @@ pub fn custom_carbon_invalid(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Entrez un nombre positif (g CO₂/kWh)",
         AppLanguage::Chinese => "请输入正数 (g CO₂/kWh)",
         AppLanguage::Romanian => "Introduceți un număr pozitiv (g CO₂/kWh)",
+    }
+}
+
+pub fn settings_psu_efficiency(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "PSU Efficiency",
+        AppLanguage::German => "Netzteil-Effizienz",
+        AppLanguage::French => "Efficacité de l'alimentation",
+        AppLanguage::Chinese => "电源效率",
+        AppLanguage::Romanian => "Eficiență sursă alimentare",
+    }
+}
+
+pub fn setup_choose_psu_efficiency(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Select your PSU efficiency class (optional)",
+        AppLanguage::German => "Wähle die Effizienzklasse deines Netzteils (optional)",
+        AppLanguage::French => "Sélectionnez la classe d'efficacité de votre alimentation (optionnel)",
+        AppLanguage::Chinese => "选择你的电源效率等级（可选）",
+        AppLanguage::Romanian => "Selectați clasa de eficiență a sursei de alimentare (opțional)",
+    }
+}
+
+pub fn custom_psu_efficiency_placeholder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "e.g. η = 0.87",
+        AppLanguage::German => "z. B. η = 0.87",
+        AppLanguage::French => "ex. η = 0.87",
+        AppLanguage::Chinese => "例如 η = 0.87",
+        AppLanguage::Romanian => "ex: η = 0.87",
+    }
+}
+
+pub fn custom_psu_efficiency_invalid(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Enter η between 0.01 and 1.0",
+        AppLanguage::German => "Gib η zwischen 0.01 und 1.0 ein",
+        AppLanguage::French => "Entrez η entre 0.01 et 1.0",
+        AppLanguage::Chinese => "请输入 0.01 到 1.0 之间的 η 值",
+        AppLanguage::Romanian => "Introduceți η între 0.01 și 1.0",
     }
 }
 
@@ -2116,6 +2158,55 @@ impl TranslatedTheme {
 impl std::fmt::Display for TranslatedTheme {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", theme_name(self.language, self.theme))
+    }
+}
+
+pub fn psu_class_name(language: AppLanguage, class: PsuClass) -> &'static str {
+    match class {
+        PsuClass::None => match language {
+            AppLanguage::English => "Perfect",
+            AppLanguage::German => "Perfekt",
+            AppLanguage::French => "Parfaite",
+            AppLanguage::Chinese => "完美",
+            AppLanguage::Romanian => "Perfect",
+        },
+        PsuClass::Basic80 => "80+",
+        PsuClass::Bronze80 => "80+ Bronze",
+        PsuClass::Silver80 => "80+ Silver",
+        PsuClass::Gold80 => "80+ Gold",
+        PsuClass::Platinum80 => "80+ Platinum",
+        PsuClass::Titanium80 => "80+ Titanium",
+        PsuClass::Custom => custom_preset_name(language),
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TranslatedPsuEfficiency {
+    pub efficiency: PsuEfficiency,
+    language: AppLanguage,
+}
+
+impl TranslatedPsuEfficiency {
+    pub fn new(efficiency: PsuEfficiency, language: AppLanguage) -> Self {
+        Self { efficiency, language }
+    }
+
+    pub fn all(language: AppLanguage) -> Vec<Self> {
+        PsuEfficiency::presets()
+            .into_iter()
+            .map(|p| Self::new(p, language))
+            .collect()
+    }
+}
+
+impl std::fmt::Display for TranslatedPsuEfficiency {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = psu_class_name(self.language, self.efficiency.class);
+        if self.efficiency.is_custom() {
+            write!(f, "{}", name)
+        } else {
+            write!(f, "{} ({:.0}%)", name, self.efficiency.eta * 100.0)
+        }
     }
 }
 

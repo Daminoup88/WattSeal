@@ -3,7 +3,9 @@ use common::MetricKind;
 use crate::{
     pages::Page,
     themes::AppTheme,
-    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, ProcessLimit, SensorRecord, TimeRange},
+    types::{
+        AppLanguage, CarbonIntensity, Currency, ElectricityCost, ProcessLimit, PsuEfficiency, SensorRecord, TimeRange,
+    },
 };
 
 /// UI event variants dispatched by user actions and background tasks.
@@ -18,6 +20,8 @@ pub enum Message {
     ChangeElectricityCost(ElectricityCost),
     CustomKwhCostInput(String),
     ChangeCustomCurrency(Currency),
+    ChangePsuEfficiency(PsuEfficiency),
+    CustomPsuEfficiencyInput(String),
     ToggleLaunchOnStartup(bool),
     ChangeCloseBehavior(common::CloseBehavior),
     ToggleRememberCloseChoice(bool),
