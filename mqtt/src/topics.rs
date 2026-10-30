@@ -33,3 +33,18 @@ pub fn status_topic(id: &str) -> String {
 pub fn ha_discovery_topic(base_id: &str, object_id: &str) -> String {
     format!("homeassistant/sensor/{}/{}/config", base_id, object_id)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::sensor_type_to_topic;
+
+    #[test]
+    fn identical_gpu_models_with_different_pci_addresses_have_unique_topics() {
+        let first = sensor_type_to_topic("node", "AMD Radeon RX 7800 XT (0000:2f:00.0)");
+        let second = sensor_type_to_topic("node", "AMD Radeon RX 7800 XT (0000:30:00.0)");
+
+        assert_ne!(first, second);
+        assert_eq!(first, "node/sensor_data/amd_radeon_rx_7800_xt__0000_2f_00_0",);
+        assert_eq!(second, "node/sensor_data/amd_radeon_rx_7800_xt__0000_30_00_0",);
+    }
+}

@@ -108,7 +108,8 @@ pub fn create_event_from_sensors(
         match sensor_data {
             Ok(mut d) => {
                 if let (SensorType::GPU(gpu_sensor), SensorData::GPU(gpu_data)) = (sensor, &mut d) {
-                    gpu_data.name = Some(gpu_sensor.name());
+                    gpu_data.name = Some(gpu_sensor.display_name());
+                    gpu_data.topic_id = Some(gpu_sensor.name());
                 }
                 if let SensorData::CPU(ref mut cpu) = d {
                     if let Some(pp1) = cpu.pp1_energy.take() {
@@ -196,6 +197,8 @@ pub fn create_event_from_sensors(
                 usage_percent: None,
                 vram_usage_percent: None,
                 name: igpu_name,
+
+                topic_id: None,
             }));
         }
     }

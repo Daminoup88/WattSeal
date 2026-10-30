@@ -251,6 +251,8 @@ pub struct GPUData<E = EnergyUj> {
     pub usage_percent: Option<f64>,
     pub vram_usage_percent: Option<f64>,
     pub name: Option<String>,
+    #[serde(default)]
+    pub topic_id: Option<String>,
 }
 
 /// RAM energy and usage readings.
@@ -341,6 +343,7 @@ pub enum InitialInfo {
     CPU(CpuInfo),
     Memory(MemoryInfo),
     Gpus(Vec<String>),
+    Gpu { name: String, topic_id: String },
     Disks(Vec<DiskInfo>),
     Displays(Vec<ScreenInfo>),
     Battery(BatteryInfo),
@@ -360,6 +363,8 @@ pub struct HardwareInfo {
     pub cpu: CpuInfo,
     pub memory: MemoryInfo,
     pub gpus: Vec<String>,
+    #[serde(default)]
+    pub gpu_topic_ids: Vec<String>,
     pub disks: Vec<DiskInfo>,
     pub displays: Vec<ScreenInfo>,
     pub battery: BatteryInfo,
@@ -384,6 +389,7 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
         let mut cpu_info = None;
         let mut memory_info = None;
         let mut gpu_list = None;
+        let mut gpu_topic_ids = None;
         let mut disk_info = None;
         let mut display_info = None;
         let mut battery_info = None;
@@ -401,6 +407,15 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
                         }
                     }
                 }
+                InitialInfo::Gpu { name, topic_id } => {
+                    let names = gpu_list.get_or_insert_with(Vec::new);
+                    let ids = gpu_topic_ids.get_or_insert_with(Vec::new);
+
+                    if !ids.contains(&topic_id) {
+                        names.push(name);
+                        ids.push(topic_id);
+                    }
+                }
                 InitialInfo::Disks(disks) => disk_info = Some(disks),
                 InitialInfo::Displays(displays) => display_info = Some(displays),
                 InitialInfo::Battery(battery) => battery_info = Some(battery),
@@ -412,6 +427,7 @@ impl From<Vec<InitialInfo>> for HardwareInfo {
             cpu: cpu_info.unwrap_or_default(),
             memory: memory_info.unwrap_or_default(),
             gpus: gpu_list.unwrap_or_default(),
+            gpu_topic_ids: gpu_topic_ids.unwrap_or_default(),
             disks: disk_info.unwrap_or_default(),
             displays: display_info.unwrap_or_default(),
             battery: battery_info.unwrap_or_default(),
@@ -615,6 +631,7 @@ impl SensorData {
                 usage_percent: data.usage_percent,
                 vram_usage_percent: data.vram_usage_percent,
                 name: data.name.clone(),
+                topic_id: data.topic_id.clone(),
             }),
             SensorData::Ram(data) => SensorData::Ram(RamData {
                 total_energy: data.total_energy.map(|e| e.to_wh()),
@@ -701,6 +718,7 @@ impl ComputedSensorData {
             }),
             ComputedSensorData::GPU(data) => ComputedSensorData::GPU(GPUData {
                 name: data.name.clone(),
+                topic_id: data.topic_id.clone(),
                 total_energy: data.total_energy.map(|e| e.to_wh()),
                 usage_percent: data.usage_percent,
                 vram_usage_percent: data.vram_usage_percent,
@@ -1048,6 +1066,7 @@ impl Default for GPUData {
             usage_percent: Some(0.0),
             vram_usage_percent: Some(0.0),
             name: None,
+            topic_id: None,
         }
     }
 }
@@ -1131,6 +1150,33 @@ mod tests {
             vec![
                 "NVIDIA GeForce RTX 5060 Ti (0)".to_string(),
                 "Intel(R) UHD Graphics 770 (0)".to_string(),
+            ]
+        );
+    }
+
+    #[test]
+    fn hardware_info_keeps_gpu_display_names_and_topic_ids_separate() {
+        let hardware_info = HardwareInfo::from(vec![
+            InitialInfo::Gpu {
+                name: "AMD Radeon RX 7800 XT".to_string(),
+                topic_id: "AMD Radeon RX 7800 XT (0000:2f:00.0)".to_string(),
+            },
+            InitialInfo::Gpu {
+                name: "AMD Radeon RX 7800 XT".to_string(),
+                topic_id: "AMD Radeon RX 7800 XT (0000:30:00.0)".to_string(),
+            },
+        ]);
+
+        assert_eq!(
+            hardware_info.gpus,
+            vec!["AMD Radeon RX 7800 XT".to_string(), "AMD Radeon RX 7800 XT".to_string(),]
+        );
+
+        assert_eq!(
+            hardware_info.gpu_topic_ids,
+            vec![
+                "AMD Radeon RX 7800 XT (0000:2f:00.0)".to_string(),
+                "AMD Radeon RX 7800 XT (0000:30:00.0)".to_string(),
             ]
         );
     }
