@@ -18,13 +18,15 @@ use crate::{
     },
     themes::AppTheme,
     translations::{
-        TranslatedCarbonIntensity, TranslatedCloseBehavior, TranslatedElectricityCost, TranslatedTheme,
-        custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder, kwh_cost_invalid, modal_close,
+        TranslatedCarbonIntensity, TranslatedCloseBehavior, TranslatedElectricityCost, TranslatedPsuEfficiency,
+        TranslatedTheme, custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder,
+        custom_psu_efficiency_invalid, custom_psu_efficiency_placeholder, kwh_cost_invalid, modal_close,
         settings_carbon_intensity, settings_close_behavior, settings_electricity_cost, settings_general,
-        settings_language, settings_launch_on_startup, settings_theme, settings_title, setup_choose_carbon,
-        setup_choose_electricity, setup_choose_language, setup_confirm, setup_welcome_title,
+        settings_language, settings_launch_on_startup, settings_psu_efficiency, settings_theme, settings_title,
+        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_choose_psu_efficiency,
+        setup_confirm, setup_welcome_title,
     },
-    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost},
+    types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, PsuEfficiency},
 };
 /// Settings modal for theme, language, carbon intensity, and electricity cost.
 pub struct SettingsPage {}
@@ -42,6 +44,8 @@ impl SettingsPage {
         custom_carbon_input: &'a str,
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
+        psu_efficiency: PsuEfficiency,
+        custom_psu_efficiency_input: &'a str,
         launch_on_startup: bool,
         close_behavior: common::CloseBehavior,
     ) -> Element<'a, Message, AppTheme> {
@@ -76,6 +80,7 @@ impl SettingsPage {
 
         let carbon_row = carbon_intensity_row(language, carbon_intensity, custom_carbon_input);
         let kwh_row = electricity_cost_row(language, electricity_cost, custom_kwh_cost_input);
+        let psu_row = psu_efficiency_row(language, psu_efficiency, custom_psu_efficiency_input);
 
         let close_button: Button<'_, Message, AppTheme> = button(Text::new(modal_close(language)).size(FONT_SIZE_BODY))
             .class(ButtonStyle::Standard)
@@ -115,7 +120,8 @@ impl SettingsPage {
                 .into(),
             ))
             .push(carbon_row)
-            .push(kwh_row);
+            .push(kwh_row)
+            .push(psu_row);
 
         Container::new(content)
             .width(Length::Fixed(520.0))
@@ -131,6 +137,8 @@ impl SettingsPage {
         custom_carbon_input: &'a str,
         electricity_cost: ElectricityCost,
         custom_kwh_cost_input: &'a str,
+        psu_efficiency: PsuEfficiency,
+        custom_psu_efficiency_input: &'a str,
         launch_on_startup: bool,
     ) -> Element<'a, Message, AppTheme> {
         let title = Text::new(setup_welcome_title(language))
@@ -227,8 +235,40 @@ impl SettingsPage {
             ec_picker.into()
         };
 
+        let custom_psu_valid = custom_psu_efficiency_input
+            .parse::<f64>()
+            .ok()
+            .filter(|&v| v > 0.0 && v <= 1.0)
+            .is_some();
+        let psu_label = Text::new(setup_choose_psu_efficiency(language)).size(FONT_SIZE_BODY);
+        let psu_picker = pick_list(
+            TranslatedPsuEfficiency::all(language),
+            Some(TranslatedPsuEfficiency::new(psu_efficiency, language)),
+            |tp| Message::ChangePsuEfficiency(tp.efficiency),
+        )
+        .width(Length::Fill)
+        .padding(8);
+        let psu_section: Element<'_, Message, AppTheme> = if psu_efficiency.is_custom() {
+            let input = text_input(custom_psu_efficiency_placeholder(language), custom_psu_efficiency_input)
+                .on_input(Message::CustomPsuEfficiencyInput)
+                .width(Length::Fill)
+                .padding(8);
+            let mut col = Column::new().spacing(SPACING_SMALL).push(psu_picker).push(input);
+            if !custom_psu_efficiency_input.is_empty() && !custom_psu_valid {
+                col = col.push(
+                    Text::new(custom_psu_efficiency_invalid(language))
+                        .size(FONT_SIZE_SMALL)
+                        .class(TextStyle::Muted),
+                );
+            }
+            col.into()
+        } else {
+            psu_picker.into()
+        };
+
         let can_confirm = (!carbon_intensity.is_custom() || custom_input_valid)
-            && (!electricity_cost.is_custom() || custom_kwh_valid);
+            && (!electricity_cost.is_custom() || custom_kwh_valid)
+            && (!psu_efficiency.is_custom() || custom_psu_valid);
         let confirm_btn = button(Text::new(setup_confirm(language)).size(FONT_SIZE_BODY))
             .class(ButtonStyle::Standard)
             .on_press_maybe(can_confirm.then_some(Message::ConfirmSetup));
@@ -249,6 +289,8 @@ impl SettingsPage {
             .push(carbon_section)
             .push(ec_label)
             .push(electricity_section)
+            .push(psu_label)
+            .push(psu_section)
             .push(confirm_btn);
 
         Container::new(content)
@@ -391,6 +433,59 @@ fn electricity_cost_row<'a>(
         .align_y(Alignment::Center)
         .push(
             Text::new(settings_electricity_cost(language))
+                .size(FONT_SIZE_BODY)
+                .width(Length::FillPortion(2)),
+        )
+        .push(right_col)
+        .into()
+}
+
+fn psu_efficiency_row<'a>(
+    language: AppLanguage,
+    psu_efficiency: PsuEfficiency,
+    custom_psu_efficiency_input: &'a str,
+) -> Element<'a, Message, AppTheme> {
+    let custom_valid = custom_psu_efficiency_input
+        .parse::<f64>()
+        .ok()
+        .filter(|&v| v > 0.0 && v <= 1.0)
+        .is_some();
+
+    let picker = pick_list(
+        TranslatedPsuEfficiency::all(language),
+        Some(TranslatedPsuEfficiency::new(psu_efficiency, language)),
+        |tp| Message::ChangePsuEfficiency(tp.efficiency),
+    )
+    .width(Length::FillPortion(3))
+    .padding(PADDING_MEDIUM);
+
+    let right_col: Element<'_, Message, AppTheme> = if psu_efficiency.is_custom() {
+        let input = text_input(custom_psu_efficiency_placeholder(language), custom_psu_efficiency_input)
+            .on_input(Message::CustomPsuEfficiencyInput)
+            .width(Length::Fill)
+            .padding(PADDING_MEDIUM);
+        let mut col = Column::new()
+            .width(Length::FillPortion(3))
+            .spacing(4)
+            .push(picker)
+            .push(input);
+        if !custom_psu_efficiency_input.is_empty() && !custom_valid {
+            col = col.push(
+                Text::new(custom_psu_efficiency_invalid(language))
+                    .size(FONT_SIZE_BODY)
+                    .class(TextStyle::Muted),
+            );
+        }
+        col.into()
+    } else {
+        picker.into()
+    };
+
+    Row::new()
+        .spacing(SPACING_LARGE)
+        .align_y(Alignment::Center)
+        .push(
+            Text::new(settings_psu_efficiency(language))
                 .size(FONT_SIZE_BODY)
                 .width(Length::FillPortion(2)),
         )

@@ -83,6 +83,7 @@ pub struct UiSettings {
     pub theme: String,
     pub currency: String,
     pub close_behavior: CloseBehavior,
+    pub psu_efficiency: f64,
 }
 
 /// The remembered action when the user closes the window.
@@ -240,6 +241,10 @@ impl Database {
             "ALTER TABLE ui_settings ADD COLUMN close_behavior TEXT NOT NULL DEFAULT 'ask'",
             [],
         );
+        let _ = conn.execute(
+            "ALTER TABLE ui_settings ADD COLUMN psu_efficiency REAL NOT NULL DEFAULT 1.0",
+            [],
+        );
         Ok(())
     }
 
@@ -393,7 +398,7 @@ impl Database {
     /// Loads all persisted UI settings.
     pub fn load_ui_settings(&self) -> Result<Option<UiSettings>, DatabaseError> {
         let mut stmt = self.conn.prepare(
-            "SELECT language, carbon_intensity, kwh_cost, theme, currency, close_behavior \
+            "SELECT language, carbon_intensity, kwh_cost, theme, currency, close_behavior, psu_efficiency \
              FROM ui_settings WHERE id = 1",
         )?;
         let result = stmt
@@ -405,6 +410,7 @@ impl Database {
                     theme: row.get(3)?,
                     currency: row.get::<_, Option<String>>(4)?.unwrap_or_else(|| "USD".to_string()),
                     close_behavior: CloseBehavior::from_code(&row.get::<_, String>(5)?),
+                    psu_efficiency: row.get::<_, Option<f64>>(6)?.unwrap_or(1.0),
                 })
             })
             .optional()?;
@@ -414,17 +420,18 @@ impl Database {
     /// Persists all UI settings.
     pub fn save_ui_settings(&mut self, settings: &UiSettings) -> Result<(), DatabaseError> {
         self.conn.execute(
-            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency, close_behavior) \
-             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6) \
+            "INSERT INTO ui_settings (id, language, carbon_intensity, kwh_cost, theme, currency, close_behavior, psu_efficiency) \
+             VALUES (1, ?1, ?2, ?3, ?4, ?5, ?6, ?7) \
              ON CONFLICT(id) DO UPDATE SET \
-               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, close_behavior = ?6",
+               language = ?1, carbon_intensity = ?2, kwh_cost = ?3, theme = ?4, currency = ?5, close_behavior = ?6, psu_efficiency = ?7",
             params![
                 settings.language,
                 settings.carbon_intensity,
                 settings.kwh_cost,
                 settings.theme,
                 settings.currency,
-                settings.close_behavior.code()
+                settings.close_behavior.code(),
+                settings.psu_efficiency
             ],
         )?;
         Ok(())
