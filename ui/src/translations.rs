@@ -90,6 +90,36 @@ pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
     }
 }
 
+pub fn settings_open_data_folder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Open data folder",
+        AppLanguage::German => "Datenordner öffnen",
+        AppLanguage::French => "Ouvrir le dossier des données",
+        AppLanguage::Chinese => "打开数据文件夹",
+        AppLanguage::Romanian => "Deschide folderul de date",
+    }
+}
+
+pub fn settings_open_logs_folder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Open logs folder",
+        AppLanguage::German => "Protokollordner öffnen",
+        AppLanguage::French => "Ouvrir le dossier des logs",
+        AppLanguage::Chinese => "打开日志文件夹",
+        AppLanguage::Romanian => "Deschide folderul de jurnale",
+    }
+}
+
+pub fn settings_open_data_and_logs_folder(language: AppLanguage) -> &'static str {
+    match language {
+        AppLanguage::English => "Open data and logs folder",
+        AppLanguage::German => "Daten- und Protokollordner öffnen",
+        AppLanguage::French => "Ouvrir le dossier des données et logs",
+        AppLanguage::Chinese => "打开数据与日志文件夹",
+        AppLanguage::Romanian => "Deschide folderul de date și jurnale",
+    }
+}
+
 pub fn modal_close(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English => "Close",

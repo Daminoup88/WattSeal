@@ -58,7 +58,7 @@ body:
     id: logs
     attributes:
       label: Additional information
-      description: Do you want to add anything or paste any relevant logs? You can find them in the collector.log file next to the app executable.
+      description: Do you want to add anything or paste any relevant logs? You can find them in Settings → Open logs folder, collector.log file.
       render: shell
 
   - type: upload
