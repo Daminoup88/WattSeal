@@ -39,6 +39,7 @@ struct Options {
     mqtt_pass: Option<String>,
     mqtt_tls: bool,
     db_mode: bool,
+    data_dir: Option<std::path::PathBuf>,
     #[cfg(target_os = "windows")]
     install_cpu_driver: bool,
     #[cfg(target_os = "windows")]
@@ -113,6 +114,11 @@ fn options() -> OptionParser<Options> {
         .help("Do not save sensors metrics in local database.")
         .flag(false, true);
 
+    let data_dir = long("data-dir")
+        .help("Store the database and logs in this folder instead of the OS default (no legacy migration).")
+        .argument::<std::path::PathBuf>("PATH")
+        .optional();
+
     let description = "WattSeal - Per-app power monitoring tool";
 
     #[cfg(target_os = "windows")]
@@ -138,6 +144,7 @@ fn options() -> OptionParser<Options> {
             mqtt_pass,
             mqtt_tls,
             db_mode,
+            data_dir,
             install_cpu_driver,
             uninstall_cpu_driver,
         })
@@ -160,6 +167,7 @@ fn options() -> OptionParser<Options> {
             mqtt_pass,
             mqtt_tls,
             db_mode,
+            data_dir,
         })
         .to_options()
         .descr(description);
@@ -178,7 +186,12 @@ fn spawn_ui(ui_child: &Arc<Mutex<Option<Child>>>) -> Result<(), String> {
         return Ok(());
     }
     if let Ok(exe) = std::env::current_exe() {
-        match Command::new(exe).arg("--ui").spawn() {
+        let mut cmd = Command::new(exe);
+        cmd.arg("--ui");
+        if let Some(dir) = common::paths::custom_data_dir() {
+            cmd.arg("--data-dir").arg(dir); // UI must use the same folder as the collector
+        }
+        match cmd.spawn() {
             Ok(child) => {
                 *guard = Some(child);
                 Ok(())
@@ -404,11 +417,8 @@ fn run_collector_loop(mut collector: Collector, mut connectors: Connectors) {
 }
 
 fn main() {
-    if let Err(e) = common::set_current_dir_to_exe_dir() {
-        common::clog!("⚠ Failed to set working directory to executable directory: {}", e);
-    }
-
     let options = options().run();
+    common::paths::init(options.data_dir.as_ref());
 
     #[cfg(target_os = "windows")]
     {
@@ -454,7 +464,7 @@ fn main() {
     }
 
     // Prevent a second collector from writing the same database
-    let _singleton = match common::SingletonGuard::acquire(common::DATABASE_PATH) {
+    let _singleton = match common::SingletonGuard::acquire(&common::paths::database_path()) {
         Ok(guard) => guard,
         Err(msg) => {
             common::clog!("✗ {msg}");

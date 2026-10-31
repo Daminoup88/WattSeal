@@ -11,7 +11,7 @@ use crate::{
         container::ContainerStyle,
         style_constants::{
             FONT_BOLD, FONT_SIZE_BODY, FONT_SIZE_HEADER, FONT_SIZE_SMALL, FONT_SIZE_SUBTITLE, PADDING_MEDIUM,
-            PADDING_XLARGE, SPACING_LARGE, SPACING_SMALL,
+            PADDING_XLARGE, SPACING_LARGE, SPACING_SMALL, SPACING_XLARGE,
         },
         text::TextStyle,
         toggler::TogglerStyle,
@@ -22,9 +22,10 @@ use crate::{
         TranslatedTheme, custom_carbon_invalid, custom_carbon_placeholder, custom_kwh_cost_placeholder,
         custom_psu_efficiency_invalid, custom_psu_efficiency_placeholder, kwh_cost_invalid, modal_close,
         settings_carbon_intensity, settings_close_behavior, settings_electricity_cost, settings_general,
-        settings_language, settings_launch_on_startup, settings_psu_efficiency, settings_theme, settings_title,
-        setup_choose_carbon, setup_choose_electricity, setup_choose_language, setup_choose_psu_efficiency,
-        setup_confirm, setup_welcome_title,
+        settings_language, settings_launch_on_startup, settings_open_data_and_logs_folder, settings_open_data_folder,
+        settings_open_logs_folder, settings_psu_efficiency, settings_theme, settings_title, setup_choose_carbon,
+        setup_choose_electricity, setup_choose_language, setup_choose_psu_efficiency, setup_confirm,
+        setup_welcome_title,
     },
     types::{AppLanguage, CarbonIntensity, Currency, ElectricityCost, PsuEfficiency},
 };
@@ -121,7 +122,8 @@ impl SettingsPage {
             ))
             .push(carbon_row)
             .push(kwh_row)
-            .push(psu_row);
+            .push(psu_row)
+            .push(folders_row(language));
 
         Container::new(content)
             .width(Length::Fixed(520.0))
@@ -319,6 +321,25 @@ fn launch_on_startup_row<'a>(language: AppLanguage, launch_on_startup: bool) -> 
             .class(TogglerStyle::Standard)
             .into(),
     )
+}
+
+fn folders_row<'a>(language: AppLanguage) -> Element<'a, Message, AppTheme> {
+    let open_btn = |label: &'static str, path: &std::path::Path| {
+        button(Text::new(label).size(FONT_SIZE_BODY))
+            .class(ButtonStyle::Standard)
+            .on_press(Message::OpenFolder(path.to_path_buf()))
+    };
+    let (data, logs) = (common::paths::data_dir(), common::paths::log_dir());
+    let row = if logs != data {
+        Row::new()
+            .spacing(SPACING_XLARGE)
+            .push(open_btn(settings_open_data_folder(language), data))
+            .push(open_btn(settings_open_logs_folder(language), logs))
+    } else {
+        Row::new().push(open_btn(settings_open_data_and_logs_folder(language), data))
+    };
+
+    Container::new(row).width(Length::Fill).center_x(Length::Fill).into()
 }
 
 fn carbon_intensity_row<'a>(

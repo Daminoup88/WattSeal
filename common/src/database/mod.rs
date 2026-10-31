@@ -20,7 +20,6 @@ use crate::{
     },
 };
 
-pub static DATABASE_PATH: &str = "power_monitoring.db";
 pub const DATABASE_TARGET_VERSION: i32 = 3;
 pub const LIVE_SAMPLING_PERIOD_SECONDS: i64 = 1;
 pub const HOURLY_SAMPLING_PERIOD_SECONDS: i64 = 3600;
@@ -210,7 +209,7 @@ impl Database {
     }
 
     fn open_connection() -> Result<Connection, DatabaseError> {
-        let conn = Connection::open(DATABASE_PATH)?;
+        let conn = Connection::open(crate::paths::database_path())?;
         conn.pragma_update(None, "journal_mode", "WAL")?;
         conn.pragma_update(None, "synchronous", "NORMAL")?;
         conn.pragma_update(None, "busy_timeout", "5000")?;

@@ -1,6 +1,7 @@
 pub mod autostart;
 pub mod database;
 pub mod logging;
+pub mod paths;
 pub mod singleton;
 pub mod types;
 pub mod utils;
@@ -16,16 +17,13 @@ macro_rules! clog {
     }};
 }
 
-pub use database::{
-    CloseBehavior, DATABASE_PATH, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table,
-};
+pub use database::{CloseBehavior, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table};
 pub use singleton::SingletonGuard;
 pub use types::{
     AllTimeData, CPUData, ComputedSensorData, ConsumptionUnit, DiskData, EnergyUj, GPUData, HardwareInfo, IconData,
     LabeledValue, MICROJOULES_PER_JOULE, MetricKind, MetricSample, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR,
     SecondaryValues, SensorData, TotalData,
 };
-pub use utils::set_current_dir_to_exe_dir;
 
 /// Exit code the UI subprocess uses to signal "stop the collector too".
 pub const EXIT_CODE_SHUTDOWN_ALL: i32 = 42;

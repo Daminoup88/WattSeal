@@ -529,6 +529,10 @@ impl App {
             }
             Message::CloseUIOnly => self.close(CloseBehavior::WindowOnly),
             Message::CloseAll => self.close(CloseBehavior::Everything),
+            Message::OpenFolder(path) => {
+                open::that(path).ok();
+                Task::none()
+            }
             Message::OpenUrl(url) => {
                 if url.starts_with("https://") || url.starts_with("http://") {
                     open::that(&url).ok();

@@ -44,5 +44,6 @@ pub enum Message {
     DismissCloseDialog,
     CloseUIOnly,
     CloseAll,
+    OpenFolder(std::path::PathBuf),
     OpenUrl(String),
 }

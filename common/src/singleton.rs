@@ -1,4 +1,7 @@
-use std::fs::{File, OpenOptions};
+use std::{
+    fs::{File, OpenOptions},
+    path::Path,
+};
 
 use fs2::FileExt;
 
@@ -23,15 +26,16 @@ impl SingletonGuard {
     ///
     /// Returns `Ok(guard)` if this is the only collector for this database,
     /// or an error message if another collector already holds the lock.
-    pub fn acquire(db_path: &str) -> Result<Self, String> {
-        let lock_path = format!("{db_path}.collector.lock");
+    pub fn acquire(db_path: &Path) -> Result<Self, String> {
+        let mut lock_path = db_path.as_os_str().to_owned();
+        lock_path.push(".collector.lock");
 
         let file = OpenOptions::new()
             .write(true)
             .create(true)
             .truncate(false)
             .open(&lock_path)
-            .map_err(|e| format!("Failed to create lock file '{lock_path}': {e}"))?;
+            .map_err(|e| format!("Failed to create lock file {lock_path:?}: {e}"))?;
 
         file.try_lock_exclusive().map_err(|_| {
             "Another collector is already running for this database. \

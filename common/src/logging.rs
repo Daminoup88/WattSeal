@@ -1,10 +1,6 @@
 #[cfg(not(debug_assertions))]
 use std::{fs::OpenOptions, io::Write};
 
-/// Log file path used by collector and main in release mode.
-#[cfg(not(debug_assertions))]
-pub const LOG_FILE: &str = "collector.log";
-
 /// Session marker written once at the start of every init session.
 #[cfg(not(debug_assertions))]
 pub const SESSION_MARKER: &str = ">>> session start <<<";
@@ -12,7 +8,11 @@ pub const SESSION_MARKER: &str = ">>> session start <<<";
 /// Append a timestamped line to the log file.
 #[cfg(not(debug_assertions))]
 pub fn log_to_file(msg: &str) {
-    let Ok(mut f) = OpenOptions::new().create(true).append(true).open(LOG_FILE) else {
+    let Ok(mut f) = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(crate::paths::log_file())
+    else {
         return;
     };
     let ts = chrono::Local::now().format("%Y-%m-%d %H:%M:%S");
@@ -23,7 +23,7 @@ pub fn log_to_file(msg: &str) {
 #[cfg(not(debug_assertions))]
 pub fn start_log_session() {
     use std::io::BufRead;
-    if let Ok(f) = std::fs::File::open(LOG_FILE) {
+    if let Ok(f) = std::fs::File::open(crate::paths::log_file()) {
         let lines: Vec<String> = std::io::BufReader::new(f).lines().flatten().collect();
         let starts: Vec<usize> = lines
             .iter()
@@ -33,7 +33,7 @@ pub fn start_log_session() {
             .collect();
         if starts.len() >= 2 {
             let keep_from = starts[starts.len() - 2];
-            let _ = std::fs::write(LOG_FILE, lines[keep_from..].join("\n") + "\n");
+            let _ = std::fs::write(crate::paths::log_file(), lines[keep_from..].join("\n") + "\n");
         }
     }
     log_to_file(SESSION_MARKER);
