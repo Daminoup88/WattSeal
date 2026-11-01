@@ -254,7 +254,8 @@ impl App {
                 }
                 self.refresh_all_time_data();
                 self.tick_count += 1;
-                if self.tick_count == 1 || self.tick_count % 10 == 0 {
+                // Need to wait for 2 ticks before refreshing processes for the first time because it needs 2 ticks to compute the delta
+                if self.tick_count == 2 || self.tick_count % 10 == 0 {
                     self.refresh_process_data();
                 }
                 Task::none()
