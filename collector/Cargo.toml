@@ -24,5 +24,5 @@ nvml-wrapper = "0.13.0"
 common = { path = "../common" }
 display-info = "0.5.9"
 chrono = "0.4.44"
-sysinfo = "0.39.3"
+sysinfo = "0.40.1"
 battery = "0.7.8"

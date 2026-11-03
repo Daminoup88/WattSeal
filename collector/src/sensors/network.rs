@@ -23,11 +23,14 @@ pub struct NetworkSensor {
 
 impl NetworkSensor {
     /// Creates a sensor with an empty network list.
-    pub fn new() -> Self {
-        Self {
-            networks: RefCell::new(Networks::new()),
+    pub fn new() -> Result<Self, SensorError> {
+        let networks =
+            Networks::new().map_err(|e| SensorError::ReadError(format!("Failed to initialize networks: {e:?}")))?;
+
+        Ok(Self {
+            networks: RefCell::new(networks),
             last_reading: Cell::new(Instant::now()),
-        }
+        })
     }
 }
 
@@ -74,7 +77,10 @@ impl Sensor for NetworkSensor {
             .try_borrow_mut()
             .map_err(|e| SensorError::ReadError(format!("Failed to borrow networks: {}", e)))?;
         networks.refresh(true);
-        let names: Vec<String> = networks.iter().map(|(name, _)| name.clone()).collect();
+        let names: Vec<String> = networks
+            .iter()
+            .map(|(name, _)| name.to_string_lossy().into_owned())
+            .collect();
 
         Ok(format!("Network(s): [{}]", names.join(", ")))
     }
