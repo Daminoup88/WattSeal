@@ -46,10 +46,14 @@ static GPU_TDP_TABLE: &[(&str, f64)] = &[
     ("T1000", 50.0),
     ("Mobile", 75.0),
     // AMD
+    ("RX 7900 XTX", 355.0),
     ("RX 7900 XT", 300.0),
+    ("RX 7900 GRE", 260.0),
     ("RX 7800 XT", 263.0),
     ("RX 7700 XT", 245.0),
     ("RX 7700", 200.0),
+    ("RX 7600 XT", 190.0),
+    ("RX 7600", 165.0),
     ("RX 6950 XT", 335.0),
     ("RX 6800", 250.0),
     ("RX 6700", 230.0),
@@ -57,6 +61,10 @@ static GPU_TDP_TABLE: &[(&str, f64)] = &[
     ("RX 9060", 132.0),
     ("RX 9070 XT", 304.0),
     ("RX 9070", 220.0),
+    // Integrated GPUs
+    ("Radeon Graphics", 15.0),
+    ("Radeon(TM) Graphics", 15.0),
+    ("Radeon", 15.0),
     // Intel
     ("Arc A770", 225.0),
     ("Arc A750", 225.0),
@@ -65,6 +73,7 @@ static GPU_TDP_TABLE: &[(&str, f64)] = &[
 ];
 
 const DEFAULT_DGPU_TDP: f64 = 150.0;
+const DEFAULT_IGPU_TDP: f64 = 15.0;
 /// Idle power floor as a fraction of TDP (fans/VRAM/clock still active at 0% load).
 const IDLE_FRACTION: f64 = 0.1;
 /// Curve exponent from the Hong & Kim non-linear utilization-power fit.
@@ -73,11 +82,19 @@ const CURVE_EXPONENT: f64 = 1.6;
 /// Looks up the TDP for a GPU model name, falling back to a default.
 pub fn lookup_tdp(gpu_name: &str) -> f64 {
     let name_lower = gpu_name.to_lowercase();
-    GPU_TDP_TABLE
+    if let Some((_, tdp)) = GPU_TDP_TABLE
         .iter()
         .find(|(pattern, _)| name_lower.contains(&pattern.to_lowercase()))
-        .map(|(_, tdp)| *tdp)
-        .unwrap_or(DEFAULT_DGPU_TDP)
+    {
+        return *tdp;
+    }
+
+    // As a fallback, GPUs containing "graphics", "uhd", or "iris" in their name are likely integrated GPUs (iGPU)
+    if name_lower.contains("graphics") || name_lower.contains("uhd") || name_lower.contains("iris") {
+        DEFAULT_IGPU_TDP
+    } else {
+        DEFAULT_DGPU_TDP
+    }
 }
 
 fn estimate_power(tdp: f64, usage_percent: f64) -> f64 {
@@ -91,4 +108,41 @@ pub fn estimate_energy(gpu_name: &str, usage_percent: f64, duration: Duration) -
     let tdp = lookup_tdp(gpu_name);
     let energy_joules = estimate_power(tdp, usage_percent) * duration.as_secs_f64();
     EnergyUj::from_joules(energy_joules)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lookup_tdp;
+
+    #[test]
+    fn rx7900_gre_lookup() {
+        assert_eq!(lookup_tdp("AMD Radeon RX 7900 GRE"), 260.0);
+    }
+
+    #[test]
+    fn rx7900_xtx_lookup() {
+        assert_eq!(lookup_tdp("AMD Radeon RX 7900 XTX"), 355.0);
+    }
+
+    #[test]
+    fn amd_igpu_radeon_tm_graphics() {
+        // "AMD Radeon(TM) Graphics" must resolve to iGPU TDP, not 150 W dGPU default
+        assert_eq!(lookup_tdp("AMD Radeon(TM) Graphics"), 15.0);
+    }
+
+    #[test]
+    fn amd_igpu_radeon_graphics() {
+        assert_eq!(lookup_tdp("AMD Radeon Graphics"), 15.0);
+    }
+
+    #[test]
+    fn unknown_gpu_falls_back_to_dgpu_default() {
+        assert_eq!(lookup_tdp("SomeUnknownGPU XYZ"), 150.0);
+    }
+
+    #[test]
+    fn generic_intel_igpu_falls_back_to_igpu_default() {
+        // Name contains "uhd" → iGPU heuristic
+        assert_eq!(lookup_tdp("Intel UHD Graphics 770"), 15.0);
+    }
 }

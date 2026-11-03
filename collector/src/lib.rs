@@ -12,7 +12,7 @@ pub use common::types::ConsumptionUnit;
 use common::{MetricSample, clog, types::HardwareInfo};
 use sensors::{
     DiskSensor, NetworkSensor, RamSensor, SensorType, compute_sensors, gather_hardware_info,
-    gpu::{GPUVendor, get_gpu_list},
+    gpu::{GPUVendor, get_gpu_adapters},
 };
 use sysinfo::System;
 
@@ -36,7 +36,9 @@ impl Collector {
 
         clog!("\n========== INITIALIZING SYSTEM ==========\n");
 
-        let s = System::new_all();
+        let s = System::new_all()
+            .or_else(|_| System::new())
+            .map_err(|e| format!("Failed to initialize sysinfo System: {e}"))?;
         let system = Rc::new(RefCell::new(s));
         let mut sensors = Vec::new();
 
@@ -55,16 +57,16 @@ impl Collector {
         }
 
         // GPU sensors
-        let gpu_list = get_gpu_list();
-        clog!("\nDetected GPUs: {gpu_list:#?}");
-        if gpu_list.is_empty() {
+        let adapters = get_gpu_adapters();
+        let adapter_names: Vec<String> = adapters.iter().map(|a| a.name.clone()).collect();
+        clog!("\nDetected GPUs: {adapter_names:#?}");
+        if adapters.is_empty() {
             clog!("⚠ No supported GPU adapters detected.");
         }
 
         let (mut nvidia_index, mut amd_index, mut intel_index) = (0u32, 0u32, 0u32);
-        for gpu_name in &gpu_list {
-            let vendor = GPUVendor::from_str(gpu_name);
-            let vendor_index = match vendor {
+        for adapter in &adapters {
+            let display_index = match adapter.vendor {
                 GPUVendor::Nvidia => {
                     let idx = nvidia_index;
                     nvidia_index += 1;
@@ -83,22 +85,31 @@ impl Collector {
                 GPUVendor::Other => 0,
             };
 
-            match sensors::gpu::get_gpu_energy_sensor(gpu_name, vendor_index) {
+            let luid_str = adapter
+                .luid
+                .map(|l| format!("0x{:016x}", l))
+                .unwrap_or_else(|| "none".to_string());
+            clog!(
+                "Initializing GPU sensor: '{}' (Vendor: {:?}, PCI Vendor ID: 0x{:04x}, Device ID: 0x{:04x}, LUID: {}, Index: {})",
+                adapter.name,
+                adapter.vendor,
+                adapter.vendor_id,
+                adapter.device_id,
+                luid_str,
+                display_index
+            );
+
+            match sensors::gpu::get_gpu_energy_sensor(adapter, display_index) {
                 Ok(sensor) => {
-                    clog!(
-                        "✓ GPU sensor initialized: '{}' (vendor={:?}, vendor_index={})",
-                        gpu_name,
-                        vendor,
-                        vendor_index
-                    );
+                    clog!("✓ GPU sensor initialized: '{} ({})'", adapter.name, display_index);
                     sensors.push(sensor);
                 }
                 Err(e) => {
                     clog!(
-                        "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, vendor_index={}): {:?}",
-                        gpu_name,
-                        vendor,
-                        vendor_index,
+                        "✗ Failed to initialize GPU sensor for '{}' (vendor={:?}, index={}): {:?}",
+                        adapter.name,
+                        adapter.vendor,
+                        display_index,
                         e
                     );
                 }
@@ -107,8 +118,24 @@ impl Collector {
 
         // RAM, Disk, Network sensors
         sensors.push(SensorType::RAM(RamSensor::new(system.clone())));
-        sensors.push(SensorType::Disk(DiskSensor::new()));
-        sensors.push(SensorType::Network(NetworkSensor::new()));
+        match DiskSensor::new() {
+            Ok(disk_sensor) => {
+                clog!("✓ Disk sensor initialized successfully");
+                sensors.push(SensorType::Disk(disk_sensor));
+            }
+            Err(e) => {
+                clog!("✗ Failed to initialize Disk sensor: {:?}", e);
+            }
+        }
+        match NetworkSensor::new() {
+            Ok(network_sensor) => {
+                clog!("✓ Network sensor initialized successfully");
+                sensors.push(SensorType::Network(network_sensor));
+            }
+            Err(e) => {
+                clog!("✗ Failed to initialize Network sensor: {:?}", e);
+            }
+        }
 
         // Hardware info
         clog!("\n========== GATHERING HARDWARE INFORMATION ==========\n");

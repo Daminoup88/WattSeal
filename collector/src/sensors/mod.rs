@@ -21,7 +21,7 @@ pub use common::{
 pub use cpu::CPUSensor;
 pub use disk::DiskSensor;
 use display_info::DisplayInfo;
-pub use gpu::{GPUSensor, get_gpu_list};
+pub use gpu::{GPUSensor, GpuAdapter, get_gpu_adapters};
 pub use network::NetworkSensor;
 pub use ram::RamSensor;
 use sysinfo::System;
@@ -140,7 +140,7 @@ pub fn measure_sensors(
                     }
                 }
 
-                // Track integrated Intel GPUs for estimation fallback.
+                // Track integrated GPUs for energy resolution.
                 if let SensorType::GPU(gpu_sensor) = sensor {
                     if gpu_sensor.is_integrated() {
                         integrated_gpu_indice = Some(data.len());
