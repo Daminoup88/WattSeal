@@ -2148,6 +2148,12 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::Romanian => "Islanda",
             AppLanguage::Chinese => "冰岛",
         },
+        CountryKey::Georgia => match language {
+            AppLanguage::English | AppLanguage::Romanian => "Georgia",
+            AppLanguage::German => "Georgien",
+            AppLanguage::French => "Géorgie",
+            AppLanguage::Chinese => "格鲁吉亚",
+        },
         CountryKey::World => match language {
             AppLanguage::English => "World average",
             AppLanguage::German => "Weltdurchschnitt",
