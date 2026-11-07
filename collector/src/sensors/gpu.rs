@@ -207,30 +207,41 @@ fn is_software_or_indirect_adapter(flags: u32) -> bool {
 pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
     if let Ok(gpus) = sysinfo::Gpus::new_with_refreshed_list() {
         if !gpus.is_empty() {
-            return gpus
+            let amdgpu_ids = installed_amdgpu_ids();
+            let mut adapters: Vec<_> = gpus
                 .iter()
                 .map(|gpu| {
-                    let name = gpu
+                    let model = gpu
                         .model()
                         .filter(|m| !m.is_empty())
                         .or_else(|| gpu.vendor())
                         .unwrap_or("Unknown GPU")
                         .to_string();
-                    let vendor = gpu
-                        .vendor()
-                        .map(GPUVendor::from_str)
-                        .unwrap_or_else(|| GPUVendor::from_str(&name));
-                    let pci_bus_id = Some(gpu.pci().to_string());
+                    let pci_bus_id = gpu.pci().to_string();
+                    let sysfs_device = std::path::Path::new("/sys/bus/pci/devices").join(&pci_bus_id);
+                    let vendor_id = read_pci_attribute(&sysfs_device, "vendor").unwrap_or(0);
+                    let device_id = read_pci_attribute(&sysfs_device, "device").unwrap_or(0);
+                    let vendor = (vendor_id != 0)
+                        .then(|| GPUVendor::from_pci_vendor_id(vendor_id))
+                        .filter(|vendor| *vendor != GPUVendor::Other)
+                        .or_else(|| gpu.vendor().map(GPUVendor::from_str))
+                        .unwrap_or_else(|| GPUVendor::from_str(&model));
+                    let name = if vendor == GPUVendor::Amd {
+                        resolve_amd_marketing_name(&sysfs_device, &model, amdgpu_ids.as_deref())
+                    } else {
+                        model
+                    };
                     GpuAdapter {
                         name,
                         vendor,
-                        vendor_id: 0,
-                        device_id: 0,
+                        vendor_id,
+                        device_id,
                         luid: None,
-                        pci_bus_id,
+                        pci_bus_id: Some(pci_bus_id),
                     }
                 })
                 .collect();
+            return adapters;
         }
     }
 
@@ -263,6 +274,46 @@ pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
                 .collect())
         })
         .unwrap_or_default()
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn read_pci_attribute(device_path: &std::path::Path, attribute: &str) -> Option<u32> {
+    let value = std::fs::read_to_string(device_path.join(attribute)).ok()?;
+    u32::from_str_radix(value.trim().trim_start_matches("0x"), 16).ok()
+}
+
+#[cfg(target_os = "linux")]
+fn installed_amdgpu_ids() -> Option<String> {
+    ["/usr/share/libdrm/amdgpu.ids", "/usr/share/drm/amdgpu.ids"]
+        .iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn resolve_amd_marketing_name(device_path: &std::path::Path, fallback: &str, database: Option<&str>) -> String {
+    let Some(database) = database else {
+        return fallback.to_string();
+    };
+    let Some(device_id) = read_pci_attribute(device_path, "device") else {
+        return fallback.to_string();
+    };
+    let Some(revision) = read_pci_attribute(device_path, "revision") else {
+        return fallback.to_string();
+    };
+
+    lookup_amdgpu_marketing_name(database, device_id, revision).unwrap_or_else(|| fallback.to_string())
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn lookup_amdgpu_marketing_name(database: &str, device_id: u32, revision: u32) -> Option<String> {
+    database.lines().find_map(|line| {
+        let entry = line.split('#').next()?.trim();
+        let mut columns = entry.splitn(3, ',').map(str::trim);
+        let id = u32::from_str_radix(columns.next()?, 16).ok()?;
+        let rev = u32::from_str_radix(columns.next()?, 16).ok()?;
+        let name = columns.next()?.trim();
+        (id == device_id && rev == revision && !name.is_empty()).then(|| name.to_string())
+    })
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
@@ -824,8 +875,10 @@ mod amd_gpu {
             sync::atomic::{AtomicU64, Ordering},
         };
 
+        use common::types::SensorData;
+
         use super::{AmdGPUSensor, find_power_sensors, read_number};
-        use crate::{database::SensorData, sensors::Sensor};
+        use crate::sensors::Sensor;
 
         static NEXT_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -1755,7 +1808,59 @@ mod intel_gpu {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
     use super::*;
+
+    static NEXT_MARKETING_TEST_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_pci_device(device_id: &str, revision: &str) -> PathBuf {
+        let id = NEXT_MARKETING_TEST_ID.fetch_add(1, Ordering::Relaxed);
+        let device_path = std::env::temp_dir().join(format!("wattseal-pci-id-test-{}-{id}", std::process::id()));
+        fs::create_dir_all(&device_path).unwrap();
+        fs::write(device_path.join("device"), device_id).unwrap();
+        fs::write(device_path.join("revision"), revision).unwrap();
+        device_path
+    }
+
+    #[test]
+    fn resolves_amd_marketing_name_from_device_id_and_revision() {
+        let database = "747E, C8, AMD Radeon RX 7800 XT\n747E, FF, AMD Radeon RX 7700 XT\n";
+        let fallback = "Navi 32 [Radeon RX 7700 XT / 7800 XT]";
+        let rx_7800_device = temp_pci_device("0x747e\n", "0xc8\n");
+        let rx_7700_device = temp_pci_device("0x747e\n", "0xff\n");
+
+        assert_eq!(
+            resolve_amd_marketing_name(&rx_7800_device, fallback, Some(database)),
+            "AMD Radeon RX 7800 XT"
+        );
+        assert_eq!(
+            resolve_amd_marketing_name(&rx_7700_device, fallback, Some(database)),
+            "AMD Radeon RX 7700 XT"
+        );
+
+        fs::remove_dir_all(rx_7800_device).unwrap();
+        fs::remove_dir_all(rx_7700_device).unwrap();
+    }
+
+    #[test]
+    fn falls_back_for_unknown_amd_revision_or_missing_database() {
+        let database = "747E, C8, AMD Radeon RX 7800 XT\n747E, FF, AMD Radeon RX 7700 XT\n";
+        let fallback = "Navi 32 [Radeon RX 7700 XT / 7800 XT]";
+        let device_path = temp_pci_device("0x747e\n", "0x01\n");
+
+        assert_eq!(
+            resolve_amd_marketing_name(&device_path, fallback, Some(database)),
+            fallback
+        );
+        assert_eq!(resolve_amd_marketing_name(&device_path, fallback, None), fallback);
+
+        fs::remove_dir_all(device_path).unwrap();
+    }
 
     #[test]
     fn test_nvidia_match_by_bus_id() {
