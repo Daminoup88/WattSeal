@@ -63,3 +63,100 @@ pub fn separator<'a>() -> Element<'a, Message, AppTheme> {
         .width(Length::Fill)
         .into()
 }
+
+pub fn format_gpu_display_names(names: &[String]) -> Vec<String> {
+    names.iter().map(|name| format_gpu_display_name(name)).collect()
+}
+
+fn format_gpu_display_name(name: &str) -> String {
+    let Some((model, suffix)) = name.rsplit_once(" (") else {
+        return name.to_string();
+    };
+    let Some(index) = suffix.strip_suffix(')').and_then(|index| index.parse::<u32>().ok()) else {
+        return name.to_string();
+    };
+
+    if index == 0 {
+        model.to_string()
+    } else {
+        format!("{model} {}", index + 1)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::format_gpu_display_names;
+
+    #[test]
+    fn single_gpu_for_a_vendor_has_no_index() {
+        let names = vec!["Intel UHD Graphics 730 (0)".to_string()];
+
+        assert_eq!(format_gpu_display_names(&names), ["Intel UHD Graphics 730"]);
+    }
+
+    #[test]
+    fn first_gpu_has_no_index_and_later_gpu_uses_its_one_based_index() {
+        let names = vec![
+            "Intel UHD Graphics 730 (0)".to_string(),
+            "Intel Iris Xe Graphics (1)".to_string(),
+        ];
+
+        assert_eq!(
+            format_gpu_display_names(&names),
+            ["Intel UHD Graphics 730", "Intel Iris Xe Graphics 2"]
+        );
+    }
+
+    #[test]
+    fn vendor_indices_start_independently_and_follow_vendor_order() {
+        let names = vec![
+            "Intel UHD Graphics 730 (0)".to_string(),
+            "AMD Radeon RX 7800 XT (0)".to_string(),
+            "Intel Iris Xe Graphics (1)".to_string(),
+            "NVIDIA GeForce RTX 4080 (0)".to_string(),
+            "AMD Radeon RX 7700 XT (1)".to_string(),
+        ];
+
+        assert_eq!(
+            format_gpu_display_names(&names),
+            [
+                "Intel UHD Graphics 730",
+                "AMD Radeon RX 7800 XT",
+                "Intel Iris Xe Graphics 2",
+                "NVIDIA GeForce RTX 4080",
+                "AMD Radeon RX 7700 XT 2"
+            ]
+        );
+    }
+
+    #[test]
+    fn single_gpu_vendor_stays_unindexed_when_another_vendor_has_multiple() {
+        let names = vec![
+            "Intel UHD Graphics 730 (0)".to_string(),
+            "NVIDIA GeForce RTX 4080 (0)".to_string(),
+            "NVIDIA GeForce RTX 4070 (1)".to_string(),
+        ];
+
+        assert_eq!(
+            format_gpu_display_names(&names),
+            [
+                "Intel UHD Graphics 730",
+                "NVIDIA GeForce RTX 4080",
+                "NVIDIA GeForce RTX 4070 2"
+            ]
+        );
+    }
+
+    #[test]
+    fn formatting_does_not_mutate_the_gpu_names() {
+        let names = vec![
+            "Intel UHD Graphics 730 (0)".to_string(),
+            "Intel Iris Xe Graphics (1)".to_string(),
+        ];
+        let original_names = names.clone();
+
+        let _ = format_gpu_display_names(&names);
+
+        assert_eq!(names, original_names);
+    }
+}

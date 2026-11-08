@@ -13,7 +13,12 @@ use iced::{
 };
 
 use crate::{
-    components::{footer::Footer, header::Header, helpers::modal, sensor_state::SensorState},
+    components::{
+        footer::Footer,
+        header::Header,
+        helpers::{format_gpu_display_names, modal},
+        sensor_state::SensorState,
+    },
     message::Message,
     pages::{Page, dashboard::DashboardPage, info::InfoPage, settings::SettingsPage},
     styles::{
@@ -136,6 +141,13 @@ impl App {
         };
 
         let hardware_info = database.get_hardware_info().unwrap_or_default();
+        let gpu_display_names = format_gpu_display_names(
+            &hardware_info
+                .gpus
+                .iter()
+                .filter_map(|name| non_empty_string(name))
+                .collect::<Vec<_>>(),
+        );
         let sensors = database
             .get_tables()
             .into_iter()
@@ -146,14 +158,7 @@ impl App {
                 let hardware_model = if table_name == CPUData::table_name_static() {
                     non_empty_string(&hardware_info.cpu.name)
                 } else if table_name == GPUData::table_name_static() {
-                    non_empty_string(
-                        &hardware_info
-                            .gpus
-                            .iter()
-                            .filter_map(|name| non_empty_string(name))
-                            .collect::<Vec<_>>()
-                            .join("\n"),
-                    )
+                    non_empty_string(&gpu_display_names.join("\n"))
                 } else {
                     None
                 };

@@ -5,7 +5,10 @@ use iced::{
 };
 
 use crate::{
-    components::hardware_card::{InfoCard, InfoField, hardware_card},
+    components::{
+        hardware_card::{InfoCard, InfoField, hardware_card},
+        helpers::format_gpu_display_names,
+    },
     icons::Icon,
     message::Message,
     styles::{
@@ -35,6 +38,7 @@ impl InfoPage {
 
     pub fn view(&self, hw: &HardwareInfo, theme: AppTheme, language: AppLanguage) -> Element<'_, Message, AppTheme> {
         let pal = theme.palette();
+        let gpu_display_names = format_gpu_display_names(&hw.gpus);
 
         let mut specs: Vec<InfoCard> = Vec::new();
 
@@ -62,7 +66,7 @@ impl InfoPage {
                 Some(GPUData::table_name_static().to_string()),
             ));
         } else {
-            for (i, gpu) in hw.gpus.iter().enumerate() {
+            for (i, gpu) in gpu_display_names.iter().enumerate() {
                 let subtitle = graphics_processor_n(language, i + 1);
                 specs.push(InfoCard::new(
                     Icon::GPU,
