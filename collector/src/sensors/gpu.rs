@@ -58,65 +58,148 @@ pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
 
     use windows::Win32::Graphics::Dxgi::*;
 
-    let mut list = Vec::new();
-    // Use a HashSet to track the unique identifiers of the GPUs we've seen
-    let mut seen_luids: HashSet<u64> = HashSet::new();
+    let factory: IDXGIFactory1 = match unsafe { CreateDXGIFactory1() } {
+        Ok(factory) => factory,
+        Err(error) => {
+            common::clog!("Failed to create DXGI factory: {error:?}");
+            return Vec::new();
+        }
+    };
 
-    unsafe {
-        let factory: IDXGIFactory1 = match CreateDXGIFactory1() {
-            Ok(f) => f,
-            Err(_) => return vec![],
+    let mut adapters = Vec::new();
+    let mut seen_luids = HashSet::new();
+    let mut index = 0;
+
+    loop {
+        let adapter = match unsafe { factory.EnumAdapters1(index) } {
+            Ok(adapter) => adapter,
+            Err(_) => break,
+        };
+        index += 1;
+
+        let desc = match unsafe { adapter.GetDesc1() } {
+            Ok(desc) => desc,
+            Err(_) => continue,
         };
 
-        let mut i = 0;
-        loop {
-            let adapter = match factory.EnumAdapters1(i) {
-                Ok(a) => a,
-                Err(_) => break,
-            };
+        let luid = ((desc.AdapterLuid.HighPart as u32 as u64) << 32) | u64::from(desc.AdapterLuid.LowPart);
 
-            if let Ok(desc) = adapter.GetDesc1() {
-                let luid_u64 = ((desc.AdapterLuid.HighPart as u64) << 32) | (desc.AdapterLuid.LowPart as u64);
-
-                if !seen_luids.insert(luid_u64) {
-                    i += 1;
-                    continue;
-                }
-
-                let name = String::from_utf16_lossy(
-                    &desc
-                        .Description
-                        .iter()
-                        .take_while(|c| **c != 0)
-                        .cloned()
-                        .collect::<Vec<u16>>(),
-                );
-                let name = name.trim();
-
-                // Ignore Microsoft Basic Render Driver fallback driver or empty name
-                if name.to_ascii_lowercase().contains("microsoft basic render driver") || name.is_empty() {
-                    i += 1;
-                    continue;
-                }
-
-                let mut vendor = GPUVendor::from_pci_vendor_id(desc.VendorId);
-                if vendor == GPUVendor::Other {
-                    vendor = GPUVendor::from_str(name);
-                }
-
-                list.push(GpuAdapter {
-                    name: name.to_string(),
-                    vendor,
-                    vendor_id: desc.VendorId,
-                    device_id: desc.DeviceId,
-                    luid: Some(luid_u64),
-                    pci_bus_id: None,
-                });
-            }
-            i += 1;
+        // Ignore duplicate DXGI adapter identities.
+        if !seen_luids.insert(luid) {
+            continue;
         }
+
+        let name = String::from_utf16_lossy(&desc.Description);
+        let name = name.trim_end_matches('\0').trim();
+
+        // Ignore software renderers and unnamed adapters.
+        if name.is_empty()
+            || name.to_ascii_lowercase().contains("microsoft basic render driver")
+            || desc.Flags & DXGI_ADAPTER_FLAG_SOFTWARE.0 as u32 != 0
+        {
+            continue;
+        }
+
+        let mut vendor = GPUVendor::from_pci_vendor_id(desc.VendorId);
+        if vendor == GPUVendor::Other {
+            vendor = GPUVendor::from_str(name);
+        }
+
+        // Exclude software and indirect-display adapters.
+        match query_d3dkmt_adapter_type(desc.AdapterLuid) {
+            Ok(flags) => {
+                common::clog!(
+                    "GPU adapter '{}' (vendor {:?}, LUID 0x{luid:016x}) D3DKMT flags: 0x{flags:08x}",
+                    name,
+                    vendor
+                );
+
+                if is_software_or_indirect_adapter(flags) {
+                    common::clog!(
+                        "Skipping software/indirect-display adapter '{}' (LUID 0x{luid:016x})",
+                        name
+                    );
+                    continue;
+                }
+            }
+            Err(status) => {
+                common::clog!(
+                    "Could not classify GPU adapter '{}' (LUID 0x{luid:016x}): \
+             NTSTATUS 0x{status:08x}; keeping adapter",
+                    name
+                );
+            }
+        }
+
+        adapters.push(GpuAdapter {
+            name: name.to_string(),
+            vendor,
+            vendor_id: desc.VendorId,
+            device_id: desc.DeviceId,
+            luid: Some(luid),
+            pci_bus_id: None,
+        });
     }
-    list
+
+    adapters
+}
+
+#[cfg(target_os = "windows")]
+fn query_d3dkmt_adapter_type(luid: windows::Win32::Foundation::LUID) -> Result<u32, i32> {
+    use windows::Wdk::Graphics::Direct3D::{
+        D3DKMT_ADAPTERTYPE, D3DKMT_CLOSEADAPTER, D3DKMT_OPENADAPTERFROMLUID, D3DKMT_QUERYADAPTERINFO,
+        D3DKMTCloseAdapter, D3DKMTOpenAdapterFromLuid, D3DKMTQueryAdapterInfo, KMTQAITYPE_ADAPTERTYPE,
+    };
+
+    unsafe {
+        let mut open = D3DKMT_OPENADAPTERFROMLUID {
+            AdapterLuid: luid,
+            hAdapter: 0,
+        };
+
+        let status = D3DKMTOpenAdapterFromLuid(&mut open);
+        if status.0 < 0 {
+            return Err(status.0);
+        }
+
+        let mut adapter_type = D3DKMT_ADAPTERTYPE::default();
+
+        let mut query = D3DKMT_QUERYADAPTERINFO {
+            hAdapter: open.hAdapter,
+            Type: KMTQAITYPE_ADAPTERTYPE,
+            pPrivateDriverData: std::ptr::from_mut(&mut adapter_type).cast(),
+            PrivateDriverDataSize: std::mem::size_of::<D3DKMT_ADAPTERTYPE>() as u32,
+        };
+
+        let query_status = D3DKMTQueryAdapterInfo(&mut query);
+
+        let result = if query_status.0 < 0 {
+            Err(query_status.0)
+        } else {
+            Ok(adapter_type.Anonymous.Value)
+        };
+
+        let close_status = D3DKMTCloseAdapter(&D3DKMT_CLOSEADAPTER {
+            hAdapter: open.hAdapter,
+        });
+
+        if close_status.0 < 0 {
+            common::clog!(
+                "Failed to close D3DKMT adapter handle: NTSTATUS 0x{:08x}",
+                close_status.0
+            );
+        }
+
+        result
+    }
+}
+
+#[cfg(target_os = "windows")]
+fn is_software_or_indirect_adapter(flags: u32) -> bool {
+    const SOFTWARE_DEVICE: u32 = 1 << 2;
+    const INDIRECT_DISPLAY_DEVICE: u32 = 1 << 6;
+
+    flags & (SOFTWARE_DEVICE | INDIRECT_DISPLAY_DEVICE) != 0
 }
 
 /// Returns the list of GPU adapter identities.
@@ -873,15 +956,30 @@ mod intel_gpu {
         instance_name.to_lowercase().contains(&pattern)
     }
 
+    pub fn max_utilization_for_luid(items: &[(String, f64)], luid: u64) -> Option<f64> {
+        items
+            .iter()
+            .filter(|(instance_name, _)| instance_matches_luid(instance_name, luid))
+            .map(|(_, value)| *value)
+            .reduce(f64::max)
+    }
+
     pub struct IntelGPUSensor {
         query: PDH_HQUERY,
         counter: PDH_HCOUNTER,
-        luid: Option<u64>,
+        luid: u64,
         initialized: Cell<bool>,
     }
 
     impl IntelGPUSensor {
         pub fn new(adapter: &GpuAdapter) -> Result<Self, SensorError> {
+            let luid = adapter.luid.ok_or_else(|| {
+                SensorError::ReadError(format!(
+                    "Intel GPU '{}' has no DXGI LUID; skipping sensor",
+                    adapter.name
+                ))
+            })?;
+
             unsafe {
                 let mut query = MaybeUninit::<PDH_HQUERY>::uninit();
                 if PdhOpenQueryW(None, 0, query.as_mut_ptr()) != 0 {
@@ -897,20 +995,16 @@ mod intel_gpu {
                 }
                 let counter = counter.assume_init();
 
-                let luid_str = adapter
-                    .luid
-                    .map(|l| format!("0x{:016x}", l))
-                    .unwrap_or_else(|| "none".to_string());
                 common::clog!(
-                    "✓ Intel adapter '{}' (LUID: {}) mapped to PDH \\GPU Engine(*) filtered by LUID",
+                    "✓ Intel adapter '{}' (LUID: 0x{:016x}) mapped to PDH \\GPU Engine(*) filtered by LUID",
                     adapter.name,
-                    luid_str
+                    luid
                 );
 
                 Ok(IntelGPUSensor {
                     query,
                     counter,
-                    luid: adapter.luid,
+                    luid,
                     initialized: Cell::new(false),
                 })
             }
@@ -939,18 +1033,21 @@ mod intel_gpu {
                 {
                     return Ok(GPUData {
                         total_energy: None,
-                        usage_percent: Some(0.0),
+                        usage_percent: None,
                         vram_usage_percent: None,
                         name: None,
                     }
                     .into());
                 }
-                let mut buf = vec![0u8; size as usize];
-                let items = buf.as_mut_ptr() as *mut PDH_FMT_COUNTERVALUE_ITEM_W;
+                let item_size = std::mem::size_of::<PDH_FMT_COUNTERVALUE_ITEM_W>();
+                let item_capacity = (size as usize).div_ceil(item_size);
+                let mut buf = Vec::<MaybeUninit<PDH_FMT_COUNTERVALUE_ITEM_W>>::with_capacity(item_capacity);
+                buf.resize_with(item_capacity, MaybeUninit::uninit);
+                let items = buf.as_mut_ptr().cast::<PDH_FMT_COUNTERVALUE_ITEM_W>();
                 if PdhGetFormattedCounterArrayW(self.counter, PDH_FMT_DOUBLE, &mut size, &mut count, Some(items)) != 0 {
                     return Ok(GPUData {
                         total_energy: None,
-                        usage_percent: Some(0.0),
+                        usage_percent: None,
                         vram_usage_percent: None,
                         name: None,
                     }
@@ -971,27 +1068,12 @@ mod intel_gpu {
                     })
                     .collect();
 
-                let mut max = 0.0f64;
-                let mut matched_luid = false;
-                if let Some(target_luid) = self.luid {
-                    for (inst_name, val) in &valid_items {
-                        if instance_matches_luid(inst_name, target_luid) {
-                            max = max.max(*val);
-                            matched_luid = true;
-                        }
-                    }
-                }
-
-                // If LUID didn't match any instance or no LUID provided, fall back to global max across all instances
-                if !matched_luid {
-                    for (_, val) in &valid_items {
-                        max = max.max(*val);
-                    }
-                }
+                let usage_percent =
+                    max_utilization_for_luid(&valid_items, self.luid).map(|value| value.clamp(0.0, 100.0));
 
                 Ok(GPUData {
                     total_energy: None,
-                    usage_percent: Some(max.clamp(0.0, 100.0)),
+                    usage_percent,
                     vram_usage_percent: None,
                     name: None,
                 }
@@ -1096,5 +1178,54 @@ mod tests {
 
         assert!(intel_gpu::instance_matches_luid(matching_sample, luid));
         assert!(!intel_gpu::instance_matches_luid(other_luid_sample, luid));
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn pdh_utilization_requires_the_known_luid_and_aggregates_its_engines() {
+        let target = "pid_1_luid_0x00000000_0x0000f9ef_phys_0_eng_0_engtype_3d".to_string();
+        let target_other_engine = "pid_2_luid_0x00000000_0x0000f9ef_phys_0_eng_1_engtype_copy".to_string();
+        let other = "pid_1_luid_0x00000000_0x0001d05b_phys_0_eng_0_engtype_3d".to_string();
+        let items = vec![(target, 23.0), (target_other_engine, 41.0), (other, 97.0)];
+        let target_luid = 0xf9ef;
+        let absent_luid = 0x1234;
+
+        assert_eq!(intel_gpu::max_utilization_for_luid(&items, target_luid), Some(41.0));
+        assert_eq!(intel_gpu::max_utilization_for_luid(&items, absent_luid), None);
+        assert_eq!(intel_gpu::max_utilization_for_luid(&[], target_luid), None);
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn intel_sensor_requires_a_luid_before_opening_pdh() {
+        let adapter = GpuAdapter {
+            name: "Intel GPU".to_string(),
+            vendor: GPUVendor::Intel,
+            vendor_id: 0x8086,
+            device_id: 0x1234,
+            luid: None,
+            pci_bus_id: None,
+        };
+
+        assert!(intel_gpu::IntelGPUSensor::new(&adapter).is_err());
+    }
+
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn filters_software_and_indirect_adapters() {
+        // Software device.
+        assert!(is_software_or_indirect_adapter(1 << 2));
+
+        // Indirect display device.
+        assert!(is_software_or_indirect_adapter(1 << 6));
+
+        // Both flags.
+        assert!(is_software_or_indirect_adapter((1 << 2) | (1 << 6)));
+
+        // Physical adapter.
+        assert!(!is_software_or_indirect_adapter(0));
+
+        // Paravirtualized alone should not be excluded.
+        assert!(!is_software_or_indirect_adapter(1 << 7));
     }
 }
