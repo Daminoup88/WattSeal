@@ -207,30 +207,41 @@ fn is_software_or_indirect_adapter(flags: u32) -> bool {
 pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
     if let Ok(gpus) = sysinfo::Gpus::new_with_refreshed_list() {
         if !gpus.is_empty() {
-            return gpus
+            let amdgpu_ids = installed_amdgpu_ids();
+            let mut adapters: Vec<_> = gpus
                 .iter()
                 .map(|gpu| {
-                    let name = gpu
+                    let model = gpu
                         .model()
                         .filter(|m| !m.is_empty())
                         .or_else(|| gpu.vendor())
                         .unwrap_or("Unknown GPU")
                         .to_string();
-                    let vendor = gpu
-                        .vendor()
-                        .map(GPUVendor::from_str)
-                        .unwrap_or_else(|| GPUVendor::from_str(&name));
-                    let pci_bus_id = Some(gpu.pci().to_string());
+                    let pci_bus_id = gpu.pci().to_string();
+                    let sysfs_device = std::path::Path::new("/sys/bus/pci/devices").join(&pci_bus_id);
+                    let vendor_id = read_pci_attribute(&sysfs_device, "vendor").unwrap_or(0);
+                    let device_id = read_pci_attribute(&sysfs_device, "device").unwrap_or(0);
+                    let vendor = (vendor_id != 0)
+                        .then(|| GPUVendor::from_pci_vendor_id(vendor_id))
+                        .filter(|vendor| *vendor != GPUVendor::Other)
+                        .or_else(|| gpu.vendor().map(GPUVendor::from_str))
+                        .unwrap_or_else(|| GPUVendor::from_str(&model));
+                    let name = if vendor == GPUVendor::Amd {
+                        resolve_amd_marketing_name(&sysfs_device, &model, amdgpu_ids.as_deref())
+                    } else {
+                        model
+                    };
                     GpuAdapter {
                         name,
                         vendor,
-                        vendor_id: 0,
-                        device_id: 0,
+                        vendor_id,
+                        device_id,
                         luid: None,
-                        pci_bus_id,
+                        pci_bus_id: Some(pci_bus_id),
                     }
                 })
                 .collect();
+            return adapters;
         }
     }
 
@@ -265,6 +276,46 @@ pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
         .unwrap_or_default()
 }
 
+#[cfg(any(target_os = "linux", test))]
+fn read_pci_attribute(device_path: &std::path::Path, attribute: &str) -> Option<u32> {
+    let value = std::fs::read_to_string(device_path.join(attribute)).ok()?;
+    u32::from_str_radix(value.trim().trim_start_matches("0x"), 16).ok()
+}
+
+#[cfg(target_os = "linux")]
+fn installed_amdgpu_ids() -> Option<String> {
+    ["/usr/share/libdrm/amdgpu.ids", "/usr/share/drm/amdgpu.ids"]
+        .iter()
+        .find_map(|path| std::fs::read_to_string(path).ok())
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn resolve_amd_marketing_name(device_path: &std::path::Path, fallback: &str, database: Option<&str>) -> String {
+    let Some(database) = database else {
+        return fallback.to_string();
+    };
+    let Some(device_id) = read_pci_attribute(device_path, "device") else {
+        return fallback.to_string();
+    };
+    let Some(revision) = read_pci_attribute(device_path, "revision") else {
+        return fallback.to_string();
+    };
+
+    lookup_amdgpu_marketing_name(database, device_id, revision).unwrap_or_else(|| fallback.to_string())
+}
+
+#[cfg(any(target_os = "linux", test))]
+fn lookup_amdgpu_marketing_name(database: &str, device_id: u32, revision: u32) -> Option<String> {
+    database.lines().find_map(|line| {
+        let entry = line.split('#').next()?.trim();
+        let mut columns = entry.splitn(3, ',').map(str::trim);
+        let id = u32::from_str_radix(columns.next()?, 16).ok()?;
+        let rev = u32::from_str_radix(columns.next()?, 16).ok()?;
+        let name = columns.next()?.trim();
+        (id == device_id && rev == revision && !name.is_empty()).then(|| name.to_string())
+    })
+}
+
 #[cfg(not(any(target_os = "windows", target_os = "linux")))]
 pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
     Vec::new()
@@ -274,7 +325,7 @@ pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
 pub enum GPUSensorInner {
     #[cfg(any(target_os = "windows", target_os = "linux"))]
     Nvidia(nvidia_gpu::NvidiaGPUSensor),
-    #[cfg(target_os = "windows")]
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     Amd(amd_gpu::AmdGPUSensor),
     #[cfg(target_os = "windows")]
     Intel { sensor: intel_gpu::IntelGPUSensor },
@@ -291,7 +342,7 @@ impl Sensor for GPUSensor {
         let mut data = match &self.inner {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensorInner::Nvidia(sensor) => sensor.read_full_data()?,
-            #[cfg(target_os = "windows")]
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensorInner::Amd(sensor) => sensor.read_full_data()?,
             #[cfg(target_os = "windows")]
             GPUSensorInner::Intel { sensor } => sensor.read_full_data()?,
@@ -336,6 +387,7 @@ pub fn get_gpu_energy_sensor(adapter: &GpuAdapter, index: u32) -> Result<SensorT
     {
         let inner = match adapter.vendor {
             GPUVendor::Nvidia => nvidia_gpu::NvidiaGPUSensor::new(adapter, index).map(GPUSensorInner::Nvidia),
+            GPUVendor::Amd => amd_gpu::AmdGPUSensor::new(adapter).map(GPUSensorInner::Amd),
             _ => Err(SensorError::NotSupported),
         }?;
         return Ok(SensorType::GPU(GPUSensor { name, inner }));
@@ -360,8 +412,10 @@ impl GPUSensor {
         match &self.inner {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensorInner::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
+            #[cfg(any(target_os = "windows", target_os = "linux"))]
+            GPUSensorInner::Amd(_) => Err(SensorError::NotSupported),
             #[cfg(target_os = "windows")]
-            GPUSensorInner::Amd(_) | GPUSensorInner::Intel { .. } => Err(SensorError::NotSupported),
+            GPUSensorInner::Intel { .. } => Err(SensorError::NotSupported),
             #[cfg(not(any(target_os = "windows", target_os = "linux")))]
             _ => Err(SensorError::NotSupported),
         }
@@ -611,6 +665,675 @@ mod amd_gpu {
             self.last_reading.set(now);
 
             Ok(data.into())
+        }
+    }
+}
+
+#[cfg(target_os = "linux")]
+mod amd_gpu {
+    use std::{
+        cell::Cell,
+        fs,
+        path::{Path, PathBuf},
+        time::Instant,
+    };
+
+    use common::types::{EnergyUj, GPUData, SensorData};
+
+    use crate::sensors::{GpuAdapter, Sensor, SensorError};
+
+    pub struct AmdGPUSensor {
+        device_path: PathBuf,
+        power_paths: Vec<PathBuf>,
+        energy_paths: Vec<PathBuf>,
+        last_energy_reading: Cell<Option<u64>>,
+        last_reading: Cell<Option<Instant>>,
+    }
+
+    impl AmdGPUSensor {
+        pub fn new(adapter: &GpuAdapter) -> Result<Self, SensorError> {
+            let pci_address = adapter.pci_bus_id.as_deref().ok_or(SensorError::NotSupported)?;
+            let device_path = Path::new("/sys/bus/pci/devices").join(pci_address);
+            let driver = fs::read_link(device_path.join("driver")).map_err(|_| SensorError::NotSupported)?;
+            if driver.file_name().and_then(|name| name.to_str()) != Some("amdgpu") {
+                return Err(SensorError::NotSupported);
+            }
+            let device_path = fs::canonicalize(device_path).map_err(|_| SensorError::NotSupported)?;
+            Self::new_with_paths(device_path, pci_address.to_string())
+        }
+
+        fn new_with_paths(device_path: PathBuf, _pci_address: String) -> Result<Self, SensorError> {
+            let power_paths = find_power_sensors(&device_path);
+            let energy_paths = find_energy_sensors(&device_path);
+            let usage_path = device_path.join("gpu_busy_percent");
+
+            if power_paths.is_empty() && energy_paths.is_empty() && !usage_path.exists() {
+                return Err(SensorError::NotSupported);
+            }
+
+            Ok(Self {
+                device_path,
+                power_paths,
+                energy_paths,
+                last_energy_reading: Cell::new(None),
+                last_reading: Cell::new(None),
+            })
+        }
+    }
+
+    impl Sensor for AmdGPUSensor {
+        fn read_full_data(&self) -> Result<SensorData, SensorError> {
+            let now = Instant::now();
+
+            let power_uw = self
+                .power_paths
+                .iter()
+                .find_map(|path| read_number(path).filter(|power| *power >= 0.0));
+
+            let counter_uj = self
+                .energy_paths
+                .iter()
+                .find_map(|path| fs::read_to_string(path).ok()?.trim().parse::<u64>().ok());
+
+            let counter_energy = counter_uj.and_then(|current| {
+                let previous = self.last_energy_reading.replace(Some(current))?;
+                current.checked_sub(previous).map(EnergyUj::from_u64)
+            });
+
+            let power_energy = power_uw.and_then(|power| {
+                let previous = self.last_reading.replace(Some(now))?;
+                let duration = now.duration_since(previous).as_secs_f64();
+
+                // Microwatts multiplied by seconds give microjoules.
+                Some(EnergyUj::from_joules(power * duration / 1_000_000.0))
+            });
+
+            let total_energy = if let Some(energy) = counter_energy {
+                Some(energy)
+            } else {
+                if counter_uj.is_none() && power_energy.is_some() {
+                    // The power estimate covers this interval. Rebaseline the
+                    // counter on recovery to avoid counting it twice.
+                    self.last_energy_reading.set(None);
+                }
+
+                power_energy
+            };
+
+            let usage_percent =
+                read_number(&self.device_path.join("gpu_busy_percent")).filter(|value| (0.0..=100.0).contains(value));
+
+            if total_energy.is_none() && power_uw.is_none() && counter_uj.is_none() && usage_percent.is_none() {
+                return Err(SensorError::ReadError(
+                    "AMD GPU power and utilization telemetry unavailable".to_string(),
+                ));
+            }
+
+            let vram_used = read_number(&self.device_path.join("mem_info_vram_used"));
+
+            let vram_total = read_number(&self.device_path.join("mem_info_vram_total"));
+
+            let vram_usage_percent = match (vram_used, vram_total) {
+                (Some(used), Some(total)) if total > 0.0 => Some((used / total * 100.0).clamp(0.0, 100.0)),
+                _ => None,
+            };
+
+            Ok(GPUData {
+                total_energy,
+                usage_percent,
+                vram_usage_percent,
+                name: None,
+            }
+            .into())
+        }
+    }
+
+    fn read_number(path: &Path) -> Option<f64> {
+        let value = fs::read_to_string(path).ok()?;
+        let number = value.trim().parse::<f64>().ok()?;
+        number.is_finite().then_some(number)
+    }
+
+    fn find_energy_sensors(device_path: &Path) -> Vec<PathBuf> {
+        let Ok(entries) = fs::read_dir(device_path.join("hwmon")) else {
+            return Vec::new();
+        };
+
+        let mut energy_paths = Vec::new();
+
+        for entry in entries.flatten() {
+            let hwmon_path = entry.path();
+
+            if fs::read_to_string(hwmon_path.join("name"))
+                .ok()
+                .is_none_or(|name| name.trim() != "amdgpu")
+            {
+                continue;
+            }
+
+            let Ok(files) = fs::read_dir(hwmon_path) else {
+                continue;
+            };
+
+            for file in files.flatten() {
+                let filename = file.file_name();
+                let filename = filename.to_string_lossy();
+
+                if let Some(index) = filename
+                    .strip_prefix("energy")
+                    .and_then(|name| name.strip_suffix("_input"))
+                {
+                    if !index.is_empty() && index.bytes().all(|byte| byte.is_ascii_digit()) {
+                        energy_paths.push(file.path());
+                    }
+                }
+            }
+        }
+
+        energy_paths.sort();
+        energy_paths
+    }
+
+    fn find_power_sensors(device_path: &Path) -> Vec<PathBuf> {
+        let Ok(entries) = fs::read_dir(device_path.join("hwmon")) else {
+            return Vec::new();
+        };
+
+        let mut average_paths = Vec::new();
+        let mut input_paths = Vec::new();
+
+        for entry in entries.flatten() {
+            let hwmon_path = entry.path();
+
+            if fs::read_to_string(hwmon_path.join("name"))
+                .ok()
+                .is_none_or(|name| name.trim() != "amdgpu")
+            {
+                continue;
+            }
+
+            let average_path = hwmon_path.join("power1_average");
+            if average_path.exists() {
+                average_paths.push(average_path);
+            }
+
+            let input_path = hwmon_path.join("power1_input");
+            if input_path.exists() {
+                input_paths.push(input_path);
+            }
+        }
+
+        average_paths.extend(input_paths);
+        average_paths
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use std::{
+            fs,
+            path::PathBuf,
+            sync::atomic::{AtomicU64, Ordering},
+        };
+
+        use common::types::SensorData;
+
+        use super::{AmdGPUSensor, find_power_sensors, read_number};
+        use crate::sensors::Sensor;
+
+        static NEXT_ID: AtomicU64 = AtomicU64::new(0);
+
+        fn temp_file() -> PathBuf {
+            let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
+
+            std::env::temp_dir().join(format!("wattseal-amdgpu-test-{}-{id}", std::process::id()))
+        }
+
+        #[test]
+        fn recovers_after_both_energy_sources_fail() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let energy_path = hwmon_path.join("energy1_input");
+            let power_path = hwmon_path.join("power1_average");
+
+            fs::write(&energy_path, "10000000\n").unwrap();
+            fs::write(&power_path, "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            sensor.read_full_data().unwrap();
+
+            fs::write(&energy_path, "invalid\n").unwrap();
+            fs::write(&power_path, "invalid\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert_eq!(sensor.last_energy_reading.get(), Some(10_000_000));
+
+            fs::write(&power_path, "100000000\n").unwrap();
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let joules = data.total_energy.expect("Expected power fallback").as_joules();
+
+                    assert!(
+                        (200.0..205.0).contains(&joules),
+                        "Expected approximately 200 J, got {joules} J"
+                    );
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert_eq!(sensor.last_energy_reading.get(), None);
+
+            fs::write(&energy_path, "13000000\n").unwrap();
+
+            sensor.read_full_data().unwrap();
+            assert_eq!(sensor.last_energy_reading.get(), Some(13_000_000));
+
+            fs::write(&energy_path, "15000000\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let joules = data.total_energy.expect("Expected counter energy").as_joules();
+
+                    assert_eq!(joules, 2.0);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn falls_back_to_power_when_energy_counter_fails() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let energy_path = hwmon_path.join("energy1_input");
+            fs::write(&energy_path, "10000000\n").unwrap();
+            fs::write(hwmon_path.join("power1_average"), "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            sensor.read_full_data().unwrap();
+
+            fs::write(&energy_path, "invalid\n").unwrap();
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let joules = data.total_energy.expect("Expected power fallback").as_joules();
+                    assert!(
+                        (200.0..205.0).contains(&joules),
+                        "Expected approximately 200 J from power, got {joules} J"
+                    );
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert_eq!(sensor.last_energy_reading.get(), None);
+
+            fs::write(&energy_path, "13000000\n").unwrap();
+
+            // The first recovered reading establishes a new counter baseline.
+            sensor.read_full_data().unwrap();
+            assert_eq!(sensor.last_energy_reading.get(), Some(13_000_000));
+
+            fs::write(&energy_path, "15000000\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected recovered counter energy");
+                    assert_eq!(energy.as_joules(), 2.0);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn handles_energy_counter_reset_with_power_available() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let energy_path = hwmon_path.join("energy1_input");
+            fs::write(&energy_path, "10000000\n").unwrap();
+            fs::write(hwmon_path.join("power1_average"), "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            sensor.read_full_data().unwrap();
+
+            fs::write(&energy_path, "1000000\n").unwrap();
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let joules = data.total_energy.expect("Expected power fallback").as_joules();
+                    assert!(
+                        (200.0..205.0).contains(&joules),
+                        "Expected approximately 200 J, got {joules} J"
+                    );
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert_eq!(sensor.last_energy_reading.get(), Some(1_000_000));
+
+            fs::write(&energy_path, "3000000\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected counter energy");
+                    assert_eq!(energy.as_joules(), 2.0);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn handles_cumulative_energy_counter_reset() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let energy_path = hwmon_path.join("energy1_input");
+            fs::write(&energy_path, "10000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            sensor.read_full_data().unwrap();
+
+            fs::write(&energy_path, "1000000\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::write(&energy_path, "3000000\n").unwrap();
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected energy after counter reset");
+                    assert_eq!(energy.as_joules(), 2.0);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn uses_cumulative_energy_counter_before_power_estimate() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let energy_path = hwmon_path.join("energy1_input");
+            fs::write(&energy_path, "10000000\n").unwrap();
+            fs::write(hwmon_path.join("power1_average"), "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            assert_eq!(sensor.energy_paths, vec![energy_path.clone()]);
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::write(&energy_path, "13000000\n").unwrap();
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            match sensor.read_full_data().unwrap() {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected counter energy");
+                    assert_eq!(energy.as_joules(), 3.0);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn first_power_sample_initializes_energy_measurement() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+            fs::write(hwmon_path.join("power1_average"), "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            assert!(sensor.last_reading.get().is_none());
+
+            let first = sensor.read_full_data().unwrap();
+
+            match first {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert!(sensor.last_reading.get().is_some());
+
+            std::thread::sleep(std::time::Duration::from_millis(20));
+
+            let second = sensor.read_full_data().unwrap();
+
+            match second {
+                SensorData::GPU(data) => assert!(data.total_energy.is_some()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn preserves_energy_interval_after_power_read_failure() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let power_path = hwmon_path.join("power1_average");
+            fs::write(&power_path, "100000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            sensor.read_full_data().unwrap();
+            let previous = sensor.last_reading.get().unwrap();
+
+            fs::write(&power_path, "invalid\n").unwrap();
+
+            let failed_power_sample = sensor.read_full_data().unwrap();
+
+            match failed_power_sample {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            assert_eq!(sensor.last_reading.get(), Some(previous));
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            fs::write(&power_path, "100000000\n").unwrap();
+
+            let recovered_sample = sensor.read_full_data().unwrap();
+
+            match recovered_sample {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected energy after recovery");
+                    let joules = energy.as_joules();
+
+                    assert!(
+                        (200.0..205.0).contains(&joules),
+                        "Expected approximately 200 J, got {joules} J"
+                    );
+                    assert!(sensor.last_reading.get().unwrap() > previous);
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn falls_back_to_power_input_when_average_is_invalid() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+            fs::write(hwmon_path.join("power1_average"), "invalid\n").unwrap();
+            fs::write(hwmon_path.join("power1_input"), "80000000\n").unwrap();
+            fs::write(device_path.join("gpu_busy_percent"), "25\n").unwrap();
+
+            let sensor = AmdGPUSensor::new_with_paths(device_path.clone(), "ffff:ff:ff.f".to_string()).unwrap();
+
+            assert_eq!(sensor.power_paths.len(), 2);
+
+            let first = sensor.read_full_data().unwrap();
+            match first {
+                SensorData::GPU(data) => assert!(data.total_energy.is_none()),
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            sensor
+                .last_reading
+                .set(Some(std::time::Instant::now() - std::time::Duration::from_secs(2)));
+
+            let second = sensor.read_full_data().unwrap();
+            match second {
+                SensorData::GPU(data) => {
+                    let energy = data.total_energy.expect("Expected fallback energy");
+                    let joules = energy.as_joules();
+
+                    assert!(
+                        (160.0..165.0).contains(&joules),
+                        "Expected approximately 160 J, got {joules} J"
+                    );
+                }
+                _ => panic!("Expected GPU sensor data"),
+            }
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn selects_power_sensor_with_fallback() {
+            let device_path = temp_file();
+            let hwmon_path = device_path.join("hwmon/hwmon0");
+
+            fs::create_dir_all(&hwmon_path).unwrap();
+            fs::write(hwmon_path.join("name"), "amdgpu\n").unwrap();
+
+            let average = hwmon_path.join("power1_average");
+            let input = hwmon_path.join("power1_input");
+
+            assert!(find_power_sensors(&device_path).is_empty());
+
+            fs::write(&input, "100000000\n").unwrap();
+            assert_eq!(find_power_sensors(&device_path), vec![input.clone()]);
+
+            fs::write(&average, "90000000\n").unwrap();
+            assert_eq!(find_power_sensors(&device_path), vec![average, input]);
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn prefers_average_power_across_hwmon_directories() {
+            let device_path = temp_file();
+            let first_hwmon = device_path.join("hwmon/hwmon0");
+            let second_hwmon = device_path.join("hwmon/hwmon1");
+
+            fs::create_dir_all(&first_hwmon).unwrap();
+            fs::create_dir_all(&second_hwmon).unwrap();
+            fs::write(first_hwmon.join("name"), "amdgpu\n").unwrap();
+            fs::write(second_hwmon.join("name"), "amdgpu\n").unwrap();
+
+            let input = first_hwmon.join("power1_input");
+            let average = second_hwmon.join("power1_average");
+            fs::write(&input, "100000000\n").unwrap();
+            fs::write(&average, "90000000\n").unwrap();
+
+            let paths = find_power_sensors(&device_path);
+            assert_eq!(paths, vec![average, input]);
+
+            fs::remove_dir_all(device_path).unwrap();
+        }
+
+        #[test]
+        fn reads_valid_sysfs_number() {
+            let path = temp_file();
+            fs::write(&path, "12345\n").unwrap();
+
+            assert_eq!(read_number(&path), Some(12345.0));
+
+            fs::remove_file(path).unwrap();
+        }
+
+        #[test]
+        fn rejects_invalid_sysfs_number() {
+            let path = temp_file();
+            fs::write(&path, "not-a-number\\n").unwrap();
+
+            assert_eq!(read_number(&path), None);
+
+            fs::remove_file(path).unwrap();
+        }
+
+        #[test]
+        fn handles_missing_sysfs_file() {
+            let path = temp_file();
+
+            assert_eq!(read_number(&path), None);
         }
     }
 }
@@ -1085,7 +1808,59 @@ mod intel_gpu {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        fs,
+        path::PathBuf,
+        sync::atomic::{AtomicU64, Ordering},
+    };
+
     use super::*;
+
+    static NEXT_MARKETING_TEST_ID: AtomicU64 = AtomicU64::new(0);
+
+    fn temp_pci_device(device_id: &str, revision: &str) -> PathBuf {
+        let id = NEXT_MARKETING_TEST_ID.fetch_add(1, Ordering::Relaxed);
+        let device_path = std::env::temp_dir().join(format!("wattseal-pci-id-test-{}-{id}", std::process::id()));
+        fs::create_dir_all(&device_path).unwrap();
+        fs::write(device_path.join("device"), device_id).unwrap();
+        fs::write(device_path.join("revision"), revision).unwrap();
+        device_path
+    }
+
+    #[test]
+    fn resolves_amd_marketing_name_from_device_id_and_revision() {
+        let database = "747E, C8, AMD Radeon RX 7800 XT\n747E, FF, AMD Radeon RX 7700 XT\n";
+        let fallback = "Navi 32 [Radeon RX 7700 XT / 7800 XT]";
+        let rx_7800_device = temp_pci_device("0x747e\n", "0xc8\n");
+        let rx_7700_device = temp_pci_device("0x747e\n", "0xff\n");
+
+        assert_eq!(
+            resolve_amd_marketing_name(&rx_7800_device, fallback, Some(database)),
+            "AMD Radeon RX 7800 XT"
+        );
+        assert_eq!(
+            resolve_amd_marketing_name(&rx_7700_device, fallback, Some(database)),
+            "AMD Radeon RX 7700 XT"
+        );
+
+        fs::remove_dir_all(rx_7800_device).unwrap();
+        fs::remove_dir_all(rx_7700_device).unwrap();
+    }
+
+    #[test]
+    fn falls_back_for_unknown_amd_revision_or_missing_database() {
+        let database = "747E, C8, AMD Radeon RX 7800 XT\n747E, FF, AMD Radeon RX 7700 XT\n";
+        let fallback = "Navi 32 [Radeon RX 7700 XT / 7800 XT]";
+        let device_path = temp_pci_device("0x747e\n", "0x01\n");
+
+        assert_eq!(
+            resolve_amd_marketing_name(&device_path, fallback, Some(database)),
+            fallback
+        );
+        assert_eq!(resolve_amd_marketing_name(&device_path, fallback, None), fallback);
+
+        fs::remove_dir_all(device_path).unwrap();
+    }
 
     #[test]
     fn test_nvidia_match_by_bus_id() {
