@@ -209,15 +209,18 @@ impl AppLanguage {
         }
     }
 
-    /// Detects the OS locale and returns the best matching [`AppLanguage`] or defaults to English.
+    /// Resolves the primary language subtag of an OS locale.
+    fn from_locale(locale: &str) -> Self {
+        let language = locale.split(['-', '_']).next().unwrap_or("").to_ascii_uppercase();
+
+        Self::from_code(&language)
+    }
+
+    /// Detects the OS locale and defaults to English when unavailable.
     pub fn from_os() -> Self {
-        let tag = match sys_locale::get_locale() {
-            Some(l) => l,
-            None => return AppLanguage::default(),
-        };
-        // Extract the xx part from xx-XX or xx_XX (e.g. "en-US" -> "en").
-        let primary = tag.split(['-', '_']).next().unwrap_or("");
-        Self::from_code(&primary.to_uppercase())
+        sys_locale::get_locale()
+            .map(|locale| Self::from_locale(&locale))
+            .unwrap_or_default()
     }
 }
 
