@@ -15,7 +15,8 @@ pub fn app_name(language: AppLanguage) -> &'static str {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => "WattSeal",
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "WattSeal",
     }
 }
 
@@ -28,12 +29,13 @@ pub fn page_dashboard(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Tableau de bord",
         AppLanguage::Chinese => "仪表盘",
         AppLanguage::Romanian => "Tablou de bord",
+        AppLanguage::PortugueseBrazil => "Painel",
     }
 }
 
 pub fn page_info(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::German | AppLanguage::Romanian => "Info",
+        AppLanguage::English | AppLanguage::German | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Info",
         AppLanguage::French => "Infos",
         AppLanguage::Chinese => "信息",
     }
@@ -48,6 +50,7 @@ pub fn settings_title(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Paramètres",
         AppLanguage::Chinese => "设置",
         AppLanguage::Romanian => "Setări",
+        AppLanguage::PortugueseBrazil => "Configurações",
     }
 }
 
@@ -57,6 +60,7 @@ pub fn settings_general(language: AppLanguage) -> &'static str {
         AppLanguage::German => "Allgemein",
         AppLanguage::French => "Général",
         AppLanguage::Chinese => "常规",
+        AppLanguage::PortugueseBrazil => "Geral",
     }
 }
 
@@ -67,6 +71,7 @@ pub fn settings_theme(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Thème",
         AppLanguage::Chinese => "主题",
         AppLanguage::Romanian => "Temă",
+        AppLanguage::PortugueseBrazil => "Tema",
     }
 }
 
@@ -77,6 +82,7 @@ pub fn settings_language(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Langue",
         AppLanguage::Chinese => "语言",
         AppLanguage::Romanian => "Limbă",
+        AppLanguage::PortugueseBrazil => "Idioma",
     }
 }
 
@@ -87,6 +93,7 @@ pub fn settings_launch_on_startup(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Lancer au démarrage",
         AppLanguage::Chinese => "开机自启动",
         AppLanguage::Romanian => "Pornește la conectare",
+        AppLanguage::PortugueseBrazil => "Iniciar com o sistema",
     }
 }
 
@@ -97,6 +104,7 @@ pub fn settings_open_data_folder(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Ouvrir le dossier des données",
         AppLanguage::Chinese => "打开数据文件夹",
         AppLanguage::Romanian => "Deschide folderul de date",
+        AppLanguage::PortugueseBrazil => "Abrir pasta de dados",
     }
 }
 
@@ -107,6 +115,7 @@ pub fn settings_open_logs_folder(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Ouvrir le dossier des logs",
         AppLanguage::Chinese => "打开日志文件夹",
         AppLanguage::Romanian => "Deschide folderul de jurnale",
+        AppLanguage::PortugueseBrazil => "Abrir pasta de logs",
     }
 }
 
@@ -117,6 +126,7 @@ pub fn settings_open_data_and_logs_folder(language: AppLanguage) -> &'static str
         AppLanguage::French => "Ouvrir le dossier des données et logs",
         AppLanguage::Chinese => "打开数据与日志文件夹",
         AppLanguage::Romanian => "Deschide folderul de date și jurnale",
+        AppLanguage::PortugueseBrazil => "Abrir pasta de dados e logs",
     }
 }
 
@@ -127,6 +137,7 @@ pub fn modal_close(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Fermer",
         AppLanguage::Chinese => "关闭",
         AppLanguage::Romanian => "Închide",
+        AppLanguage::PortugueseBrazil => "Fechar",
     }
 }
 
@@ -137,6 +148,7 @@ pub fn star_on_github(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Étoiler sur GitHub",
         AppLanguage::Chinese => "在 GitHub 上加星",
         AppLanguage::Romanian => "Acordă o stea pe GitHub",
+        AppLanguage::PortugueseBrazil => "Favoritar no GitHub",
     }
 }
 
@@ -147,6 +159,7 @@ pub fn report_issue(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Signaler un bug",
         AppLanguage::Chinese => "报告问题",
         AppLanguage::Romanian => "Raportează o problemă",
+        AppLanguage::PortugueseBrazil => "Informar um problema",
     }
 }
 
@@ -159,6 +172,7 @@ pub fn current_power_consumption(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Consommation actuelle",
         AppLanguage::Chinese => "当前功耗",
         AppLanguage::Romanian => "Consum curent",
+        AppLanguage::PortugueseBrazil => "Consumo atual",
     }
 }
 
@@ -169,6 +183,7 @@ pub fn database_migrating_title(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Préparation de la base de données",
         AppLanguage::Chinese => "准备数据库",
         AppLanguage::Romanian => "Bază de date în pregătire",
+        AppLanguage::PortugueseBrazil => "Preparando o banco de dados",
     }
 }
 
@@ -187,6 +202,9 @@ pub fn database_migrating_description(language: AppLanguage) -> &'static str {
         AppLanguage::Romanian => {
             "WattSeal așteaptă colectorul să termine de migrat baza de date. Reîncercare în fiecare secundă..."
         }
+        AppLanguage::PortugueseBrazil => {
+            "O WattSeal está aguardando o coletor terminar a migração do banco de dados. Tentando novamente a cada segundo…"
+        }
     }
 }
 
@@ -197,12 +215,17 @@ pub fn all_time(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Depuis le début",
         AppLanguage::Chinese => "累计",
         AppLanguage::Romanian => "De la început",
+        AppLanguage::PortugueseBrazil => "Todo o período",
     }
 }
 
 pub fn total(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English | AppLanguage::French | AppLanguage::Chinese | AppLanguage::Romanian => "Total",
+        AppLanguage::English
+        | AppLanguage::French
+        | AppLanguage::Chinese
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "Total",
         AppLanguage::German => "Gesamt",
     }
 }
@@ -214,6 +237,7 @@ pub fn emissions(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Émissions",
         AppLanguage::Chinese => "碳排放",
         AppLanguage::Romanian => "Emisii",
+        AppLanguage::PortugueseBrazil => "Emissões",
     }
 }
 
@@ -224,6 +248,7 @@ pub fn zero_carbon_intensity_warning(language: AppLanguage) -> &'static str {
         AppLanguage::French => "\u{26a0} Choisissez une intensité carbone réelle dans les paramètres ! \u{26a0}",
         AppLanguage::Chinese => "\u{26a0} 请在设置中选择真实的电网碳强度！ \u{26a0}",
         AppLanguage::Romanian => "\u{26a0} Alegeți o intensitate de carbon reală în setări! \u{26a0}",
+        AppLanguage::PortugueseBrazil => "\u{26a0} Escolha uma intensidade de carbono real nas configurações! \u{26a0}",
     }
 }
 
@@ -235,7 +260,8 @@ pub fn cpu(language: AppLanguage) -> &'static str {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => "CPU",
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "CPU",
     }
 }
 
@@ -246,6 +272,7 @@ pub fn processor_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations processeur",
         AppLanguage::Chinese => "处理器信息",
         AppLanguage::Romanian => "Informații procesor",
+        AppLanguage::PortugueseBrazil => "Informações do processador",
     }
 }
 
@@ -255,6 +282,7 @@ pub fn model(language: AppLanguage) -> &'static str {
         AppLanguage::German => "Modell",
         AppLanguage::French => "Modèle",
         AppLanguage::Chinese => "型号",
+        AppLanguage::PortugueseBrazil => "Modelo",
     }
 }
 
@@ -265,6 +293,7 @@ pub fn cores(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Cœurs",
         AppLanguage::Chinese => "核心",
         AppLanguage::Romanian => "Nuclee",
+        AppLanguage::PortugueseBrazil => "Núcleos",
     }
 }
 
@@ -275,6 +304,7 @@ pub fn cores_and_threads(language: AppLanguage, physical: u16, logical: u16) -> 
         AppLanguage::French => format!("{} cœurs / {} threads", physical, logical),
         AppLanguage::Chinese => format!("{} 核 / {} 线程", physical, logical),
         AppLanguage::Romanian => format!("{} nuclee / {} thread-uri", physical, logical),
+        AppLanguage::PortugueseBrazil => format!("{} núcleos / {} threads", physical, logical),
     }
 }
 
@@ -284,7 +314,8 @@ pub fn gpu(language: AppLanguage) -> &'static str {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => "GPU",
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "GPU",
     }
 }
 
@@ -295,6 +326,7 @@ pub fn graphics_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations graphiques",
         AppLanguage::Chinese => "显卡信息",
         AppLanguage::Romanian => "Informații grafice",
+        AppLanguage::PortugueseBrazil => "Informações gráficas",
     }
 }
 
@@ -305,6 +337,7 @@ pub fn graphics_processor_n(language: AppLanguage, n: usize) -> String {
         AppLanguage::French => format!("Processeur graphique {}", n),
         AppLanguage::Chinese => format!("图形处理器 {}", n),
         AppLanguage::Romanian => format!("Procesor grafic {}", n),
+        AppLanguage::PortugueseBrazil => format!("Processador gráfico {}", n),
     }
 }
 
@@ -315,6 +348,7 @@ pub fn memory(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Mémoire",
         AppLanguage::Chinese => "内存",
         AppLanguage::Romanian => "Memorie",
+        AppLanguage::PortugueseBrazil => "Memória",
     }
 }
 
@@ -325,6 +359,7 @@ pub fn ram_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations RAM",
         AppLanguage::Chinese => "内存信息",
         AppLanguage::Romanian => "Informații RAM",
+        AppLanguage::PortugueseBrazil => "Informações da RAM",
     }
 }
 
@@ -335,6 +370,7 @@ pub fn total_memory(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Mémoire totale",
         AppLanguage::Chinese => "总内存",
         AppLanguage::Romanian => "Memorie Totală",
+        AppLanguage::PortugueseBrazil => "Memória total",
     }
 }
 
@@ -342,6 +378,7 @@ pub fn swap(language: AppLanguage) -> &'static str {
     match language {
         AppLanguage::English | AppLanguage::French | AppLanguage::Chinese | AppLanguage::Romanian => "Swap",
         AppLanguage::German => "Auslagerungsspeicher",
+        AppLanguage::PortugueseBrazil => "Memória virtual",
     }
 }
 
@@ -352,6 +389,7 @@ pub fn system(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Système",
         AppLanguage::Chinese => "系统",
         AppLanguage::Romanian => "Sistem",
+        AppLanguage::PortugueseBrazil => "Sistema",
     }
 }
 
@@ -362,6 +400,7 @@ pub fn os_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations OS",
         AppLanguage::Chinese => "操作系统信息",
         AppLanguage::Romanian => "Informații Sistem de Operare",
+        AppLanguage::PortugueseBrazil => "Informações do SO",
     }
 }
 
@@ -372,6 +411,7 @@ pub fn operating_system(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Système d'exploitation",
         AppLanguage::Chinese => "操作系统",
         AppLanguage::Romanian => "Sistem de operare",
+        AppLanguage::PortugueseBrazil => "Sistema operacional",
     }
 }
 
@@ -382,6 +422,7 @@ pub fn hostname(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Nom d'hôte",
         AppLanguage::Chinese => "主机名",
         AppLanguage::Romanian => "Nume de gazdă",
+        AppLanguage::PortugueseBrazil => "Nome do computador",
     }
 }
 
@@ -392,6 +433,7 @@ pub fn storage(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Stockage",
         AppLanguage::Chinese => "存储",
         AppLanguage::Romanian => "Stocare",
+        AppLanguage::PortugueseBrazil => "Armazenamento",
     }
 }
 
@@ -402,6 +444,7 @@ pub fn disk_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations disque",
         AppLanguage::Chinese => "磁盘信息",
         AppLanguage::Romanian => "Informații disc",
+        AppLanguage::PortugueseBrazil => "Informações do disco",
     }
 }
 
@@ -412,6 +455,7 @@ pub fn disk(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Disque",
         AppLanguage::Chinese => "磁盘",
         AppLanguage::Romanian => "Disc",
+        AppLanguage::PortugueseBrazil => "Disco",
     }
 }
 
@@ -421,7 +465,8 @@ pub fn disk_n(language: AppLanguage, n: usize) -> String {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => {
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => {
             format!("{} {}", disk(language), n)
         }
     }
@@ -434,6 +479,7 @@ pub fn space(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Espace",
         AppLanguage::Chinese => "空间",
         AppLanguage::Romanian => "Spațiu",
+        AppLanguage::PortugueseBrazil => "Espaço",
     }
 }
 
@@ -444,6 +490,7 @@ pub fn network(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Réseau",
         AppLanguage::Chinese => "网络",
         AppLanguage::Romanian => "Rețea",
+        AppLanguage::PortugueseBrazil => "Rede",
     }
 }
 
@@ -454,6 +501,7 @@ pub fn battery(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Batterie",
         AppLanguage::Chinese => "电池",
         AppLanguage::Romanian => "Baterie",
+        AppLanguage::PortugueseBrazil => "Bateria",
     }
 }
 
@@ -464,6 +512,7 @@ pub fn battery_status(language: AppLanguage) -> &'static str {
         AppLanguage::French => "État de la batterie",
         AppLanguage::Chinese => "电池状态",
         AppLanguage::Romanian => "Stare Baterie",
+        AppLanguage::PortugueseBrazil => "Status da bateria",
     }
 }
 
@@ -474,6 +523,7 @@ pub fn process(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Processus",
         AppLanguage::Chinese => "进程",
         AppLanguage::Romanian => "Procese",
+        AppLanguage::PortugueseBrazil => "Processos",
     }
 }
 
@@ -484,6 +534,7 @@ pub fn name(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Nom",
         AppLanguage::Chinese => "名称",
         AppLanguage::Romanian => "Nume",
+        AppLanguage::PortugueseBrazil => "Nome",
     }
 }
 
@@ -494,6 +545,7 @@ pub fn capacity(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Capacité",
         AppLanguage::Chinese => "容量",
         AppLanguage::Romanian => "Capacitate",
+        AppLanguage::PortugueseBrazil => "Capacidade",
     }
 }
 
@@ -503,6 +555,7 @@ pub fn capacity_wh_cycles(language: AppLanguage, cap_wh: f32, cycles: u32) -> St
         AppLanguage::English | AppLanguage::French | AppLanguage::Chinese => format!("{} Wh ({} cycles)", val, cycles),
         AppLanguage::German => format!("{} Wh ({} Ladezyklen)", val, cycles),
         AppLanguage::Romanian => format!("{} Wh ({} cicluri)", val, cycles),
+        AppLanguage::PortugueseBrazil => format!("{} Wh ({} ciclos)", val, cycles),
     }
 }
 
@@ -513,7 +566,8 @@ pub fn capacity_wh_only(language: AppLanguage, cap_wh: f32) -> String {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => {
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => {
             format!("{} Wh", val)
         }
     }
@@ -524,6 +578,7 @@ pub fn na_with_cycles(language: AppLanguage, cycles: u32) -> String {
         AppLanguage::English | AppLanguage::French | AppLanguage::Chinese => format!("N/A ({} cycles)", cycles),
         AppLanguage::German => format!("N/A ({} Ladezyklen)", cycles),
         AppLanguage::Romanian => format!("N/A ({} cicluri)", cycles),
+        AppLanguage::PortugueseBrazil => format!("N/D ({} ciclos)", cycles),
     }
 }
 
@@ -534,6 +589,7 @@ pub fn display(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Écran",
         AppLanguage::Chinese => "显示器",
         AppLanguage::Romanian => "Ecran",
+        AppLanguage::PortugueseBrazil => "Tela",
     }
 }
 
@@ -544,6 +600,7 @@ pub fn screen_information(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Informations écran",
         AppLanguage::Chinese => "屏幕信息",
         AppLanguage::Romanian => "Informații ecran",
+        AppLanguage::PortugueseBrazil => "Informações da tela",
     }
 }
 
@@ -554,6 +611,7 @@ pub fn mode(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Mode",
         AppLanguage::Chinese => "模式",
         AppLanguage::Romanian => "Mod",
+        AppLanguage::PortugueseBrazil => "Modo",
     }
 }
 
@@ -564,6 +622,7 @@ pub fn primary_display(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Écran principal",
         AppLanguage::Chinese => "主显示器",
         AppLanguage::Romanian => "Ecran principal",
+        AppLanguage::PortugueseBrazil => "Tela principal",
     }
 }
 
@@ -574,6 +633,7 @@ pub fn secondary_display(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Écran secondaire",
         AppLanguage::Chinese => "副显示器",
         AppLanguage::Romanian => "Ecran secundar",
+        AppLanguage::PortugueseBrazil => "Tela secundária",
     }
 }
 
@@ -586,6 +646,7 @@ pub fn na(language: AppLanguage) -> &'static str {
         | AppLanguage::French
         | AppLanguage::Chinese
         | AppLanguage::Romanian => "N/A",
+        AppLanguage::PortugueseBrazil => "N/D",
     }
 }
 
@@ -596,6 +657,7 @@ pub fn no_data_available(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Aucune donnée disponible",
         AppLanguage::Chinese => "暂无数据",
         AppLanguage::Romanian => "Nu există date disponibile",
+        AppLanguage::PortugueseBrazil => "Sem dados disponíveis",
     }
 }
 
@@ -608,6 +670,7 @@ pub fn power_label(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Puissance :",
         AppLanguage::Chinese => "功率：",
         AppLanguage::Romanian => "Putere:",
+        AppLanguage::PortugueseBrazil => "Potência:",
     }
 }
 
@@ -631,6 +694,7 @@ pub fn tooltip_value(language: AppLanguage, value_text: &str) -> String {
         AppLanguage::French => format!("Valeur : {}", value_text),
         AppLanguage::Chinese => format!("数值：{}", value_text),
         AppLanguage::Romanian => format!("Valoare: {}", value_text),
+        AppLanguage::PortugueseBrazil => format!("Valor: {}", value_text),
     }
 }
 
@@ -641,6 +705,7 @@ pub fn tooltip_time(language: AppLanguage, time_text: &str) -> String {
         AppLanguage::French => format!("Heure : {}", time_text),
         AppLanguage::Chinese => format!("时间：{}", time_text),
         AppLanguage::Romanian => format!("Timp: {}", time_text),
+        AppLanguage::PortugueseBrazil => format!("Hora: {}", time_text),
     }
 }
 
@@ -652,6 +717,7 @@ pub fn application(language: AppLanguage) -> &'static str {
         AppLanguage::German => "Anwendung",
         AppLanguage::Chinese => "应用",
         AppLanguage::Romanian => "Aplicație",
+        AppLanguage::PortugueseBrazil => "Aplicativo",
     }
 }
 
@@ -662,6 +728,7 @@ pub fn power(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Puissance",
         AppLanguage::Chinese => "功率",
         AppLanguage::Romanian => "Putere",
+        AppLanguage::PortugueseBrazil => "Potência",
     }
 }
 
@@ -672,6 +739,7 @@ pub fn energy(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Énergie",
         AppLanguage::Chinese => "能耗",
         AppLanguage::Romanian => "Energie",
+        AppLanguage::PortugueseBrazil => "Energia",
     }
 }
 
@@ -695,7 +763,8 @@ pub fn ram(language: AppLanguage) -> &'static str {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => "RAM",
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "RAM",
     }
 }
 
@@ -706,6 +775,7 @@ pub fn disk_read(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Lecture disque",
         AppLanguage::Chinese => "磁盘读取",
         AppLanguage::Romanian => "Citire disc",
+        AppLanguage::PortugueseBrazil => "Leitura de disco",
     }
 }
 
@@ -716,6 +786,7 @@ pub fn disk_write(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Écriture disque",
         AppLanguage::Chinese => "磁盘写入",
         AppLanguage::Romanian => "Scriere disc",
+        AppLanguage::PortugueseBrazil => "Gravação em disco",
     }
 }
 
@@ -728,6 +799,7 @@ pub fn last_minute(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernière minute",
         AppLanguage::Chinese => "最近 1 分钟",
         AppLanguage::Romanian => "Ultimul minut",
+        AppLanguage::PortugueseBrazil => "Último minuto",
     }
 }
 
@@ -738,6 +810,7 @@ pub fn last_hour(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernière heure",
         AppLanguage::Chinese => "最近 1 小时",
         AppLanguage::Romanian => "Ultima oră",
+        AppLanguage::PortugueseBrazil => "Última hora",
     }
 }
 
@@ -748,6 +821,7 @@ pub fn last_24_hours(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernières 24 heures",
         AppLanguage::Chinese => "最近 24 小时",
         AppLanguage::Romanian => "Ultimele 24 ore",
+        AppLanguage::PortugueseBrazil => "Últimas 24 horas",
     }
 }
 
@@ -758,6 +832,7 @@ pub fn last_week(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernière semaine",
         AppLanguage::Chinese => "最近 1 周",
         AppLanguage::Romanian => "Ultima săptămână",
+        AppLanguage::PortugueseBrazil => "Última semana",
     }
 }
 
@@ -768,6 +843,7 @@ pub fn last_month(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernier mois",
         AppLanguage::Chinese => "最近 1 个月",
         AppLanguage::Romanian => "Ultima lună",
+        AppLanguage::PortugueseBrazil => "Último mês",
     }
 }
 
@@ -778,6 +854,7 @@ pub fn last_year(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Dernière année",
         AppLanguage::Chinese => "最近 1 年",
         AppLanguage::Romanian => "Ultimul an",
+        AppLanguage::PortugueseBrazil => "Último ano",
     }
 }
 
@@ -801,6 +878,7 @@ pub fn metric_power(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Puissance",
         AppLanguage::Chinese => "功率",
         AppLanguage::Romanian => "Putere",
+        AppLanguage::PortugueseBrazil => "Potência",
     }
 }
 
@@ -815,6 +893,7 @@ pub fn metric_usage(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Utilisation",
         AppLanguage::Chinese => "使用率",
         AppLanguage::Romanian => "Utilizare",
+        AppLanguage::PortugueseBrazil => "Uso",
     }
 }
 
@@ -825,6 +904,7 @@ pub fn metric_speed(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Vitesse",
         AppLanguage::Chinese => "速度",
         AppLanguage::Romanian => "Viteză",
+        AppLanguage::PortugueseBrazil => "Velocidade",
     }
 }
 
@@ -844,7 +924,8 @@ pub fn label_usage(language: AppLanguage) -> &'static str {
         | AppLanguage::German
         | AppLanguage::French
         | AppLanguage::Chinese
-        | AppLanguage::Romanian => metric_usage(language),
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => metric_usage(language),
     }
 }
 
@@ -855,6 +936,7 @@ pub fn label_read(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Lecture",
         AppLanguage::Chinese => "读取",
         AppLanguage::Romanian => "Citire",
+        AppLanguage::PortugueseBrazil => "Leitura",
     }
 }
 
@@ -865,12 +947,13 @@ pub fn label_write(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Écriture",
         AppLanguage::Chinese => "写入",
         AppLanguage::Romanian => "Scriere",
+        AppLanguage::PortugueseBrazil => "Gravação",
     }
 }
 
 pub fn label_download(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Download",
+        AppLanguage::English | AppLanguage::PortugueseBrazil => "Download",
         AppLanguage::German => "Download",
         AppLanguage::French => "Téléchargement",
         AppLanguage::Chinese => "下载",
@@ -880,7 +963,7 @@ pub fn label_download(language: AppLanguage) -> &'static str {
 
 pub fn label_upload(language: AppLanguage) -> &'static str {
     match language {
-        AppLanguage::English => "Upload",
+        AppLanguage::English | AppLanguage::PortugueseBrazil => "Upload",
         AppLanguage::German => "Upload",
         AppLanguage::French => "Envoi",
         AppLanguage::Chinese => "上传",
@@ -903,6 +986,7 @@ pub fn translate_label(language: AppLanguage, english_label: &str) -> &'static s
             AppLanguage::French => "Inconnu",
             AppLanguage::Chinese => "未知",
             AppLanguage::Romanian => "Necunoscut",
+            AppLanguage::PortugueseBrazil => "Desconhecido",
         },
     }
 }
@@ -915,6 +999,7 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
             AppLanguage::French => "Disque",
             AppLanguage::Chinese => "磁盘",
             AppLanguage::Romanian => "Disc",
+            AppLanguage::PortugueseBrazil => "Disco",
             _ => english_name,
         },
         "Network" => match language {
@@ -922,6 +1007,7 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
             AppLanguage::French => "Réseau",
             AppLanguage::Chinese => "网络",
             AppLanguage::Romanian => "Rețea",
+            AppLanguage::PortugueseBrazil => "Rede",
             _ => english_name,
         },
         "Processes" => match language {
@@ -929,6 +1015,7 @@ pub fn sensor_name<'a>(language: AppLanguage, english_name: &'a str) -> &'a str 
             AppLanguage::French => "Processus",
             AppLanguage::Chinese => "进程",
             AppLanguage::Romanian => "Procese",
+            AppLanguage::PortugueseBrazil => "Processos",
             _ => english_name,
         },
         "Total" => match language {
@@ -953,6 +1040,7 @@ pub fn settings_electricity_cost(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Coût de l'électricité",
         AppLanguage::Chinese => "电价",
         AppLanguage::Romanian => "Cost electricitate",
+        AppLanguage::PortugueseBrazil => "Tarifa de energia",
     }
 }
 
@@ -963,6 +1051,7 @@ pub fn kwh_cost_placeholder(language: AppLanguage) -> &'static str {
         AppLanguage::French => "ex. 0.20",
         AppLanguage::Chinese => "例如 0.20",
         AppLanguage::Romanian => "ex: 0.20",
+        AppLanguage::PortugueseBrazil => "ex.: 0.20",
     }
 }
 
@@ -973,6 +1062,7 @@ pub fn kwh_cost_invalid(language: AppLanguage, currency_symbol: &str) -> String 
         AppLanguage::French => "Entrez un nombre positif",
         AppLanguage::Romanian => "Introduceți un număr pozitiv",
         AppLanguage::Chinese => "请输入正数",
+        AppLanguage::PortugueseBrazil => "Digite um número positivo",
     };
     return format!("{} ({}/kWh)", text, currency_symbol);
 }
@@ -984,6 +1074,7 @@ pub fn setup_choose_electricity(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Sélectionnez votre tarif d'électricité",
         AppLanguage::Chinese => "选择你的电价",
         AppLanguage::Romanian => "Selectați tariful dvs. de electricitate",
+        AppLanguage::PortugueseBrazil => "Selecione a tarifa da sua energia elétrica",
     }
 }
 
@@ -994,6 +1085,7 @@ pub fn custom_kwh_cost_placeholder(language: AppLanguage) -> &'static str {
         AppLanguage::French => "ex. 0.25",
         AppLanguage::Chinese => "例如 0.25",
         AppLanguage::Romanian => "ex: 0.25",
+        AppLanguage::PortugueseBrazil => "ex.: 0.25",
     }
 }
 
@@ -1004,6 +1096,7 @@ pub fn electricity_bill(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Facture estimée",
         AppLanguage::Chinese => "预估电费",
         AppLanguage::Romanian => "Factură estimată",
+        AppLanguage::PortugueseBrazil => "Fatura estimada",
     }
 }
 
@@ -1014,6 +1107,7 @@ pub fn settings_carbon_intensity(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Intensité carbone",
         AppLanguage::Chinese => "碳强度",
         AppLanguage::Romanian => "Intensitate Carbon",
+        AppLanguage::PortugueseBrazil => "Intensidade de carbono",
     }
 }
 
@@ -1024,6 +1118,7 @@ pub fn setup_welcome_title(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Bienvenue sur WattSeal",
         AppLanguage::Chinese => "欢迎使用 WattSeal",
         AppLanguage::Romanian => "Bine ați venit la WattSeal",
+        AppLanguage::PortugueseBrazil => "Bem-vindo ao WattSeal",
     }
 }
 
@@ -1034,6 +1129,7 @@ pub fn setup_choose_language(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Choisissez votre langue",
         AppLanguage::Chinese => "选择语言",
         AppLanguage::Romanian => "Alegeți limba",
+        AppLanguage::PortugueseBrazil => "Escolha seu idioma",
     }
 }
 
@@ -1044,6 +1140,7 @@ pub fn setup_choose_carbon(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Sélectionnez l'intensité carbone de votre réseau électrique",
         AppLanguage::Chinese => "选择你所在电网的碳强度",
         AppLanguage::Romanian => "Selectați intensitatea de carbon a rețelei electrice",
+        AppLanguage::PortugueseBrazil => "Selecione a intensidade de carbono da sua rede elétrica",
     }
 }
 
@@ -1054,6 +1151,7 @@ pub fn setup_confirm(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Confirmer",
         AppLanguage::Chinese => "确认",
         AppLanguage::Romanian => "Confirmați",
+        AppLanguage::PortugueseBrazil => "Confirmar",
     }
 }
 
@@ -1064,6 +1162,7 @@ pub fn custom_carbon_placeholder(language: AppLanguage) -> &'static str {
         AppLanguage::French => "ex. 300",
         AppLanguage::Chinese => "例如 300",
         AppLanguage::Romanian => "ex: 300",
+        AppLanguage::PortugueseBrazil => "ex.: 300",
     }
 }
 
@@ -1074,6 +1173,7 @@ pub fn custom_carbon_invalid(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Entrez un nombre positif (g CO₂/kWh)",
         AppLanguage::Chinese => "请输入正数 (g CO₂/kWh)",
         AppLanguage::Romanian => "Introduceți un număr pozitiv (g CO₂/kWh)",
+        AppLanguage::PortugueseBrazil => "Digite um número positivo (g CO₂/kWh)",
     }
 }
 
@@ -1084,6 +1184,7 @@ pub fn settings_psu_efficiency(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Efficacité de l'alimentation",
         AppLanguage::Chinese => "电源效率",
         AppLanguage::Romanian => "Eficiență sursă alimentare",
+        AppLanguage::PortugueseBrazil => "Eficiência da fonte",
     }
 }
 
@@ -1094,6 +1195,7 @@ pub fn setup_choose_psu_efficiency(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Sélectionnez la classe d'efficacité de votre alimentation (optionnel)",
         AppLanguage::Chinese => "选择你的电源效率等级（可选）",
         AppLanguage::Romanian => "Selectați clasa de eficiență a sursei de alimentare (opțional)",
+        AppLanguage::PortugueseBrazil => "Selecione a classe de eficiência da sua fonte (opcional)",
     }
 }
 
@@ -1104,6 +1206,7 @@ pub fn custom_psu_efficiency_placeholder(language: AppLanguage) -> &'static str 
         AppLanguage::French => "ex. η = 0.87",
         AppLanguage::Chinese => "例如 η = 0.87",
         AppLanguage::Romanian => "ex: η = 0.87",
+        AppLanguage::PortugueseBrazil => "ex.: η = 0.87",
     }
 }
 
@@ -1114,6 +1217,7 @@ pub fn custom_psu_efficiency_invalid(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Entrez η entre 0.01 et 1.0",
         AppLanguage::Chinese => "请输入 0.01 到 1.0 之间的 η 值",
         AppLanguage::Romanian => "Introduceți η între 0.01 și 1.0",
+        AppLanguage::PortugueseBrazil => "Digite η entre 0.01 e 1.0",
     }
 }
 
@@ -1126,6 +1230,7 @@ pub fn info_modal_current_power(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Puissance actuelle",
         AppLanguage::Chinese => "当前功率",
         AppLanguage::Romanian => "Putere actuală",
+        AppLanguage::PortugueseBrazil => "Potência atual",
     }
 }
 
@@ -1136,6 +1241,7 @@ pub fn info_modal_all_time_power(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Énergie totale",
         AppLanguage::Chinese => "累计能耗",
         AppLanguage::Romanian => "Energie totală",
+        AppLanguage::PortugueseBrazil => "Energia acumulada",
     }
 }
 
@@ -1146,6 +1252,7 @@ pub fn info_modal_current_top_consumer(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Plus gros consommateur actuel",
         AppLanguage::Chinese => "当前最大耗电",
         AppLanguage::Romanian => "Cel mai mare consumator actual",
+        AppLanguage::PortugueseBrazil => "Maior consumidor atual",
     }
 }
 
@@ -1156,6 +1263,7 @@ pub fn info_modal_all_time_top_consumer(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Plus gros consommateur total",
         AppLanguage::Chinese => "累计最大耗电",
         AppLanguage::Romanian => "Cel mai mare consumator total",
+        AppLanguage::PortugueseBrazil => "Maior consumidor acumulado",
     }
 }
 
@@ -1166,6 +1274,7 @@ pub fn info_modal_top_process(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Processus le plus gourmand",
         AppLanguage::Chinese => "耗电最高进程",
         AppLanguage::Romanian => "Cel mai intensiv proces",
+        AppLanguage::PortugueseBrazil => "Processo que mais consome",
     }
 }
 
@@ -1176,6 +1285,7 @@ pub fn info_modal_coming_soon(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Bientôt disponible",
         AppLanguage::Chinese => "即将推出",
         AppLanguage::Romanian => "În curând",
+        AppLanguage::PortugueseBrazil => "Em breve",
     }
 }
 
@@ -1205,12 +1315,14 @@ pub fn info_modal_title(language: AppLanguage, key: &str) -> String {
                 AppLanguage::French => "Émissions carbone".to_string(),
                 AppLanguage::Chinese => "碳排放".to_string(),
                 AppLanguage::Romanian => "Emisii de carbon".to_string(),
+                AppLanguage::PortugueseBrazil => "Emissões de carbono".to_string(),
             },
             _ => match language {
                 AppLanguage::English | AppLanguage::German | AppLanguage::French | AppLanguage::Romanian => {
                     "Info".to_string()
                 }
                 AppLanguage::Chinese => "信息".to_string(),
+                AppLanguage::PortugueseBrazil => "Informações".to_string(),
             },
         };
     }
@@ -1259,6 +1371,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Sarcinile intensive (compilare, encodare) cresc consumul\n\
                  \u{2022} Tensiuni ridicate (overclocking) cresc consumul"
             }
+            AppLanguage::PortugueseBrazil => {
+                "A CPU (Unidade Central de Processamento) funciona como o cérebro do computador e executa as instruções e os cálculos.\n\
+                 \n\
+                 O que faz o consumo subir:\n\
+                 \u{2022} Frequência de clock mais alta\n\
+                 \u{2022} Mais núcleos ativos\n\
+                 \u{2022} Tarefas pesadas, como compilação e codificação\n\
+                 \u{2022} Tensão mais alta, como no overclock"
+            }
         };
     } else if key == GPUData::table_name_static() {
         return match language {
@@ -1301,6 +1422,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Encodare/decodare video\n\
                  \u{2022} Sarcini IA și învățare automată\n\
                  \u{2022} Utilizare intensă a VRAM-ului și lățime de bandă a memoriei"
+            }
+            AppLanguage::PortugueseBrazil => {
+                "A GPU (Unidade de Processamento Gráfico) cuida da renderização de gráficos e dos cálculos em paralelo.\n\
+                 \n\
+                 O que mais consome energia:\n\
+                 \u{2022} Jogos e renderização 3D\n\
+                 \u{2022} Codificação e decodificação de vídeo\n\
+                 \u{2022} Tarefas de IA e aprendizado de máquina\n\
+                 \u{2022} Uso alto de VRAM e de largura de banda da memória"
             }
         };
     } else if key == RamData::table_name_static() {
@@ -1346,6 +1476,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Pe scurt, memoria RAM consumă curent constant, cât timp sistemul este pornit,\
                  chiar și în stand-by."
             }
+            AppLanguage::PortugueseBrazil => {
+                "A RAM (Memória de Acesso Aleatório) guarda, de forma temporária e com acesso rápido, os programas em execução e os dados em uso.\n\
+                 \n\
+                 O que aumenta o consumo:\n\
+                 \u{2022} Frequências de memória mais altas (MHz)\n\
+                 \u{2022} Mais módulos ativos\n\
+                 \u{2022} Operações de leitura/gravação frequentes\n\
+                 \n\
+                 Em geral, a RAM gasta energia sempre que o sistema está ligado, mesmo em repouso."
+            }
         };
     } else if key == DiskData::table_name_static() {
         return match language {
@@ -1387,6 +1527,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Rotirea discurilor (HDD)\n\
                  \u{2022} Operații de scriere NAND (SSD)\n\
                  \u{2022} Căutari și indexări pe disc"
+            }
+            AppLanguage::PortugueseBrazil => {
+                "Unidades de armazenamento (SSD / HDD) guardam seus arquivos e o sistema de forma permanente.\n\
+                 \n\
+                 Principais consumidores de energia:\n\
+                 \u{2022} Operações contínuas de leitura/gravação\n\
+                 \u{2022} Pratos girando (HDD)\n\
+                 \u{2022} Operações de gravação NAND (SSD)\n\
+                 \u{2022} Busca e indexação no disco"
             }
         };
     } else if key == NetworkData::table_name_static() {
@@ -1437,6 +1586,17 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Periferice Bluetooth sau wireless\n\n\
                 Notă: Utilizarea internetului generează emisii indirecte prin infrastructura de rețea și servere remote (28\u{2013}63 g CO₂/GB), care nu sunt incluse în măsurătorile WattSeal pentru calculatorul dumneavoastră."
             }
+            AppLanguage::PortugueseBrazil => {
+                "As interfaces de rede cuidam da transmissão de dados entre o seu computador e outros dispositivos ou a internet.\n\
+                 \n\
+                 Principais consumidores de energia:\n\
+                 \u{2022} Alto volume de dados trafegados\n\
+                 \u{2022} Transmissão de rádio Wi-Fi\n\
+                 \u{2022} Conexões de rede ativas\n\
+                 \u{2022} Bluetooth e periféricos sem fio\n\
+                 \n\
+                 Observação: o uso da internet gera emissões indiretas da infraestrutura de rede e de servidores remotos (28\u{2013}63 g CO₂/GB), que não estão incluídas nas medições do WattSeal para o seu PC."
+            }
         };
     } else if key == ProcessData::table_name_static() {
         return match language {
@@ -1469,6 +1629,12 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  variabil) al fiecărui proces.\n\
                  Procesele și serviciile ascunse contribuie de asemenea la consumul total."
             }
+            AppLanguage::PortugueseBrazil => {
+                "Mostra quais aplicativos consomem mais energia no seu sistema.\n\
+                 \n\
+                 A potência é estimada com base no uso de CPU e GPU (maior consumo variável) de cada processo.\n\
+                 Processos e serviços em segundo plano também contribuem para o consumo total."
+            }
         };
     } else if key == TotalData::table_name_static() {
         return match language {
@@ -1499,6 +1665,11 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  Aceasta este suma totală a tuturor componentelor hardware (CPU, GPU, RAM, Disc, \
                  Rețea). Înțelegerea componentei care consumă cel mai mult ajută la optimizarea \
                  consumului de energie."
+            }
+            AppLanguage::PortugueseBrazil => {
+                "Mostra o consumo total de energia do seu sistema.\n\
+                 \n\
+                 Esse valor é a soma do consumo de todos os componentes de hardware (CPU, GPU, RAM, disco e rede). Saber qual componente consome mais ajuda a otimizar o uso de energia."
             }
         };
     } else if key == "carbon_emissions" {
@@ -1550,6 +1721,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                  \u{2022} Emisiile legate de eliminarea hardware-ului și deșeurilor electronice (variază mult, scurgeri de materiale toxice în depozite)\n\n\
                  Notă: Tehnologia digitală consumă și multă apă pentru răcirea centrelor de date (aprox. 1,9 L/kWh) și pentru extracția mineralelor, în special în regiuni cu stres hidric."
             }
+            AppLanguage::PortugueseBrazil => {
+                "Estas emissões refletem apenas o CO₂ gerado pela eletricidade que o seu PC consome enquanto está ligado.\n\
+                 \n\
+                 Para estimar a sua pegada de carbono completa, você também deve somar:\n\
+                 \u{2022} Emissões de fabricação e transporte (~250\u{2013}500 kg CO₂eq, uma única vez), mais ainda para PCs gamer, monitores adicionais e periféricos\n\
+                 \u{2022} Emissões da infraestrutura de rede (28\u{2013}63 g CO₂/GB), que crescem com o avanço da IA\n\
+                 \u{2022} Emissões do descarte de hardware e do lixo eletrônico (variam muito; materiais tóxicos vazam em aterros)\n\
+                 \n\
+                 Observação: a tecnologia digital também consome muita água para resfriar datacenters (cerca de 1,9 L/kWh) e para a extração de minerais, especialmente em regiões com escassez de água."
+            }
         };
     } else {
         return match key {
@@ -1598,6 +1779,16 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      proceselor de fundal care rulează în bara de activități (vreme, știri...), \
                      și prin utilizarea modurilor de economisire a energiei."
                 }
+                AppLanguage::PortugueseBrazil => {
+                    "O seu sistema operacional gerencia todos os recursos de hardware e os programas em execução.\n\
+                 \n\
+                 Impacto no consumo:\n\
+                 \u{2022} Serviços em segundo plano e tarefas agendadas\n\
+                 \u{2022} Indexação e atualizações do sistema\n\
+                 \u{2022} As configurações do plano de energia afetam todos os componentes\n\
+                 \n\
+                 Você pode otimizar isso desativando programas desnecessários na inicialização, processos em segundo plano na barra de tarefas (clima, notícias...) e usando modos de economia de energia."
+                }
             },
             "battery" => match language {
                 AppLanguage::English => {
@@ -1640,6 +1831,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Utilizarea pe baterie declanșează adesea moduri de economisire a energiei\n\
                      \u{2022} Încărcarea rapidă generează mai multă căldură și consumă mai multă energie"
                 }
+                AppLanguage::PortugueseBrazil => {
+                    "A bateria armazena energia para uso portátil e influencia como a energia é gerenciada.\n\
+                 \n\
+                 Fatos importantes:\n\
+                 \u{2022} A contagem de ciclos reflete a saúde e o envelhecimento da bateria\n\
+                 \u{2022} A capacidade de projeto diminui com o tempo\n\
+                 \u{2022} Usar a bateria costuma ativar modos de economia de energia\n\
+                 \u{2022} O carregamento rápido gera mais calor e consome mais energia"
+                }
             },
             "display" => match language {
                 AppLanguage::English => {
@@ -1678,6 +1878,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Rate de reîmprospătare mai mari (Hz)\n\
                      \u{2022} Rezoluții mai înalte\n\
                      \u{2022} HDR și gamă largă de culori"
+                }
+                AppLanguage::PortugueseBrazil => {
+                    "As telas são grandes consumidoras de energia, principalmente com brilho alto.\n\
+                 \n\
+                 Principais consumidores de energia:\n\
+                 \u{2022} Brilho da tela (o fator mais importante)\n\
+                 \u{2022} Taxas de atualização mais altas (Hz)\n\
+                 \u{2022} Resoluções mais altas\n\
+                 \u{2022} HDR e gama de cores ampla"
                 }
             },
             "storage" => match language {
@@ -1719,6 +1928,15 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                      \u{2022} Operații de scriere NAND (SSD)\n\
                      \u{2022} Căutări și indexări pe disc"
                 }
+                AppLanguage::PortugueseBrazil => {
+                    "Unidades de armazenamento (SSD / HDD) guardam seus arquivos e o sistema de forma permanente.\n\
+                 \n\
+                 Principais consumidores de energia:\n\
+                 \u{2022} Operações contínuas de leitura/gravação\n\
+                 \u{2022} Pratos girando (HDD)\n\
+                 \u{2022} Operações de gravação NAND (SSD)\n\
+                 \u{2022} Busca e indexação no disco"
+                }
             },
             _ => match language {
                 AppLanguage::English => "No additional information available for this component.",
@@ -1726,6 +1944,7 @@ pub fn info_modal_description(language: AppLanguage, key: &str) -> &'static str 
                 AppLanguage::French => "Aucune information supplémentaire disponible pour ce composant.",
                 AppLanguage::Chinese => "暂无该组件的更多信息。",
                 AppLanguage::Romanian => "Nu sunt disponibile informații suplimentare pentru această componentă.",
+                AppLanguage::PortugueseBrazil => "Nenhuma informação adicional disponível para este componente.",
             },
         };
     }
@@ -1739,6 +1958,7 @@ pub fn carbon_info_measured(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Mesuré par WattSeal",
         AppLanguage::Chinese => "WattSeal 实测",
         AppLanguage::Romanian => "Măsurat de WattSeal",
+        AppLanguage::PortugueseBrazil => "Medido pelo WattSeal",
     }
 }
 
@@ -1750,6 +1970,7 @@ pub fn carbon_info_base(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Base estimée (fabrication + transport)",
         AppLanguage::Chinese => "预估基础 (制造与运输)",
         AppLanguage::Romanian => "Estimare de bază (fabricare + transport)",
+        AppLanguage::PortugueseBrazil => "Base estimada (fabricação + transporte)",
     }
 }
 
@@ -1761,6 +1982,7 @@ pub fn carbon_info_annual(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Annuel estimé (utilisation réseau)",
         AppLanguage::Chinese => "预估年度 (网络使用)",
         AppLanguage::Romanian => "Estimare anuală (utilizare rețea)",
+        AppLanguage::PortugueseBrazil => "Estimativa anual (uso de rede)",
     }
 }
 
@@ -1772,6 +1994,7 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Total estimé (toutes sources)",
         AppLanguage::Chinese => "预估累计总量",
         AppLanguage::Romanian => "Total estimat (toate sursele)",
+        AppLanguage::PortugueseBrazil => "Total estimado de todo o período",
     }
 }
 
@@ -1780,11 +2003,19 @@ pub fn carbon_info_all_time(language: AppLanguage) -> &'static str {
 pub fn process_limit_name(language: AppLanguage, limit: ProcessLimit) -> &'static str {
     match limit {
         ProcessLimit::Five => match language {
-            AppLanguage::English | AppLanguage::German | AppLanguage::French | AppLanguage::Romanian => "Top 5",
+            AppLanguage::English
+            | AppLanguage::German
+            | AppLanguage::French
+            | AppLanguage::Romanian
+            | AppLanguage::PortugueseBrazil => "Top 5",
             AppLanguage::Chinese => "前 5",
         },
         ProcessLimit::Ten => match language {
-            AppLanguage::English | AppLanguage::German | AppLanguage::French | AppLanguage::Romanian => "Top 10",
+            AppLanguage::English
+            | AppLanguage::German
+            | AppLanguage::French
+            | AppLanguage::Romanian
+            | AppLanguage::PortugueseBrazil => "Top 10",
             AppLanguage::Chinese => "前 10",
         },
         ProcessLimit::Custom => custom_preset_name(language),
@@ -1879,6 +2110,7 @@ pub fn settings_close_behavior(language: AppLanguage) -> &'static str {
         AppLanguage::French => "À la fermeture",
         AppLanguage::Chinese => "关闭时",
         AppLanguage::Romanian => "La închidere",
+        AppLanguage::PortugueseBrazil => "Ao fechar",
     }
 }
 
@@ -1889,6 +2121,7 @@ pub fn close_remember_choice(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Mémoriser mon choix",
         AppLanguage::Chinese => "记住我的选择",
         AppLanguage::Romanian => "Reține alegerea mea",
+        AppLanguage::PortugueseBrazil => "Lembrar minha escolha",
     }
 }
 
@@ -1921,6 +2154,7 @@ impl std::fmt::Display for TranslatedCloseBehavior {
                 AppLanguage::French => "Toujours demander",
                 AppLanguage::Chinese => "每次询问",
                 AppLanguage::Romanian => "Întreabă de fiecare dată",
+                AppLanguage::PortugueseBrazil => "Perguntar sempre",
             },
             common::CloseBehavior::WindowOnly => close_ui_only(self.language),
             common::CloseBehavior::Everything => close_everything(self.language),
@@ -1936,6 +2170,7 @@ pub fn close_dialog_title(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Fermer WattSeal",
         AppLanguage::Chinese => "关闭 WattSeal",
         AppLanguage::Romanian => "Închide WattSeal",
+        AppLanguage::PortugueseBrazil => "Fechar o WattSeal",
     }
 }
 
@@ -1948,6 +2183,7 @@ pub fn close_dialog_description(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Voulez-vous fermer uniquement l'interface, ou aussi arrêter le collecteur ?",
         AppLanguage::Chinese => "仅关闭窗口，还是同时停止后台采集？",
         AppLanguage::Romanian => "Doriți să închideți doar fereastra sau și să opriți colectorul de fundal?",
+        AppLanguage::PortugueseBrazil => "Deseja fechar somente a janela ou também parar o coletor em segundo plano?",
     }
 }
 
@@ -1958,6 +2194,7 @@ pub fn close_ui_only(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Fermer l'interface",
         AppLanguage::Chinese => "仅关闭窗口",
         AppLanguage::Romanian => "Închide doar fereastra",
+        AppLanguage::PortugueseBrazil => "Fechar somente a janela",
     }
 }
 
@@ -1968,6 +2205,7 @@ pub fn close_everything(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Tout fermer",
         AppLanguage::Chinese => "完全退出",
         AppLanguage::Romanian => "Închide tot",
+        AppLanguage::PortugueseBrazil => "Fechar tudo",
     }
 }
 
@@ -1976,37 +2214,37 @@ pub fn close_everything(language: AppLanguage) -> &'static str {
 pub fn theme_name(language: AppLanguage, theme: AppTheme) -> &'static str {
     match theme {
         AppTheme::DeepOcean => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Hunting",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Hunting",
             AppLanguage::German => "Jagen",
             AppLanguage::French => "Chasse",
             AppLanguage::Chinese => "捕猎",
         },
         AppTheme::OceanLight => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Swimming",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Swimming",
             AppLanguage::German => "Schwimmen",
             AppLanguage::French => "Baignade",
             AppLanguage::Chinese => "畅游",
         },
         AppTheme::EcoEnergy => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Sleeping",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Sleeping",
             AppLanguage::German => "Schlafen",
             AppLanguage::French => "Dodo",
             AppLanguage::Chinese => "酣睡",
         },
         AppTheme::EcoEnergyLight => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Splashing",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Splashing",
             AppLanguage::German => "Planschen",
             AppLanguage::French => "Bataille d'eau",
             AppLanguage::Chinese => "戏水",
         },
         AppTheme::GeothermalCore => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Sunbathing",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Sunbathing",
             AppLanguage::German => "Sonnenbaden",
             AppLanguage::French => "Bronzette",
             AppLanguage::Chinese => "晒日",
         },
         AppTheme::SolarUmbra => match language {
-            AppLanguage::English | AppLanguage::Romanian => "Lounging",
+            AppLanguage::English | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => "Lounging",
             AppLanguage::German => "Entspannen",
             AppLanguage::French => "Détente",
             AppLanguage::Chinese => "小憩",
@@ -2021,6 +2259,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::German => "Frankreich",
             AppLanguage::Romanian => "Franța",
             AppLanguage::Chinese => "法国",
+            AppLanguage::PortugueseBrazil => "França",
         },
         CountryKey::Germany => match language {
             AppLanguage::English => "Germany",
@@ -2028,6 +2267,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Allemagne",
             AppLanguage::Romanian => "Germania",
             AppLanguage::Chinese => "德国",
+            AppLanguage::PortugueseBrazil => "Alemanha",
         },
         CountryKey::Spain => match language {
             AppLanguage::English => "Spain",
@@ -2035,6 +2275,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Espagne",
             AppLanguage::Romanian => "Spania",
             AppLanguage::Chinese => "西班牙",
+            AppLanguage::PortugueseBrazil => "Espanha",
         },
         CountryKey::Italy => match language {
             AppLanguage::English => "Italy",
@@ -2042,6 +2283,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Italie",
             AppLanguage::Romanian => "Italia",
             AppLanguage::Chinese => "意大利",
+            AppLanguage::PortugueseBrazil => "Itália",
         },
         CountryKey::Netherlands => match language {
             AppLanguage::English => "Netherlands",
@@ -2049,6 +2291,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Pays-Bas",
             AppLanguage::Romanian => "Olanda",
             AppLanguage::Chinese => "荷兰",
+            AppLanguage::PortugueseBrazil => "Holanda",
         },
         CountryKey::Switzerland => match language {
             AppLanguage::English => "Switzerland",
@@ -2056,6 +2299,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Suisse",
             AppLanguage::Romanian => "Elveția",
             AppLanguage::Chinese => "瑞士",
+            AppLanguage::PortugueseBrazil => "Suíça",
         },
         CountryKey::Belgium => match language {
             AppLanguage::English => "Belgium",
@@ -2063,9 +2307,12 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Belgique",
             AppLanguage::Romanian => "Belgia",
             AppLanguage::Chinese => "比利时",
+            AppLanguage::PortugueseBrazil => "Bélgica",
         },
         CountryKey::Portugal => match language {
-            AppLanguage::English | AppLanguage::German | AppLanguage::French => "Portugal",
+            AppLanguage::English | AppLanguage::German | AppLanguage::French | AppLanguage::PortugueseBrazil => {
+                "Portugal"
+            }
             AppLanguage::Romanian => "Portugalia",
             AppLanguage::Chinese => "葡萄牙",
         },
@@ -2075,6 +2322,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Brésil",
             AppLanguage::Romanian => "Brazilia",
             AppLanguage::Chinese => "巴西",
+            AppLanguage::PortugueseBrazil => "Brasil",
         },
         CountryKey::UK => match language {
             AppLanguage::English => "UK",
@@ -2082,6 +2330,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Royaume-Uni",
             AppLanguage::Romanian => "Regatul Unit",
             AppLanguage::Chinese => "英国",
+            AppLanguage::PortugueseBrazil => "Reino Unido",
         },
         CountryKey::USA => match language {
             AppLanguage::English => "USA (average)",
@@ -2089,9 +2338,12 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "États-Unis (moyenne)",
             AppLanguage::Romanian => "SUA (medie)",
             AppLanguage::Chinese => "美国（平均）",
+            AppLanguage::PortugueseBrazil => "Estados Unidos (média)",
         },
         CountryKey::China => match language {
-            AppLanguage::English | AppLanguage::German | AppLanguage::Romanian => "China",
+            AppLanguage::English | AppLanguage::German | AppLanguage::Romanian | AppLanguage::PortugueseBrazil => {
+                "China"
+            }
             AppLanguage::French => "Chine",
             AppLanguage::Chinese => "中国",
         },
@@ -2100,6 +2352,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::German => "Indien",
             AppLanguage::French => "Inde",
             AppLanguage::Chinese => "印度",
+            AppLanguage::PortugueseBrazil => "Índia",
         },
         CountryKey::Indonesia => match language {
             AppLanguage::English => "Indonesia",
@@ -2107,18 +2360,21 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Indonésie",
             AppLanguage::Romanian => "Indonezia",
             AppLanguage::Chinese => "印度尼西亚",
+            AppLanguage::PortugueseBrazil => "Indonésia",
         },
         CountryKey::Philippines => match language {
             AppLanguage::English | AppLanguage::French => "Philippines",
             AppLanguage::German => "Philippinen",
             AppLanguage::Romanian => "Filipine",
             AppLanguage::Chinese => "菲律宾",
+            AppLanguage::PortugueseBrazil => "Filipinas",
         },
         CountryKey::Australia => match language {
             AppLanguage::English | AppLanguage::Romanian => "Australia",
             AppLanguage::German => "Australien",
             AppLanguage::French => "Australie",
             AppLanguage::Chinese => "澳大利亚",
+            AppLanguage::PortugueseBrazil => "Austrália",
         },
         CountryKey::Sweden => match language {
             AppLanguage::English => "Sweden",
@@ -2126,6 +2382,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Suède",
             AppLanguage::Romanian => "Suedia",
             AppLanguage::Chinese => "瑞典",
+            AppLanguage::PortugueseBrazil => "Suécia",
         },
         CountryKey::Poland => match language {
             AppLanguage::English => "Poland",
@@ -2133,6 +2390,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Pologne",
             AppLanguage::Romanian => "Polonia",
             AppLanguage::Chinese => "波兰",
+            AppLanguage::PortugueseBrazil => "Polônia",
         },
         CountryKey::Romania => match language {
             AppLanguage::English => "Romania",
@@ -2140,6 +2398,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Roumanie",
             AppLanguage::Romanian => "România",
             AppLanguage::Chinese => "罗马尼亚",
+            AppLanguage::PortugueseBrazil => "Romênia",
         },
         CountryKey::Iceland => match language {
             AppLanguage::English => "Iceland",
@@ -2147,12 +2406,14 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Islande",
             AppLanguage::Romanian => "Islanda",
             AppLanguage::Chinese => "冰岛",
+            AppLanguage::PortugueseBrazil => "Islândia",
         },
         CountryKey::Georgia => match language {
             AppLanguage::English | AppLanguage::Romanian => "Georgia",
             AppLanguage::German => "Georgien",
             AppLanguage::French => "Géorgie",
             AppLanguage::Chinese => "格鲁吉亚",
+            AppLanguage::PortugueseBrazil => "Geórgia",
         },
         CountryKey::World => match language {
             AppLanguage::English => "World average",
@@ -2160,6 +2421,7 @@ pub fn country_name(language: AppLanguage, country: CountryKey) -> &'static str 
             AppLanguage::French => "Moyenne mondiale",
             AppLanguage::Romanian => "Media mondială",
             AppLanguage::Chinese => "全球平均",
+            AppLanguage::PortugueseBrazil => "Média mundial",
         },
         CountryKey::Custom => custom_preset_name(language),
     }
@@ -2172,6 +2434,7 @@ pub fn custom_preset_name(language: AppLanguage) -> &'static str {
         AppLanguage::French => "Personnalisé",
         AppLanguage::Chinese => "自定义",
         AppLanguage::Romanian => "Personalizat",
+        AppLanguage::PortugueseBrazil => "Personalizado",
     }
 }
 
@@ -2205,6 +2468,7 @@ pub fn psu_class_name(language: AppLanguage, class: PsuClass) -> &'static str {
             AppLanguage::French => "Parfaite",
             AppLanguage::Chinese => "完美",
             AppLanguage::Romanian => "Perfect",
+            AppLanguage::PortugueseBrazil => "Perfeita",
         },
         PsuClass::Basic80 => "80+",
         PsuClass::Bronze80 => "80+ Bronze",
@@ -2325,7 +2589,11 @@ pub fn format_bytes_gb(bytes: u64, language: AppLanguage) -> String {
     }
     let gb = bytes as f64 / (1024.0 * 1024.0 * 1024.0);
     let unit = match language {
-        AppLanguage::English | AppLanguage::German | AppLanguage::Chinese | AppLanguage::Romanian => "GB",
+        AppLanguage::English
+        | AppLanguage::German
+        | AppLanguage::Chinese
+        | AppLanguage::Romanian
+        | AppLanguage::PortugueseBrazil => "GB",
         AppLanguage::French => "Go",
     };
     format!("{} {}", format_number(gb, 2, language), unit)
@@ -2344,7 +2612,11 @@ pub fn metric_unit(language: AppLanguage, metric: MetricKind) -> &'static str {
         MetricKind::Power => "W",
         MetricKind::Usage => "%",
         MetricKind::Speed => match language {
-            AppLanguage::English | AppLanguage::German | AppLanguage::Chinese | AppLanguage::Romanian => "MB/s",
+            AppLanguage::English
+            | AppLanguage::German
+            | AppLanguage::Chinese
+            | AppLanguage::Romanian
+            | AppLanguage::PortugueseBrazil => "MB/s",
             AppLanguage::French => "Mo/s",
         },
     }
@@ -2369,6 +2641,7 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
                 match language {
                     AppLanguage::English | AppLanguage::Chinese => ".",
                     AppLanguage::German | AppLanguage::French | AppLanguage::Romanian => ",",
+                    AppLanguage::PortugueseBrazil => ",",
                 },
                 "0".repeat(decimals)
             )
@@ -2382,10 +2655,12 @@ pub fn format_number(val: f64, decimals: usize, language: AppLanguage) -> String
         AppLanguage::German => ".",
         AppLanguage::French | AppLanguage::Romanian => " ",
         AppLanguage::Chinese => "",
+        AppLanguage::PortugueseBrazil => ".",
     };
     let decimal_sep = match language {
         AppLanguage::English | AppLanguage::Chinese => ".",
         AppLanguage::German | AppLanguage::French | AppLanguage::Romanian => ",",
+        AppLanguage::PortugueseBrazil => ",",
     };
 
     let is_negative = val < 0.0;
@@ -2467,5 +2742,34 @@ mod tests {
         assert_eq!(sensor_name(AppLanguage::German, "Total"), "Gesamt");
         assert_eq!(country_name(AppLanguage::German, CountryKey::Germany), "Deutschland");
         assert_eq!(close_everything(AppLanguage::German), "Alles schließen");
+    }
+
+    #[test]
+    fn brazilian_portuguese_is_selectable_and_round_trips() {
+        assert!(AppLanguage::all().contains(&AppLanguage::PortugueseBrazil));
+        assert_eq!(AppLanguage::PortugueseBrazil.code(), "PT-BR");
+        assert_eq!(AppLanguage::from_code("PT-BR"), AppLanguage::PortugueseBrazil);
+        assert_eq!(AppLanguage::from_code("PT"), AppLanguage::PortugueseBrazil);
+        assert_eq!(AppLanguage::PortugueseBrazil.to_string(), "Português (Brasil)");
+    }
+
+    #[test]
+    fn brazilian_portuguese_number_format_uses_local_separators() {
+        assert_eq!(format_number(12_345.67, 2, AppLanguage::PortugueseBrazil), "12.345,67");
+        assert_eq!(format_number(-0.5, 1, AppLanguage::PortugueseBrazil), "-0,5");
+        assert_eq!(format_number(f64::NAN, 1, AppLanguage::PortugueseBrazil), "0,0");
+    }
+
+    #[test]
+    fn brazilian_portuguese_labels_cover_core_ui_surfaces() {
+        assert_eq!(page_dashboard(AppLanguage::PortugueseBrazil), "Painel");
+        assert_eq!(settings_title(AppLanguage::PortugueseBrazil), "Configurações");
+        assert_eq!(sensor_name(AppLanguage::PortugueseBrazil, "Processes"), "Processos");
+        assert_eq!(
+            country_name(AppLanguage::PortugueseBrazil, CountryKey::Brazil),
+            "Brasil"
+        );
+        assert_eq!(close_everything(AppLanguage::PortugueseBrazil), "Fechar tudo");
+        assert_eq!(format_bytes_gb(1 << 30, AppLanguage::PortugueseBrazil), "1,00 GB");
     }
 }
