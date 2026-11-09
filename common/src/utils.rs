@@ -4,28 +4,12 @@ use std::path::Path;
 #[cfg(windows)]
 use pelite::{FileMap, PeFile};
 
-use crate::types::IconData;
-
-/// Load an icon and a friendly name from `path`.
-///
-/// Icons are retrieved cross-platform via [`file_icon_provider`].
-/// On Windows the friendly name is read from the PE version info using [`pelite`].
-///
-/// Parameters:
-/// - `path`: Path string to an executable or other file.
-///
-/// Returns: `(Option<IconData>, Option<String>)` — the icon as raw RGBA pixel
-/// data (if available) and the friendly name (if available).
-pub fn load_icon_and_name(path: &str) -> (Option<IconData>, Option<String>) {
-    let icon = std::panic::catch_unwind(|| load_icon(path)).unwrap_or_else(|_| {
-        crate::clog!("⚠ Icon extraction panicked for path: {path}");
-        None
-    });
-
+/// Load the Windows PE `FileDescription` from `path`, if available.
+pub fn load_process_name(_path: &str) -> Option<String> {
     #[cfg(windows)]
-    let name = {
-        let fd = std::panic::catch_unwind(|| pe_file_description(Path::new(path))).unwrap_or_else(|_| {
-            crate::clog!("⚠ PE metadata parsing panicked for path: {path}");
+    {
+        let fd = std::panic::catch_unwind(|| pe_file_description(Path::new(_path))).unwrap_or_else(|_| {
+            crate::clog!("⚠ PE metadata parsing panicked for path: {_path}");
             None
         });
         if let Some(fd) = fd {
@@ -33,21 +17,12 @@ pub fn load_icon_and_name(path: &str) -> (Option<IconData>, Option<String>) {
         } else {
             None
         }
-    };
+    }
+
     #[cfg(not(windows))]
-    let name: Option<String> = None;
-
-    (icon, name)
-}
-
-/// Retrieve the system icon for the file at `path` on any platform using [`file_icon_provider`].
-fn load_icon(path: &str) -> Option<IconData> {
-    let icon = file_icon_provider::get_file_icon(path, 32).ok()?;
-    Some(IconData {
-        width: icon.width,
-        height: icon.height,
-        pixels: icon.pixels,
-    })
+    {
+        None
+    }
 }
 
 /// Windows-only: extract the `FileDescription` from the PE version-info resource of the file at `path` using [`pelite`].

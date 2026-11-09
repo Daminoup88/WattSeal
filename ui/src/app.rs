@@ -6,9 +6,9 @@ use common::{
     HardwareInfo, ProcessData, TotalData, UiSettings, generic_name_for_table,
 };
 use iced::{
-    Alignment, Element, Length, Subscription, Task, event,
+    Alignment, ContentFit, Element, Length, Subscription, Task, event,
     time::{Duration, every},
-    widget::{Button, Column, Container, Row, Scrollable, Text, button, checkbox, image, stack},
+    widget::{Button, Column, Container, Row, Scrollable, Text, button, checkbox, image, stack, svg},
     window,
 };
 
@@ -847,11 +847,19 @@ impl App {
                     );
 
                     if let Some(icon_handle) = proc_sensor.get_process_icon(top_proc) {
-                        proc_row = proc_row.push(
-                            image(icon_handle)
+                        let icon: Element<'_, Message, AppTheme> = match icon_handle {
+                            picon::IconHandle::Image(handle) => image(handle)
                                 .width(Length::Fixed(16.0))
-                                .height(Length::Fixed(16.0)),
-                        );
+                                .height(Length::Fixed(16.0))
+                                .content_fit(ContentFit::Contain)
+                                .into(),
+                            picon::IconHandle::Svg(handle) => svg(handle)
+                                .width(Length::Fixed(16.0))
+                                .height(Length::Fixed(16.0))
+                                .content_fit(ContentFit::Contain)
+                                .into(),
+                        };
+                        proc_row = proc_row.push(icon);
                     }
 
                     let range = proc_sensor.current_time_range();

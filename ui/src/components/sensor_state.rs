@@ -7,15 +7,15 @@ use std::{
 
 use chrono::{DateTime, Duration, Local, Timelike};
 use common::{
-    ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, IconData, MetricKind, NetworkData, ProcessData, RamData,
-    SecondaryValues, TotalData, utils::load_icon_and_name,
+    ComputedSensorData, DatabaseEntry, DiskData, EnergyUj, MetricKind, NetworkData, ProcessData, RamData,
+    SecondaryValues, TotalData, utils::load_process_name,
 };
 use iced::{
     Alignment, ContentFit, Element, Length, Padding, Task,
     widget::{
         Button, Column, Container, Row, Scrollable, Space, Text, button, image, pick_list,
         scrollable::{Direction, Scrollbar},
-        text_input, tooltip,
+        svg, text_input, tooltip,
     },
 };
 
@@ -319,8 +319,7 @@ impl TotalState {
 
 struct ProcessesState {
     top_processes: Vec<ProcessData>,
-    icon_handles: HashMap<String, image::Handle>,
-    icon_cache: HashMap<String, (Option<IconData>, Option<String>)>,
+    icon_cache: HashMap<String, (Option<picon::IconHandle>, Option<String>)>,
     limit_choice: ProcessLimit,
     custom_limit_input: String,
 }
@@ -329,7 +328,6 @@ impl ProcessesState {
     fn new() -> Self {
         Self {
             top_processes: Vec::new(),
-            icon_handles: HashMap::new(),
             icon_cache: HashMap::new(),
             limit_choice: ProcessLimit::default(),
             custom_limit_input: "15".to_string(),
@@ -367,45 +365,36 @@ impl ProcessesState {
 
         for process in &mut next_top {
             if let Some(exe_path) = &process.measured.process_exe_path {
-                let path = Path::new(exe_path);
-                if !path.is_absolute() {
-                    continue;
-                }
-                let entry = self.icon_cache.entry(exe_path.clone()).or_insert_with(|| {
-                    if path.is_file() {
-                        load_icon_and_name(exe_path)
-                    } else {
-                        (None, None)
+                let entry = self.icon_cache.entry(process_identity(process)).or_insert_with(|| {
+                    let path = Path::new(exe_path);
+                    if !path.is_absolute() || !path.is_file() {
+                        return (None, None);
                     }
+
+                    #[cfg(any(target_os = "windows", target_os = "macos"))]
+                    let icon_input = Some(exe_path.as_str());
+                    #[cfg(not(any(target_os = "windows", target_os = "macos")))]
+                    let icon_input = path.file_name().and_then(|name| name.to_str());
+
+                    (icon_input.and_then(picon::get_icon), load_process_name(exe_path))
                 });
-                process.icon = entry.0.clone();
                 if let Some(ref friendly_name) = entry.1 {
                     process.measured.app_name = friendly_name.clone();
                 }
             }
         }
 
-        for process in &next_top {
-            if let Some(icon_data) = &process.icon {
-                self.icon_handles.insert(
-                    process_identity(process),
-                    image::Handle::from_rgba(icon_data.width, icon_data.height, icon_data.pixels.clone()),
-                );
-            }
-        }
-
-        self.icon_handles
-            .retain(|key, _| next_top.iter().any(|process| process_identity(process) == *key));
         self.top_processes = next_top;
     }
 
     fn clear(&mut self) {
         self.top_processes.clear();
-        self.icon_handles.clear();
     }
 
-    fn icon_handle_for(&self, process: &ProcessData) -> Option<image::Handle> {
-        self.icon_handles.get(&process_identity(process)).cloned()
+    fn icon_handle_for(&self, process: &ProcessData) -> Option<picon::IconHandle> {
+        self.icon_cache
+            .get(&process_identity(process))
+            .and_then(|(icon, _)| icon.clone())
     }
 }
 
@@ -506,7 +495,7 @@ impl SensorState {
     }
 
     /// Returns the cached icon handle for a process.
-    pub fn get_process_icon(&self, process: &ProcessData) -> Option<image::Handle> {
+    pub fn get_process_icon(&self, process: &ProcessData) -> Option<picon::IconHandle> {
         if let SensorCategory::Processes(state) = &self.sensor_category {
             state.icon_handle_for(process)
         } else {
@@ -1093,15 +1082,19 @@ impl SensorState {
     }
 }
 
-fn process_icon_cell(cached_handle: Option<image::Handle>) -> Element<'static, Message, AppTheme> {
-    let icon: Element<'static, Message, AppTheme> = if let Some(handle) = cached_handle {
-        image(handle)
+fn process_icon_cell(cached_handle: Option<picon::IconHandle>) -> Element<'static, Message, AppTheme> {
+    let icon: Element<'static, Message, AppTheme> = match cached_handle {
+        Some(picon::IconHandle::Image(handle)) => image(handle)
             .width(Length::Fixed(PROCESS_ICON_SIZE))
             .height(Length::Fixed(PROCESS_ICON_SIZE))
             .content_fit(ContentFit::Contain)
-            .into()
-    } else {
-        Space::new().into()
+            .into(),
+        Some(picon::IconHandle::Svg(handle)) => svg(handle)
+            .width(Length::Fixed(PROCESS_ICON_SIZE))
+            .height(Length::Fixed(PROCESS_ICON_SIZE))
+            .content_fit(ContentFit::Contain)
+            .into(),
+        None => Space::new().into(),
     };
 
     Container::new(icon)
@@ -1184,5 +1177,36 @@ mod tests {
 
         assert!(state.set_custom_limit_input("0".to_string()));
         assert_eq!(state.limit(), 1);
+    }
+
+    #[test]
+    fn process_icon_cache_skips_missing_or_invalid_paths() {
+        let missing_path =
+            std::env::temp_dir().join(format!("wattseal-missing-process-icon-{}.exe", std::process::id()));
+        assert!(!missing_path.is_file());
+
+        let mut relative_path = ProcessData::default();
+        relative_path.measured.process_exe_path = Some("relative.exe".to_string());
+        let mut nonexistent_path = ProcessData::default();
+        nonexistent_path.measured.process_exe_path = Some(missing_path.to_string_lossy().into_owned());
+
+        let mut state = ProcessesState::new();
+        state.update_from_snapshot(&[ProcessData::default(), relative_path, nonexistent_path]);
+
+        assert_eq!(state.icon_cache.len(), 2);
+        assert!(
+            state
+                .icon_cache
+                .values()
+                .all(|(icon, name)| icon.is_none() && name.is_none())
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn picon_returns_none_for_a_nonexistent_executable() {
+        let path = std::env::temp_dir().join(format!("wattseal-no-icon-{}.exe", std::process::id()));
+        assert!(!path.exists());
+        assert!(picon::get_icon(path.to_string_lossy().into_owned()).is_none());
     }
 }

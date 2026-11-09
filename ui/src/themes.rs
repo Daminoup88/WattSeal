@@ -142,6 +142,18 @@ impl Base for AppTheme {
     }
 }
 
+impl iced::widget::svg::Catalog for AppTheme {
+    type Class<'a> = iced::widget::svg::StyleFn<'a, Self>;
+
+    fn default<'a>() -> Self::Class<'a> {
+        Box::new(|_, _| iced::widget::svg::Style::default())
+    }
+
+    fn style(&self, class: &Self::Class<'_>, status: iced::widget::svg::Status) -> iced::widget::svg::Style {
+        class(self, status)
+    }
+}
+
 impl AppTheme {
     /// Resolves a theme by its English display name, falling back to the default.
     pub fn from_name(name: &str) -> Self {

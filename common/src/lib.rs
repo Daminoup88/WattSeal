@@ -20,8 +20,8 @@ macro_rules! clog {
 pub use database::{CloseBehavior, Database, DatabaseEntry, DatabaseError, UiSettings, generic_name_for_table};
 pub use singleton::SingletonGuard;
 pub use types::{
-    AllTimeData, CPUData, ComputedSensorData, ConsumptionUnit, DiskData, EnergyUj, GPUData, HardwareInfo, IconData,
-    LabeledValue, MICROJOULES_PER_JOULE, MetricKind, MetricSample, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR,
+    AllTimeData, CPUData, ComputedSensorData, ConsumptionUnit, DiskData, EnergyUj, GPUData, HardwareInfo, LabeledValue,
+    MICROJOULES_PER_JOULE, MetricKind, MetricSample, NetworkData, ProcessData, RamData, SECONDS_PER_HOUR,
     SecondaryValues, SensorData, TotalData,
 };
 

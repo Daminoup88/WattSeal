@@ -8,6 +8,7 @@ common = { path = "../common" }
 open = "5"
 iced = { version = "0.14.0", features = ["advanced", "tokio", "image"] }
 image = { version = "0.25", default-features = false, features = ["png"] }
+picon = "0.1.0"
 plotters-iced2 = "0.14"
 chrono = "0.4.44"
 plotters = "0.3.7"

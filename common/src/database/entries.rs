@@ -307,7 +307,6 @@ impl DatabaseEntry for ProcessData {
             },
             process_energy: row.get("process_energy_uj")?,
             subprocess_count: row.get("subprocess_count")?,
-            icon: None,
         })
     }
 

@@ -280,14 +280,6 @@ pub struct NetworkData<E = EnergyUj> {
     pub uploaded_bytes: Byte,
 }
 
-/// Raw RGBA icon pixel data.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct IconData {
-    pub width: u32,
-    pub height: u32,
-    pub pixels: Vec<u8>,
-}
-
 /// Measured process details (raw resource metrics).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MeasuredProcessData {
@@ -307,7 +299,6 @@ pub struct ProcessData<E = EnergyUj> {
     pub measured: MeasuredProcessData,
     pub process_energy: E,
     pub subprocess_count: u32,
-    pub icon: Option<IconData>,
 }
 
 /// Tagged union of all raw measured sensor reading types.
@@ -745,7 +736,6 @@ impl ComputedSensorData {
                         measured: p.measured.clone(),
                         process_energy: p.process_energy.to_wh(),
                         subprocess_count: p.subprocess_count,
-                        icon: p.icon.clone(),
                     })
                     .collect();
                 ComputedSensorData::Process(converted_processes)
@@ -1118,7 +1108,6 @@ impl Default for ProcessData {
             measured: MeasuredProcessData::default(),
             process_energy: EnergyUj(0),
             subprocess_count: 0,
-            icon: None,
         }
     }
 }
