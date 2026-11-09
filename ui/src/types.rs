@@ -177,9 +177,9 @@ impl AppLanguage {
             AppLanguage::English,
             AppLanguage::French,
             AppLanguage::Chinese,
+            AppLanguage::PortugueseBrazil,
             AppLanguage::German,
             AppLanguage::Romanian,
-            AppLanguage::PortugueseBrazil,
         ]
     }
 
