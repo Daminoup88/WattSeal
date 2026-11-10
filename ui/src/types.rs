@@ -168,6 +168,7 @@ pub enum AppLanguage {
     German,
     Romanian,
     PortugueseBrazil,
+    Russian,
 }
 
 impl AppLanguage {
@@ -178,6 +179,7 @@ impl AppLanguage {
             AppLanguage::French,
             AppLanguage::Chinese,
             AppLanguage::PortugueseBrazil,
+            AppLanguage::Russian,
             AppLanguage::German,
             AppLanguage::Romanian,
         ]
@@ -192,6 +194,7 @@ impl AppLanguage {
             AppLanguage::Chinese => "ZH",
             AppLanguage::Romanian => "RO",
             AppLanguage::PortugueseBrazil => "PT-BR",
+            AppLanguage::Russian => "RU",
         }
     }
 
@@ -205,6 +208,7 @@ impl AppLanguage {
             "RO" => AppLanguage::Romanian,
             // "PT" comes from the OS locale (only the part before the "-" is read)
             "PT-BR" | "PT" => AppLanguage::PortugueseBrazil,
+            "RU" => AppLanguage::Russian,
             _ => AppLanguage::English,
         }
     }
@@ -233,6 +237,7 @@ impl Display for AppLanguage {
             AppLanguage::Chinese => write!(f, "简体中文"),
             AppLanguage::Romanian => write!(f, "Română"),
             AppLanguage::PortugueseBrazil => write!(f, "Português (Brasil)"),
+            AppLanguage::Russian => write!(f, "Русский"),
         }
     }
 }
