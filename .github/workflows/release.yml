@@ -84,6 +84,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
+            WattSeal-windows-portable.exe
             WattSeal-windows.exe
             WattSeal-linux
             WattSeal-macos
