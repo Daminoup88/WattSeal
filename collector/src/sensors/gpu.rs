@@ -208,7 +208,7 @@ pub fn get_gpu_adapters() -> Vec<GpuAdapter> {
     if let Ok(gpus) = sysinfo::Gpus::new_with_refreshed_list() {
         if !gpus.is_empty() {
             let amdgpu_ids = installed_amdgpu_ids();
-            let mut adapters: Vec<_> = gpus
+            let adapters: Vec<_> = gpus
                 .iter()
                 .map(|gpu| {
                     let model = gpu
@@ -339,20 +339,24 @@ pub struct GPUSensor {
 
 impl Sensor for GPUSensor {
     fn read_full_data(&self) -> Result<SensorData, SensorError> {
-        let mut data = match &self.inner {
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensorInner::Nvidia(sensor) => sensor.read_full_data()?,
-            #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensorInner::Amd(sensor) => sensor.read_full_data()?,
-            #[cfg(target_os = "windows")]
-            GPUSensorInner::Intel { sensor } => sensor.read_full_data()?,
-            #[cfg(not(any(target_os = "windows", target_os = "linux")))]
-            _ => return Err(SensorError::NotSupported),
-        };
-        if let SensorData::GPU(ref mut gpu) = data {
-            gpu.name = Some(self.name());
+        #[cfg(any(target_os = "windows", target_os = "linux"))]
+        {
+            let mut data = match &self.inner {
+                #[cfg(any(target_os = "windows", target_os = "linux"))]
+                GPUSensorInner::Nvidia(sensor) => sensor.read_full_data()?,
+                #[cfg(any(target_os = "windows", target_os = "linux"))]
+                GPUSensorInner::Amd(sensor) => sensor.read_full_data()?,
+                #[cfg(target_os = "windows")]
+                GPUSensorInner::Intel { sensor } => sensor.read_full_data()?,
+            };
+            if let SensorData::GPU(ref mut gpu) = data {
+                gpu.name = Some(self.name());
+            }
+            Ok(data)
         }
-        Ok(data)
+
+        #[cfg(not(any(target_os = "windows", target_os = "linux")))]
+        Err(SensorError::NotSupported)
     }
 
     fn read_initial_info(&self) -> Result<InitialInfo, SensorError> {
@@ -366,6 +370,7 @@ impl Sensor for GPUSensor {
 
 /// Creates a GPU energy sensor for the given adapter and display index.
 pub fn get_gpu_energy_sensor(adapter: &GpuAdapter, index: u32) -> Result<SensorType, SensorError> {
+    #[cfg(any(target_os = "windows", target_os = "linux"))]
     let name = format!("{} ({})", adapter.name, index);
 
     #[cfg(target_os = "windows")]
@@ -400,6 +405,7 @@ pub fn get_gpu_energy_sensor(adapter: &GpuAdapter, index: u32) -> Result<SensorT
     }
 }
 
+#[cfg(any(target_os = "windows", target_os = "linux"))]
 fn names_match(left: &str, right: &str) -> bool {
     let left = left.to_lowercase();
     let right = right.to_lowercase();
@@ -408,10 +414,10 @@ fn names_match(left: &str, right: &str) -> bool {
 
 impl GPUSensor {
     /// Returns per-process GPU utilization percentages.
-    pub fn get_process_gpu_usage(&self, current_timestamp: u64) -> Result<HashMap<u32, f64>, SensorError> {
+    pub fn get_process_gpu_usage(&self, _current_timestamp: u64) -> Result<HashMap<u32, f64>, SensorError> {
         match &self.inner {
             #[cfg(any(target_os = "windows", target_os = "linux"))]
-            GPUSensorInner::Nvidia(sensor) => sensor.get_processes_gpu_usage(current_timestamp),
+            GPUSensorInner::Nvidia(sensor) => sensor.get_processes_gpu_usage(_current_timestamp),
             #[cfg(any(target_os = "windows", target_os = "linux"))]
             GPUSensorInner::Amd(_) => Err(SensorError::NotSupported),
             #[cfg(target_os = "windows")]

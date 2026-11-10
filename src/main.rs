@@ -280,10 +280,7 @@ fn appindicator_available() -> bool {
     ];
     CANDIDATES
         .iter()
-        .any(|name| match unsafe { libloading::Library::new(name) } {
-            Ok(lib) => true,
-            Err(_) => false,
-        })
+        .any(|name| unsafe { libloading::Library::new(name).is_ok() })
 }
 
 /// Linux: try to initialise GTK, create the tray icon and run the GTK event loop.
