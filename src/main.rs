@@ -483,6 +483,23 @@ fn main() {
     // Doesn't run in headless mode
     let (tx, rx) = mpsc::channel::<Result<(), String>>();
 
+    // Windows/macOS: system tray + winit event loop
+    #[cfg(not(target_os = "linux"))]
+    let event_loop = {
+        #[cfg(target_os = "macos")]
+        {
+            use winit::platform::macos::{ActivationPolicy, EventLoopBuilderExtMacOS};
+
+            let mut builder = EventLoop::builder();
+            builder.with_activation_policy(ActivationPolicy::Accessory);
+            builder.build()
+        }
+        #[cfg(not(target_os = "macos"))]
+        {
+            EventLoop::new()
+        }
+    };
+
     let options_clone = options.clone();
     thread::spawn(move || {
         let (collector, connectors) = match init_collector_and_connectors(&options_clone) {
@@ -518,7 +535,7 @@ fn main() {
     // Windows/macOS: system tray + winit event loop
     #[cfg(not(target_os = "linux"))]
     {
-        let event_loop = match EventLoop::new() {
+        let event_loop = match event_loop {
             Ok(loop_handle) => loop_handle,
             Err(e) => {
                 common::clog!("✗ Failed to create event loop: {e}");
