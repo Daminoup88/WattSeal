@@ -112,7 +112,13 @@ jobs:
 
       - name: Install Inno Setup
         if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
-        run: choco install innosetup --yes --no-progress
+        shell: pwsh
+        run: |
+          $Inno7Path = "C:\Program Files\Inno Setup 7"
+          
+          winget install --id JRSoftware.InnoSetup.7 -e -s winget --location "$Inno7Path"
+          
+          echo "INNO_7_DIR=$Inno7Path" >> $env:GITHUB_ENV
 
       - name: Build Windows installer
         if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
@@ -123,7 +129,7 @@ jobs:
             throw "Could not read the workspace version from Cargo.toml"
           }
           $version = $versionMatch.Matches[0].Groups[1].Value
-          $compiler = (Get-Command ISCC.exe -ErrorAction Stop).Source
+          $compiler = Join-Path $env:INNO_7_DIR "ISCC.exe"
           & $compiler "/DMyAppVersion=$version" "resources\windows\wattseal.iss"
           if ($LASTEXITCODE -ne 0) {
             throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
