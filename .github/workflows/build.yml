@@ -36,7 +36,8 @@ jobs:
           - os: windows-latest
             os-name: Windows x64
             binary-src: target/release/WattSeal.exe
-            binary-dst-base: WattSeal-windows
+            binary-dst-base: WattSeal-windows-portable
+            installer-dst: WattSeal-windows.exe
             ext: .exe
 
           - os: ubuntu-latest
@@ -44,11 +45,13 @@ jobs:
             zigbuild-target: x86_64-unknown-linux-gnu.2.17
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
             binary-dst-base: WattSeal-linux
+            installer-dst: ""
 
           - os: macos-latest
             os-name: macOS arm64
             binary-src: target/release/WattSeal
             binary-dst-base: WattSeal-macos
+            installer-dst: ""
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
@@ -107,6 +110,26 @@ jobs:
             format('cargo zigbuild --release --target {0}', matrix.zigbuild-target) ||
             'cargo build --release' }}
 
+      - name: Install Inno Setup
+        if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build Windows installer
+        if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
+        shell: pwsh
+        run: |
+          $versionMatch = Select-String -Path Cargo.toml -Pattern '^version = "([^"]+)"$' | Select-Object -First 1
+          if (-not $versionMatch) {
+            throw "Could not read the workspace version from Cargo.toml"
+          }
+          $version = $versionMatch.Matches[0].Groups[1].Value
+          $compiler = (Get-Command ISCC.exe -ErrorAction Stop).Source
+          & $compiler "/DMyAppVersion=$version" "resources\windows\wattseal.iss"
+          if ($LASTEXITCODE -ne 0) {
+            throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
+          }
+          Copy-Item "resources\windows\Output\WattSeal-windows.exe" .
+
       - name: Package
         if: ${{ !inputs.check-only }}
         shell: bash
@@ -120,4 +143,6 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}
-          path: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
+          path: |
+            ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
+            ${{ matrix.installer-dst }}
