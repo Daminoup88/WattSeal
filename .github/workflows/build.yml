@@ -37,7 +37,7 @@ jobs:
             os-name: Windows x64
             binary-src: target/release/WattSeal.exe
             binary-dst-base: WattSeal-windows-portable
-            installer-dst: WattSeal-windows.exe
+            installer-dst-base: WattSeal-windows
             ext: .exe
 
           - os: ubuntu-latest
@@ -45,13 +45,13 @@ jobs:
             zigbuild-target: x86_64-unknown-linux-gnu.2.17
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
             binary-dst-base: WattSeal-linux
-            installer-dst: ""
+            installer-dst-base: ""
 
           - os: macos-latest
             os-name: macOS arm64
             binary-src: target/release/WattSeal
             binary-dst-base: WattSeal-macos
-            installer-dst: ""
+            installer-dst-base: ""
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
@@ -112,7 +112,13 @@ jobs:
 
       - name: Install Inno Setup
         if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
-        run: choco install innosetup --yes --no-progress
+        shell: pwsh
+        run: |
+          $Inno7Path = "C:\Program Files\Inno Setup 7"
+          
+          winget install --id JRSoftware.InnoSetup.7 -e -s winget --location "$Inno7Path"
+          
+          echo "INNO_7_DIR=$Inno7Path" >> $env:GITHUB_ENV
 
       - name: Build Windows installer
         if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
@@ -123,12 +129,13 @@ jobs:
             throw "Could not read the workspace version from Cargo.toml"
           }
           $version = $versionMatch.Matches[0].Groups[1].Value
-          $compiler = (Get-Command ISCC.exe -ErrorAction Stop).Source
+          $compiler = Join-Path $env:INNO_7_DIR "ISCC.exe"
           & $compiler "/DMyAppVersion=$version" "resources\windows\wattseal.iss"
           if ($LASTEXITCODE -ne 0) {
             throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
           }
-          Copy-Item "resources\windows\Output\WattSeal-windows.exe" .
+          $installerDst = "${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          Copy-Item "resources\windows\Output\WattSeal-windows.exe" $installerDst
 
       - name: Package
         if: ${{ !inputs.check-only }}
@@ -138,11 +145,16 @@ jobs:
           cp "${{ matrix.binary-src }}" "$FINAL_DST"
           chmod +x "$FINAL_DST" 2>/dev/null || true
 
-      - name: Upload artifact
+      - name: Upload portable artifact
         if: ${{ !inputs.check-only && inputs.upload-artifacts }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}
-          path: |
-            ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
-            ${{ matrix.installer-dst }}
+          path: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
+
+      - name: Upload installer artifact
+        if: ${{ !inputs.check-only && inputs.upload-artifacts && matrix.installer-dst-base != '' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}
+          path: ${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}

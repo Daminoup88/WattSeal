@@ -83,6 +83,7 @@ jobs:
       - uses: softprops/action-gh-release@v3
         with:
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
             WattSeal-windows-portable.exe
             WattSeal-windows.exe
