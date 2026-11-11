@@ -88,4 +88,4 @@ jobs:
             WattSeal-windows-portable.exe
             WattSeal-windows.exe
             WattSeal-linux
-            WattSeal-macos
+            WattSeal-macos.dmg

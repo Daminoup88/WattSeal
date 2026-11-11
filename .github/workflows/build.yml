@@ -46,12 +46,14 @@ jobs:
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
             binary-dst-base: WattSeal-linux
             installer-dst-base: ""
+            ext: ""
 
-          - os: macos-latest
+          - os: macos-26
             os-name: macOS arm64
             binary-src: target/release/WattSeal
-            binary-dst-base: WattSeal-macos
-            installer-dst-base: ""
+            binary-dst-base: ""
+            installer-dst-base: WattSeal-macos
+            ext: .dmg
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
@@ -71,20 +73,38 @@ jobs:
       - name: Append version suffix
         if: inputs.version-suffix != ''
         shell: python
+        env:
+          VERSION_SUFFIX: ${{ inputs.version-suffix }}
         run: |
+          import os
           import re
+
           with open("Cargo.toml", "r", encoding="utf-8") as f:
               content = f.read()
-          match = re.search(r'^version = "(\d+)\.(\d+)\.(\d+)"', content, re.MULTILINE)
-          major, minor, patch = match.group(1), match.group(2), int(match.group(3)) + 1
-          new_version = f'{major}.{minor}.{patch}${{ inputs.version-suffix }}'
+
+          match = re.search(
+              r'^version = "(\d+)\.(\d+)\.(\d+)"',
+              content,
+              re.MULTILINE
+          )
+          if not match:
+              raise RuntimeError("Could not parse Cargo version")
+
+          major, minor = match.group(1), match.group(2)
+          patch = int(match.group(3)) + 1
+          new_version = f'{major}.{minor}.{patch}{os.environ["VERSION_SUFFIX"]}'
+
           new_content = re.sub(
               r'^version = "\d+\.\d+\.\d+"',
               f'version = "{new_version}"',
-              content, count=1, flags=re.MULTILINE
+              content,
+              count=1,
+              flags=re.MULTILINE
           )
+
           with open("Cargo.toml", "w", encoding="utf-8") as f:
               f.write(new_content)
+
           print(f"Version set to {new_version}")
 
       - name: Install cargo-zigbuild
@@ -109,6 +129,109 @@ jobs:
           ${{ matrix.zigbuild-target != '' &&
             format('cargo zigbuild --release --target {0}', matrix.zigbuild-target) ||
             'cargo build --release' }}
+
+      - name: Package macOS app and disk image
+        if: ${{ !inputs.check-only && matrix.os == 'macos-26' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          executable="${{ matrix.binary-src }}"
+          file "$executable"
+          architectures="$(lipo -archs "$executable")"
+          echo "Architectures: $architectures"
+          [[ " $architectures " == *" arm64 "* ]] || {
+            echo "The macOS build must contain arm64" >&2
+            exit 1
+          }
+
+          version="$(awk '
+            /^\[workspace\.package\]/ { in_workspace_package = 1; next }
+            /^\[/ { in_workspace_package = 0 }
+            in_workspace_package && /^version[[:space:]]*=/ {
+              gsub(/"/, "", $3)
+              print $3
+              exit
+            }
+          ' Cargo.toml)"
+          if [[ -z "$version" ]]; then
+            echo "Could not read the workspace version from Cargo.toml" >&2
+            exit 1
+          fi
+          bundle_version="$(printf '%s' "$version" | sed -E 's/[-+].*$//')"
+          if [[ ! "$bundle_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid numeric bundle version derived from $version: $bundle_version" >&2
+            exit 1
+          fi
+
+          app="WattSeal.app"
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          cp "$executable" "$app/Contents/MacOS/WattSeal"
+          chmod 755 "$app/Contents/MacOS/WattSeal"
+          cp resources/macos/AppIcon.icns "$app/Contents/Resources/AppIcon.icns"
+
+          cat > "$app/Contents/Info.plist" <<PLIST
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleExecutable</key>
+            <string>WattSeal</string>
+            <key>CFBundleName</key>
+            <string>WattSeal</string>
+            <key>CFBundleDisplayName</key>
+            <string>WattSeal</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleIdentifier</key>
+            <string>com.wattseal.app</string>
+            <key>CFBundleInfoDictionaryVersion</key>
+            <string>6.0</string>
+            <key>CFBundleShortVersionString</key>
+            <string>$bundle_version</string>
+            <key>CFBundleVersion</key>
+            <string>$bundle_version</string>
+            <key>CFBundleIconFile</key>
+            <string>AppIcon</string>
+          </dict>
+          </plist>
+          PLIST
+          plutil -lint "$app/Contents/Info.plist"
+          bundle_executable="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist")"
+          test "$bundle_executable" = "$(basename "$app/Contents/MacOS/WattSeal")"
+          test -x "$app/Contents/MacOS/$bundle_executable"
+          bundle_icon="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$app/Contents/Info.plist")"
+          test -s "$app/Contents/Resources/$bundle_icon.icns"
+          test -s "$app/Contents/Resources/AppIcon.icns"
+          iconset="$RUNNER_TEMP/wattseal-icon.iconset"
+          iconutil -c iconset "$app/Contents/Resources/AppIcon.icns" -o "$iconset"
+          test -n "$(find "$iconset" -name '*.png' -print -quit)"
+
+          dmg_root="$RUNNER_TEMP/wattseal-dmg-root"
+          mountpoint="$RUNNER_TEMP/wattseal-dmg-mount"
+          mkdir -p "$dmg_root" "$mountpoint"
+          ditto "$app" "$dmg_root/WattSeal.app"
+          ln -s /Applications "$dmg_root/Applications"
+          image="${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          hdiutil create -volname WattSeal -srcfolder "$dmg_root" \
+            -format UDZO -ov "$image"
+          test -s "$image"
+          hdiutil verify "$image"
+          mounted=0
+          cleanup() {
+            if [[ "$mounted" -eq 1 ]]; then
+              hdiutil detach "$mountpoint"
+            fi
+          }
+          trap cleanup EXIT
+          hdiutil attach "$image" -nobrowse -readonly -mountpoint "$mountpoint"
+          mounted=1
+          test -d "$mountpoint/WattSeal.app"
+          test -L "$mountpoint/Applications"
+          test "$(readlink "$mountpoint/Applications")" = /Applications
+          hdiutil detach "$mountpoint"
+          mounted=0
+          trap - EXIT
 
       - name: Install Inno Setup
         if: ${{ !inputs.check-only && matrix.os == 'windows-latest' }}
@@ -138,7 +261,7 @@ jobs:
           Copy-Item "resources\windows\Output\WattSeal-windows.exe" $installerDst
 
       - name: Package
-        if: ${{ !inputs.check-only }}
+        if: ${{ !inputs.check-only && matrix.binary-dst-base != '' }}
         shell: bash
         run: |
           FINAL_DST="${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
@@ -146,7 +269,7 @@ jobs:
           chmod +x "$FINAL_DST" 2>/dev/null || true
 
       - name: Upload portable artifact
-        if: ${{ !inputs.check-only && inputs.upload-artifacts }}
+        if: ${{ !inputs.check-only && inputs.upload-artifacts && matrix.binary-dst-base != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}
