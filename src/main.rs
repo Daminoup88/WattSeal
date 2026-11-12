@@ -24,6 +24,54 @@ use winit::{
     window::WindowId,
 };
 
+#[cfg(target_os = "windows")]
+fn attach_console_for_cli() {
+    use std::os::windows::io::RawHandle;
+
+    use windows_sys::Win32::{
+        Foundation::{ERROR_ACCESS_DENIED, GENERIC_WRITE, INVALID_HANDLE_VALUE},
+        Storage::FileSystem::{CreateFileW, FILE_SHARE_READ, FILE_SHARE_WRITE, OPEN_EXISTING},
+        System::Console::{ATTACH_PARENT_PROCESS, AttachConsole, STD_ERROR_HANDLE, STD_OUTPUT_HANDLE, SetStdHandle},
+    };
+
+    // No arguments means a normal GUI launch.
+    if std::env::args_os().nth(1).is_none() {
+        return;
+    }
+
+    // Attach to the launching terminal. ERROR_ACCESS_DENIED also means that this process is already attached to a console, which is fine.
+    if unsafe { AttachConsole(ATTACH_PARENT_PROCESS) } == 0 {
+        let error = std::io::Error::last_os_error();
+        if error.raw_os_error() != Some(ERROR_ACCESS_DENIED as i32) {
+            return;
+        }
+    }
+
+    // Open the console output device and redirect both standard streams.
+    let console_name: Vec<u16> = "CONOUT$\0".encode_utf16().collect();
+    let console = unsafe {
+        CreateFileW(
+            console_name.as_ptr(),
+            GENERIC_WRITE,
+            FILE_SHARE_READ | FILE_SHARE_WRITE,
+            std::ptr::null(),
+            OPEN_EXISTING,
+            0,
+            std::ptr::null_mut(),
+        )
+    };
+    if console == INVALID_HANDLE_VALUE {
+        return;
+    }
+
+    // Keep this handle alive for the process lifetime: the standard handles reference it, and Windows reclaims it when the process exits.
+    let console = console as RawHandle;
+    unsafe {
+        SetStdHandle(STD_OUTPUT_HANDLE, console as _);
+        SetStdHandle(STD_ERROR_HANDLE, console as _);
+    }
+}
+
 /// Configuration options for the application.
 #[derive(Debug, Clone)]
 struct Options {
@@ -414,6 +462,9 @@ fn run_collector_loop(mut collector: Collector, mut connectors: Connectors) {
 }
 
 fn main() {
+    #[cfg(target_os = "windows")]
+    attach_console_for_cli();
+
     let options = options().run();
     common::paths::init(options.data_dir.as_ref());
 

@@ -5884,6 +5884,7 @@ dependencies = [
  "runas",
  "tray-icon",
  "ui",
+ "windows-sys 0.61.2",
  "winit",
  "winres",
 ]

@@ -47,6 +47,7 @@ bpaf = { version = "0.9.26", features = ["derive", "dull-color"] }
 
 [target.'cfg(windows)'.dependencies]
 runas = "1.2"
+windows-sys = { version = "0.61.2", features = ["Win32_Foundation", "Win32_Storage_FileSystem", "Win32_System_Console"] }
 
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 winit = "0.30.13"
