@@ -37,23 +37,26 @@ jobs:
             os-name: Windows x64
             binary-src: target/release/WattSeal.exe
             binary-dst-base: WattSeal-windows-portable
+            binary-ext: .exe
             installer-dst-base: WattSeal-windows
-            ext: .exe
+            installer-ext: .exe
 
           - os: ubuntu-latest
             os-name: Linux x64
             zigbuild-target: x86_64-unknown-linux-gnu.2.17
             binary-src: target/x86_64-unknown-linux-gnu/release/WattSeal
-            binary-dst-base: WattSeal-linux
-            installer-dst-base: ""
-            ext: ""
+            binary-dst-base: WattSeal-linux-portable
+            binary-ext: ""
+            installer-dst-base: WattSeal-linux
+            installer-ext: .AppImage
 
           - os: macos-26
             os-name: macOS arm64
             binary-src: target/release/WattSeal
             binary-dst-base: ""
+            binary-ext: ""
             installer-dst-base: WattSeal-macos
-            ext: .dmg
+            installer-ext: .dmg
 
     runs-on: ${{ matrix.os }}
     timeout-minutes: ${{ inputs.check-only && 15 || 60 }}
@@ -116,7 +119,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
-            libgtk-3-dev pkg-config \
+            desktop-file-utils libgtk-3-bin libgtk-3-dev pkg-config xvfb \
             libxkbcommon-dev libwayland-dev
 
       - name: Check
@@ -129,6 +132,65 @@ jobs:
           ${{ matrix.zigbuild-target != '' &&
             format('cargo zigbuild --release --target {0}', matrix.zigbuild-target) ||
             'cargo build --release' }}
+
+      - name: Package Linux AppImage
+        if: ${{ !inputs.check-only && matrix.os == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          executable="${{ matrix.binary-src }}"
+          test -x "$executable"
+          appdir="$RUNNER_TEMP/WattSeal.AppDir"
+          mkdir -p "$appdir/usr/bin" \
+            "$appdir/usr/share/applications" \
+            "$appdir/usr/share/icons/hicolor/512x512/apps"
+          install -m 755 "$executable" "$appdir/usr/bin/WattSeal"
+          install -m 644 resources/linux/WattSeal.desktop \
+            "$appdir/usr/share/applications/WattSeal.desktop"
+          install -m 644 resources/icon.png \
+            "$appdir/usr/share/icons/hicolor/512x512/apps/WattSeal.png"
+          ln -s usr/share/applications/WattSeal.desktop "$appdir/WattSeal.desktop"
+          ln -s usr/share/icons/hicolor/512x512/apps/WattSeal.png "$appdir/WattSeal.png"
+          ln -s WattSeal.png "$appdir/.DirIcon"
+          cat > "$appdir/AppRun" <<'APPRUN'
+          #!/bin/sh
+          exec "$APPDIR/usr/bin/WattSeal" "$@"
+          APPRUN
+          chmod 755 "$appdir/AppRun"
+
+          test -s "$appdir/usr/bin/WattSeal"
+          test -x "$appdir/usr/bin/WattSeal"
+          cmp resources/linux/WattSeal.desktop "$appdir/usr/share/applications/WattSeal.desktop"
+          grep -Fxq 'Exec=AppRun' "$appdir/WattSeal.desktop"
+          desktop-file-validate "$appdir/WattSeal.desktop"
+          test -L "$appdir/WattSeal.desktop"
+          test -L "$appdir/WattSeal.png"
+          test -L "$appdir/.DirIcon"
+          file -L "$appdir/WattSeal.png" | grep -Fq 'PNG image data'
+
+          appimagetool="$RUNNER_TEMP/appimagetool-x86_64.AppImage"
+          curl --fail --location --retry 3 \
+            https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage \
+            --output "$appimagetool"
+          chmod 755 "$appimagetool"
+          image="${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.installer-ext }}"
+          ARCH=x86_64 APPIMAGE_EXTRACT_AND_RUN=1 "$appimagetool" "$appdir" "$image"
+          test -s "$image"
+
+          APPIMAGE_EXTRACT_AND_RUN=1 "./$image" --help >/dev/null
+          integration_data="$RUNNER_TEMP/wattseal-desktop-integration"
+          mkdir -p "$integration_data/applications"
+          desktop-file-install \
+            --dir="$integration_data/applications" \
+            --set-key=Exec \
+            --set-value="\"$PWD/$image\" --help" \
+            "$appdir/WattSeal.desktop"
+          desktop-file-validate "$integration_data/applications/WattSeal.desktop"
+          xvfb-run -a env \
+            APPIMAGE_EXTRACT_AND_RUN=1 \
+            XDG_DATA_HOME="$integration_data" \
+            gtk-launch WattSeal
 
       - name: Package macOS app and disk image
         if: ${{ !inputs.check-only && matrix.os == 'macos-26' }}
@@ -212,7 +274,7 @@ jobs:
           mkdir -p "$dmg_root" "$mountpoint"
           ditto "$app" "$dmg_root/WattSeal.app"
           ln -s /Applications "$dmg_root/Applications"
-          image="${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          image="${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.installer-ext }}"
           hdiutil create -volname WattSeal -srcfolder "$dmg_root" \
             -format UDZO -ov "$image"
           test -s "$image"
@@ -257,14 +319,14 @@ jobs:
           if ($LASTEXITCODE -ne 0) {
             throw "Inno Setup compilation failed with exit code $LASTEXITCODE"
           }
-          $installerDst = "${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          $installerDst = "${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.installer-ext }}"
           Copy-Item "resources\windows\Output\WattSeal-windows.exe" $installerDst
 
       - name: Package
         if: ${{ !inputs.check-only && matrix.binary-dst-base != '' }}
         shell: bash
         run: |
-          FINAL_DST="${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}"
+          FINAL_DST="${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.binary-ext }}"
           cp "${{ matrix.binary-src }}" "$FINAL_DST"
           chmod +x "$FINAL_DST" 2>/dev/null || true
 
@@ -273,11 +335,11 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}
-          path: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
+          path: ${{ matrix.binary-dst-base }}${{ inputs.version-suffix }}${{ matrix.binary-ext }}
 
       - name: Upload installer artifact
         if: ${{ !inputs.check-only && inputs.upload-artifacts && matrix.installer-dst-base != '' }}
         uses: actions/upload-artifact@v7
         with:
           name: ${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}
-          path: ${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.ext }}
+          path: ${{ matrix.installer-dst-base }}${{ inputs.version-suffix }}${{ matrix.installer-ext }}

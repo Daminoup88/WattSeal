@@ -87,5 +87,6 @@ jobs:
           files: |
             WattSeal-windows-portable.exe
             WattSeal-windows.exe
-            WattSeal-linux
+            WattSeal-linux-portable
+            WattSeal-linux.AppImage
             WattSeal-macos.dmg
