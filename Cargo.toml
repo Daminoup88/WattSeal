@@ -21,7 +21,7 @@ resolver = "3"
 members = ["collector", "connectors", "ui", "common"]
 
 [workspace.package]
-version = "1.0.6"
+version = "1.1.0"
 authors = ["Damien PHILIPPE <damien.philippe@edu.esiee.fr>", "Paul MALLARD <paul.mallard@edu.esiee.fr>"]
 readme = "README.md"
 license = "GPL-3.0"

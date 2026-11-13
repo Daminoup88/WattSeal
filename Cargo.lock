@@ -766,7 +766,7 @@ dependencies = [
 
 [[package]]
 name = "collector"
-version = "1.0.6"
+version = "1.1.0"
 dependencies = [
  "adlx",
  "battery",
@@ -798,7 +798,7 @@ dependencies = [
 
 [[package]]
 name = "common"
-version = "1.0.6"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "dirs 7.0.0",
@@ -822,7 +822,7 @@ dependencies = [
 
 [[package]]
 name = "connectors"
-version = "1.0.6"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "common",
@@ -5618,7 +5618,7 @@ dependencies = [
 
 [[package]]
 name = "ui"
-version = "1.0.6"
+version = "1.1.0"
 dependencies = [
  "chrono",
  "common",
@@ -5871,7 +5871,7 @@ dependencies = [
 
 [[package]]
 name = "wattseal"
-version = "1.0.6"
+version = "1.1.0"
 dependencies = [
  "bpaf",
  "chrono",
